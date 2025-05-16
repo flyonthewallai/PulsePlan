@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "Rhythm",
+    "slug": "rhythm",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rhythm.app",
+      "associatedDomains": [
+        "applinks:rhythm.app",
+        "applinks:127.0.0.1:8081"
+      ]
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.rhythm.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "rhythm",
+              "host": "reset-password"
+            },
+            {
+              "scheme": "rhythm",
+              "host": "auth",
+              "pathPrefix": "/callback"
+            },
+            {
+              "scheme": "exp",
+              "host": "127.0.0.1:8081",
+              "pathPrefix": "/--/auth/callback"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff",
+          "image": "./assets/icon.png",
+          "imageWidth": 200
+        }
+      ]
+    ],
+    "scheme": "rhythm",
+    "sdkVersion": "53.0.0"
+  }
+} 
