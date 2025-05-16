@@ -157,7 +157,7 @@ Backend route: `POST /generate_schedule`
 ## 💳 Payments (Stripe)
 
 * Freemium model: 1 week of scheduling free
-* \$3/month to unlock unlimited planning + GPT personalization
+* \$5/month to unlock unlimited planning + GPT personalization
 * Stripe Checkout + webhook integration
 * User plan stored in Supabase via metadata
 
