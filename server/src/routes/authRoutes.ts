@@ -9,6 +9,7 @@ import {
   handleMicrosoftCallback,
   disconnectMicrosoft
 } from '../controllers/microsoftAuthController';
+import { createUserRecord } from '../controllers/authController';
 
 const router = express.Router();
 
@@ -61,5 +62,7 @@ router.get('/microsoft/callback', handleMicrosoftCallback);
  * @access  Private
  */
 router.delete('/microsoft/:userId', disconnectMicrosoft);
+
+router.post('/create-user', createUserRecord);
 
 export default router; 

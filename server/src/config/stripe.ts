@@ -25,7 +25,7 @@ if (!STRIPE_PREMIUM_PRICE_ID) {
 
 // Initialize Stripe client
 const stripe = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16', // Use latest stable API version
+  apiVersion: '2025-04-30.basil', // Use latest stable API version
 });
 
 export default stripe;

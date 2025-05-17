@@ -76,12 +76,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // Re-enable button after a delay
           setTimeout(() => {
-            syncButton.textContent = "Sync to Rhythm";
+            syncButton.textContent = "Sync to PulsePlan";
             syncButton.disabled = true;
           }, 3000);
         } else {
           // Handle errors
-          syncButton.textContent = "Sync to Rhythm";
+          syncButton.textContent = "Sync to PulsePlan";
           syncButton.disabled = false;
           messageElement.textContent = `Error: ${
             response.error || "Unknown error occurred."

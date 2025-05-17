@@ -226,7 +226,7 @@ function storeAssignments(assignments) {
     chrome.storage.local.set({ unsynced_count: unsyncedCount });
 
     console.log(
-      `Rhythm extension: Stored ${assignments.length} new assignments`
+      `PulsePlan extension: Stored ${assignments.length} new assignments`
     );
   });
 }

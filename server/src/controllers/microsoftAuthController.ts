@@ -7,6 +7,10 @@ import supabase from '../config/supabase';
  * Initiates the Microsoft OAuth flow
  */
 export const initiateMicrosoftAuth = async (req: Request, res: Response) => {
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase is not configured on the server.' });
+  }
+
   try {
     const { userId } = req.query;
     
@@ -31,6 +35,10 @@ export const initiateMicrosoftAuth = async (req: Request, res: Response) => {
  * Handles the Microsoft OAuth callback
  */
 export const handleMicrosoftCallback = async (req: Request, res: Response) => {
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase is not configured on the server.' });
+  }
+
   const { code, state, error: authError, error_description } = req.query;
   
   // Handle authentication errors
@@ -55,7 +63,7 @@ export const handleMicrosoftCallback = async (req: Request, res: Response) => {
     }
     
     const accessToken = tokenResponse.accessToken;
-    const refreshToken = tokenResponse.refreshToken;
+    const refreshToken = (tokenResponse as any).refreshToken || (tokenResponse as any).refresh_token;
     const expiresOn = tokenResponse.expiresOn;
     
     if (!refreshToken) {
@@ -108,6 +116,10 @@ export const handleMicrosoftCallback = async (req: Request, res: Response) => {
  * Disconnects Microsoft Calendar
  */
 export const disconnectMicrosoft = async (req: Request, res: Response) => {
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase is not configured on the server.' });
+  }
+
   try {
     const { userId } = req.params;
     

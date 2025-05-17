@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export const Settings = ({
@@ -60,7 +59,7 @@ export const Settings = ({
   }, {
     title: 'Subscription',
     settings: [{
-      name: 'Rhythm Pro',
+      name: 'PulsePlan Pro',
       icon: '⭐',
       highlight: true
     }, {
@@ -82,7 +81,7 @@ export const Settings = ({
           Settings
         </Text>
         <Text style={darkMode ? styles.darkSubtext : styles.lightSubtext}>
-          Customize your Rhythm experience
+          Customize your PulsePlan experience
         </Text>
       </View>
 
@@ -127,7 +126,7 @@ export const Settings = ({
                         <Text style={styles.proBadgeText}>PRO</Text>
                       </View>
                     ) : (
-                      <ChevronRight size={20} color={darkMode ? '#9CA3AF' : '#6B7280'} />
+                      <Ionicons name="chevron-forward" size={20} color={darkMode ? '#9CA3AF' : '#6B7280'} />
                     )}
                   </View>
                 </TouchableOpacity>
@@ -138,8 +137,8 @@ export const Settings = ({
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Rhythm v1.0.0</Text>
-        <Text style={styles.footerText}>© {new Date().getFullYear()} Rhythm App</Text>
+        <Text style={styles.footerText}>PulsePlan v1.0.0</Text>
+        <Text style={styles.footerText}>© {new Date().getFullYear()} PulsePlan App</Text>
       </View>
     </ScrollView>
   );

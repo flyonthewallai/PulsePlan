@@ -1,5 +1,5 @@
 /**
- * upload.js - Handles uploading assignments to the Rhythm API
+ * upload.js - Handles uploading assignments to the PulsePlan API
  * This is a background service worker that processes messages from the popup
  */
 
@@ -11,7 +11,7 @@ const API_ENDPOINT =
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "syncAssignments") {
     // Start the sync process
-    syncAssignmentsToRhythm()
+    syncAssignmentsToPulsePlan()
       .then((result) => {
         sendResponse(result);
       })
@@ -25,10 +25,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 /**
- * Main function to sync assignments to Rhythm
+ * Main function to sync assignments to PulsePlan
  * Gets assignments from storage, authenticates, and sends to the API
  */
-async function syncAssignmentsToRhythm() {
+async function syncAssignmentsToPulsePlan() {
   try {
     // Get the auth token and assignments from storage
     const { rhythm_jwt, canvas_assignments } = await getFromStorage([
@@ -38,7 +38,7 @@ async function syncAssignmentsToRhythm() {
 
     // Check if user is logged in
     if (!rhythm_jwt) {
-      throw new Error("Not logged in. Please log in to Rhythm first.");
+      throw new Error("Not logged in. Please log in to PulsePlan first.");
     }
 
     // Check if we have assignments to sync

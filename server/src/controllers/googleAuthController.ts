@@ -8,6 +8,9 @@ import supabase from '../config/supabase';
  */
 export const initiateGoogleAuth = (req: Request, res: Response) => {
   try {
+    if (!oauth2Client) {
+      return res.status(500).json({ error: 'Google OAuth is not configured on the server.' });
+    }
     const { userId } = req.query;
     
     if (!userId) {
@@ -39,6 +42,14 @@ export const handleGoogleCallback = async (req: Request, res: Response) => {
   
   if (!code || !state) {
     return res.status(400).json({ error: 'Authorization code or state is missing' });
+  }
+  
+  if (!oauth2Client) {
+    return res.status(500).json({ error: 'Google OAuth is not configured on the server.' });
+  }
+  
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase is not configured on the server.' });
   }
   
   try {
@@ -94,6 +105,9 @@ export const handleGoogleCallback = async (req: Request, res: Response) => {
  */
 export const disconnectGoogle = async (req: Request, res: Response) => {
   try {
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase is not configured on the server.' });
+    }
     const { userId } = req.params;
     
     if (!userId) {

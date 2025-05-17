@@ -1,6 +1,6 @@
-# 🎵 Rhythm – AI-Powered Academic Scheduler
+# 🎵 PulsePlan – AI-Powered Academic Scheduler
 
-Rhythm is a mobile-first, AI-powered academic planning assistant that syncs with Canvas, Google Calendar, Apple Calendar (EventKit), and Outlook to generate personalized, adaptive schedules for students. Powered by GPT-4o and real-time data from your academic sources, Rhythm takes the stress out of time management so you can focus on what matters most.
+PulsePlan is a mobile-first, AI-powered academic planning assistant that syncs with Canvas, Google Calendar, Apple Calendar (EventKit), and Outlook to generate personalized, adaptive schedules for students. Powered by GPT-4o and real-time data from your academic sources, PulsePlan takes the stress out of time management so you can focus on what matters most.
 
 > 📱 Let your schedule find its rhythm.
 
@@ -8,13 +8,13 @@ Rhythm is a mobile-first, AI-powered academic planning assistant that syncs with
 
 ## ✨ Features
 
-* 📚 **Canvas Sync** – Automatically imports assignments via a browser extension
-* 🧠 **AI-Powered Scheduling** – Uses GPT-4o to intelligently plan your week
-* ↻ **Real-Time Adjustments** – Reschedules based on missed or completed tasks
-* 🗓️ **Calendar Integration** – Syncs with Google, Outlook, and Apple Calendars
-* ✅ **Task Management** – Mark complete, skip, or reschedule in a single tap
-* 🔒 **Auth Support** – Google Sign-In, Supabase Auth, and session-based security
-* 💸 **Freemium Model** – Free weekly planning; premium unlocks long-term control
+- 📚 **Canvas Sync** – Automatically imports assignments via a browser extension
+- 🧠 **AI-Powered Scheduling** – Uses GPT-4o to intelligently plan your week
+- ↻ **Real-Time Adjustments** – Reschedules based on missed or completed tasks
+- 🗓️ **Calendar Integration** – Syncs with Google, Outlook, and Apple Calendars
+- ✅ **Task Management** – Mark complete, skip, or reschedule in a single tap
+- 🔒 **Auth Support** – Google Sign-In, Supabase Auth, and session-based security
+- 💸 **Freemium Model** – Free weekly planning; premium unlocks long-term control
 
 ---
 
@@ -136,19 +136,19 @@ cd extension
 
 ## 🔐 Authentication
 
-* Sign in with Google (via Supabase OAuth)
-* JWTs are stored and sent with API requests
-* Stripe handles plan-level access via webhooks and user metadata
+- Sign in with Google (via Supabase OAuth)
+- JWTs are stored and sent with API requests
+- Stripe handles plan-level access via webhooks and user metadata
 
 ---
 
 ## 💬 AI Assistant (GPT-4o)
 
-The scheduling logic leverages OpenAI’s GPT-4o:
+The scheduling logic leverages OpenAI's GPT-4o:
 
-* Input: task list, time availability, past behavior
-* Output: structured plan with reasoning
-* Auto-adjusts based on completion history
+- Input: task list, time availability, past behavior
+- Output: structured plan with reasoning
+- Auto-adjusts based on completion history
 
 Backend route: `POST /generate_schedule`
 
@@ -156,23 +156,23 @@ Backend route: `POST /generate_schedule`
 
 ## 💳 Payments (Stripe)
 
-* Freemium model: 1 week of scheduling free
-* \$5/month to unlock unlimited planning + GPT personalization
-* Stripe Checkout + webhook integration
-* User plan stored in Supabase via metadata
+- Freemium model: 1 week of scheduling free
+- \$5/month to unlock unlimited planning + GPT personalization
+- Stripe Checkout + webhook integration
+- User plan stored in Supabase via metadata
 
 ---
 
 ## 🌐 Calendar APIs
 
-* Google: `googleapis` with full OAuth 2.0 flow
-* Outlook: Microsoft Graph API with `msal`
-* Apple Calendar: Local iOS EventKit access via React Native
+- Google: `googleapis` with full OAuth 2.0 flow
+- Outlook: Microsoft Graph API with `msal`
+- Apple Calendar: Local iOS EventKit access via React Native
 
 ---
 
 ## 🧩️ Browser Extension (Canvas Sync)
 
-* Chrome extension scrapes assignments from Canvas dashboard
-* Sends structured JSON to `POST /upload_canvas_data`
-* CU Boulder and other Canvas domains supported via `host_permissions`
+- Chrome extension scrapes assignments from Canvas dashboard
+- Sends structured JSON to `POST /upload_canvas_data`
+- CU Boulder and other Canvas domains supported via `host_permissions`

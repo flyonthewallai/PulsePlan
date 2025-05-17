@@ -7,6 +7,7 @@ import supabase from '../config/supabase';
  * Helper function to get a Microsoft Graph client for a user
  */
 async function getGraphClient(userId: string) {
+  if (!supabase) { throw new Error("Supabase is not configured on the server."); }
   try {
     // Get user's tokens
     const { data, error } = await supabase
@@ -41,7 +42,7 @@ async function getGraphClient(userId: string) {
           .from('calendar_connections')
           .update({
             access_token: tokenResponse.accessToken,
-            refresh_token: tokenResponse.refreshToken || data.refresh_token,
+            refresh_token: (tokenResponse as any).refreshToken || data.refresh_token,
             expires_at: tokenResponse.expiresOn ? new Date(tokenResponse.expiresOn).toISOString() : null
           })
           .eq('id', data.id);

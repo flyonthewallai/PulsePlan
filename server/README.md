@@ -1,6 +1,6 @@
-# Rhythm Calendar API Server
+# PulsePlan Calendar API Server
 
-This is the backend server for the Rhythm app, handling Google Calendar and Microsoft Outlook Calendar OAuth integration and event fetching, as well as intelligent scheduling powered by GPT-4o.
+This is the backend server for the PulsePlan app, handling Google Calendar and Microsoft Outlook Calendar OAuth integration and event fetching, as well as intelligent scheduling powered by GPT-4o.
 
 ## Features
 

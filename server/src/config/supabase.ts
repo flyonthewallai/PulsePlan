@@ -6,11 +6,14 @@ dotenv.config();
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY || '';
 
+// Only warn in development, don't exit
 if (!supabaseUrl || !supabaseKey) {
-  console.error('Supabase URL or key not found in environment variables');
-  process.exit(1);
+  console.warn('Supabase URL or key not found in environment variables. Database features will be disabled.');
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Create Supabase client only if credentials are available
+const supabase = supabaseUrl && supabaseKey
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
 
 export default supabase; 

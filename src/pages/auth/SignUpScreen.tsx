@@ -88,7 +88,7 @@ export const SignUpScreen = () => {
               resizeMode="contain"
             />
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join Rhythm and start your learning journey</Text>
+            <Text style={styles.subtitle}>Join PulsePlan and start your learning journey</Text>
           </View>
           
           <View style={styles.form}>

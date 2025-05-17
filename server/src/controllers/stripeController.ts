@@ -6,6 +6,10 @@ import supabase from '../config/supabase';
  * Create a checkout session for premium subscription
  */
 export const createCheckoutSession = async (req: Request, res: Response) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase is not configured on the server." });
+  }
+
   try {
     const { userId } = req.body;
     
@@ -54,6 +58,13 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
  * Handle Stripe webhook events
  */
 export const handleWebhook = async (req: Request, res: Response) => {
+  if (!STRIPE_WEBHOOK_SECRET) {
+    throw new Error("STRIPE_WEBHOOK_SECRET is not set in environment variables.");
+  }
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase is not configured on the server." });
+  }
+
   const signature = req.headers['stripe-signature'] as string;
 
   if (!signature) {
@@ -139,6 +150,10 @@ export const handleWebhook = async (req: Request, res: Response) => {
  * Get user subscription status
  */
 export const getSubscriptionStatus = async (req: Request, res: Response) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase is not configured on the server." });
+  }
+
   try {
     const { userId } = req.params;
     

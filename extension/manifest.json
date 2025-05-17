@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Rhythm Canvas Sync",
-  "version": "1.0.0",
-  "description": "Sync Canvas LMS assignments to Rhythm",
+  "name": "PulsePlan Canvas Sync",
+  "version": "1.0",
+  "description": "Sync Canvas LMS assignments to PulsePlan",
   "permissions": [
     "activeTab",
     "scripting",

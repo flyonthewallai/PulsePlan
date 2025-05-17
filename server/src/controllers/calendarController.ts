@@ -7,6 +7,7 @@ import supabase from '../config/supabase';
  * Helper function to get a configured OAuth client for a user
  */
 async function getUserOAuthClient(userId: string) {
+  if (!supabase) { throw new Error("Supabase is not configured on the server."); }
   // Get user's tokens
   const { data, error } = await supabase
     .from('calendar_connections')
@@ -128,6 +129,10 @@ export const getConnectionStatus = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
     
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase is not configured on the server' });
+    }
+    
     // Get connection data
     const { data, error } = await supabase
       .from('calendar_connections')
@@ -158,4 +163,19 @@ export const getConnectionStatus = async (req: Request, res: Response) => {
     console.error('Error checking connection status:', error);
     res.status(500).json({ error: 'Failed to check connection status' });
   }
+};
+
+export const getCalendarEvents = async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const { start, end } = req.query;
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase is not configured on the server." });
+  }
+  const { data: connData, error: connError } = await supabase.from("calendar_connections").select("access_token, refresh_token, expires_at, provider").eq("user_id", userId).single();
+  if (connError) { return res.status(500).json({ error: "Failed to fetch calendar connection." }); }
+  if (!connData) { return res.status(404).json({ error: "No calendar connection found." }); }
+  // (Remaining code unchanged) 
+  const { data: evtData, error: evtError } = await supabase.from("calendar_events").select("*").eq("user_id", userId).gte("start", start).lte("end", end);
+  if (evtError) { return res.status(500).json({ error: "Failed to fetch calendar events." }); }
+  res.status(200).json({ events: evtData });
 }; 

@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, getSession, getCurrentUser, resetPassword as supabaseResetPassword } from '../lib/supabase';
+import { API_URL } from '../config/api';
 
 type AuthContextType = {
   user: User | null;
@@ -25,13 +26,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (initialized) return;
     
     try {
-      const { session: currentSession, error: sessionError } = await getSession();
+      const { session: currentSession, error: sessionError } = getSession();
       if (sessionError) throw sessionError;
       
       setSession(currentSession);
       
       if (currentSession) {
-        const { user: currentUser, error: userError } = await getCurrentUser();
+        const { user: currentUser, error: userError } = getCurrentUser();
         if (userError) throw userError;
         setUser(currentUser);
       }

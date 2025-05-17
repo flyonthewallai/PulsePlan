@@ -36,6 +36,22 @@ const getStatusIcon = (status) => {
 };
 
 export const TaskCard = ({ task, onPress, darkMode }) => {
+  // Safely parse due_date
+  let timeString = '-';
+  if (task.due_date) {
+    try {
+      const dateObj = typeof task.due_date === 'string' ? new Date(task.due_date) : task.due_date;
+      if (!isNaN(dateObj.getTime())) {
+        timeString = dateObj.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+      }
+    } catch (e) {
+      // leave timeString as '-'
+    }
+  }
   return (
     <TouchableOpacity 
       style={[
@@ -59,11 +75,7 @@ export const TaskCard = ({ task, onPress, darkMode }) => {
             {task.subject}
           </Text>
           <Text style={[styles.time, darkMode ? styles.darkSubtext : styles.lightSubtext]}>
-            {task.dueDate.toLocaleTimeString('en-US', { 
-              hour: 'numeric', 
-              minute: '2-digit',
-              hour12: true 
-            })}
+            {timeString}
           </Text>
         </View>
       </View>

@@ -6,6 +6,9 @@ import supabase from '../config/supabase';
  * Verifies that the user has a premium subscription
  */
 export const requirePremium = async (req: Request, res: Response, next: NextFunction) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase is not configured on the server." });
+  }
   try {
     // Extract user ID from request
     // This assumes the user ID is passed in the request body, query, or params

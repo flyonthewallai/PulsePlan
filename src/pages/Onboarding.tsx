@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { ArrowRight } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export const Onboarding = ({
   onComplete
@@ -8,23 +8,23 @@ export const Onboarding = ({
   const [step, setStep] = useState(0);
   const [animation, setAnimation] = useState('');
   const steps = [{
-    title: 'Welcome to Rhythm',
+    title: 'Welcome to PulsePlan',
     description: 'Your AI-powered academic scheduling assistant',
     image: 'https://images.unsplash.com/photo-1606327054629-64c8b0fd6e4f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80',
     action: 'Get Started'
   }, {
     title: 'Connect Canvas',
-    description: 'Let Rhythm sync with your Canvas assignments to keep track of due dates',
+    description: 'Let PulsePlan sync with your Canvas assignments to keep track of due dates',
     image: 'https://images.unsplash.com/photo-1606327054629-64c8b0fd6e4f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80',
     action: 'Connect'
   }, {
     title: 'Connect Calendar',
-    description: "Sync your calendar so Rhythm knows when you're available",
+    description: "Sync your calendar so PulsePlan knows when you're available",
     image: 'https://images.unsplash.com/photo-1606327054629-64c8b0fd6e4f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80',
     action: 'Connect'
   }, {
     title: 'Set Preferences',
-    description: 'Tell Rhythm when you prefer to study and how you like to work',
+    description: 'Tell PulsePlan when you prefer to study and how you like to work',
     image: 'https://images.unsplash.com/photo-1606327054629-64c8b0fd6e4f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80',
     action: 'Finish'
   }];
@@ -66,7 +66,7 @@ export const Onboarding = ({
         </View>
         <TouchableOpacity style={styles.button} onPress={nextStep}>
           <Text style={styles.buttonText}>{steps[step].action}</Text>
-          <ArrowRight size={16} color="#0D1B2A" style={styles.buttonIcon} />
+          <Ionicons name="arrow-forward" size={16} color="#0D1B2A" style={styles.buttonIcon} />
         </TouchableOpacity>
       </View>
     </View>
