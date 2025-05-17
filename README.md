@@ -21,7 +21,7 @@ PulsePlan is a mobile-first, AI-powered academic planning assistant that syncs w
 ## 🧱 Architecture
 
 ```
-/rhythm
+/PulsePlan
 🖇️ extension/          # Chrome extension to scrape Canvas assignments
 🖇️ web/                # React Native frontend (Expo)
 🖇️ backend/            # API layer (FastAPI / Supabase functions)
@@ -52,8 +52,8 @@ PulsePlan is a mobile-first, AI-powered academic planning assistant that syncs w
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/flyonthewall-dev/rhythm.git
-cd rhythm
+git clone https://github.com/flyonthewall-dev/pulseplan.git
+cd PulsePlan
 ```
 
 ### 2. Set up environment variables
@@ -96,7 +96,7 @@ supabase db push
 4. Seed the database (optional):
 
 ```bash
-psql -h localhost -U postgres -d rhythm < supabase/seed.sql
+psql -h localhost -U postgres -d pulseplan < supabase/seed.sql
 ```
 
 ---
