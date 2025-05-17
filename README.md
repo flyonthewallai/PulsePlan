@@ -1,6 +1,6 @@
-# 🎵 Rhythm – AI-Powered Academic Scheduler
+# 🎵 PulsePlan – AI-Powered Academic Scheduler
 
-Rhythm is a mobile-first, AI-powered academic planning assistant that syncs with Canvas, Google Calendar, Apple Calendar (EventKit), and Outlook to generate personalized, adaptive schedules for students. Powered by GPT-4o and real-time data from your academic sources, Rhythm takes the stress out of time management so you can focus on what matters most.
+PulsePlan is a mobile-first, AI-powered academic planning assistant that syncs with Canvas, Google Calendar, Apple Calendar (EventKit), and Outlook to generate personalized, adaptive schedules for students. Powered by GPT-4o and real-time data from your academic sources, PulsePlan takes the stress out of time management so you can focus on what matters most.
 
 > 📱 Let your schedule find its rhythm.
 
@@ -21,7 +21,7 @@ Rhythm is a mobile-first, AI-powered academic planning assistant that syncs with
 ## 🧱 Architecture
 
 ```
-/rhythm
+/PulsePlan
 🖇️ extension/          # Chrome extension to scrape Canvas assignments
 🖇️ web/                # React Native frontend (Expo)
 🖇️ backend/            # API layer (FastAPI / Supabase functions)
@@ -52,8 +52,8 @@ Rhythm is a mobile-first, AI-powered academic planning assistant that syncs with
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/flyonthewall-dev/rhythm.git
-cd rhythm
+git clone https://github.com/flyonthewall-dev/pulseplan.git
+cd PulsePlan
 ```
 
 ### 2. Set up environment variables
@@ -96,7 +96,7 @@ supabase db push
 4. Seed the database (optional):
 
 ```bash
-psql -h localhost -U postgres -d rhythm < supabase/seed.sql
+psql -h localhost -U postgres -d pulseplan < supabase/seed.sql
 ```
 
 ---
