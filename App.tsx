@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { 
   View, 
   Text, 
@@ -17,10 +17,12 @@ import { Onboarding } from './src/pages/Onboarding';
 import { Dashboard } from './src/pages/Dashboard';
 import { WeekView } from './src/pages/WeekView';
 import { Settings } from './src/pages/Settings';
-import { Insights } from './src/pages/Insights';
+import { Progress } from './src/pages/Progress';
 import { AIModal } from './src/components/AIModal';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { AuthStack } from './src/navigation/AuthStack';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Deep link configuration
 const linking = {
@@ -33,12 +35,61 @@ const linking = {
   },
 };
 
+// Premium context
+interface PremiumContextType {
+  isPremium: boolean;
+  togglePremium: () => Promise<void>;
+}
+
+const PremiumContext = createContext<PremiumContextType | undefined>(undefined);
+
+export const usePremium = () => {
+  const context = useContext(PremiumContext);
+  if (context === undefined) {
+    throw new Error('usePremium must be used within a PremiumProvider');
+  }
+  return context;
+};
+
+const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isPremium, setIsPremium] = useState(false);
+
+  useEffect(() => {
+    const checkPremiumStatus = async () => {
+      try {
+        const premiumStatus = await AsyncStorage.getItem('isPremiumUser');
+        setIsPremium(premiumStatus === 'true');
+      } catch (error) {
+        console.log('Error loading premium status:', error);
+      }
+    };
+    
+    checkPremiumStatus();
+  }, []);
+
+  const togglePremium = async () => {
+    try {
+      const newStatus = !isPremium;
+      await AsyncStorage.setItem('isPremiumUser', newStatus.toString());
+      setIsPremium(newStatus);
+    } catch (error) {
+      console.log('Error saving premium status:', error);
+    }
+  };
+
+  return (
+    <PremiumContext.Provider value={{ isPremium, togglePremium }}>
+      {children}
+    </PremiumContext.Provider>
+  );
+};
+
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [darkMode, setDarkMode] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const { user, loading } = useAuth();
+  const { theme, darkMode, setDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
 
   // Handle deep links
@@ -71,8 +122,8 @@ function AppContent() {
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color="#00AEEF" />
+      <View style={[styles.container, styles.centerContent, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -107,8 +158,8 @@ function AppContent() {
         return <WeekView onTaskClick={handleTaskClick} darkMode={darkMode} />;
       case 'settings':
         return <Settings darkMode={darkMode} onToggleDarkMode={toggleDarkMode} />;
-      case 'insights':
-        return <Insights darkMode={darkMode} />;
+      case 'progress':
+        return <Progress darkMode={darkMode} />;
       default:
         return <Dashboard onTaskClick={handleTaskClick} darkMode={darkMode} />;
     }
@@ -118,7 +169,7 @@ function AppContent() {
     <View 
       style={[
         styles.container,
-        darkMode ? styles.darkContainer : styles.lightContainer,
+        { backgroundColor: theme.colors.background }
       ]}
     >
       <StatusBar style={darkMode ? 'light' : 'dark'} />
@@ -137,7 +188,10 @@ function AppContent() {
         <View 
           style={[
             styles.navbar,
-            darkMode ? styles.darkNavbar : styles.lightNavbar,
+            { 
+              backgroundColor: theme.colors.cardBackground,
+              borderTopColor: theme.colors.border
+            }
           ]}
         >
           <TouchableOpacity 
@@ -147,12 +201,11 @@ function AppContent() {
             <Ionicons 
               name={currentPage === 'dashboard' ? 'today' : 'today-outline'} 
               size={24} 
-              color={currentPage === 'dashboard' ? '#00AEEF' : darkMode ? '#D1D5DB' : '#6B7280'} 
+              color={currentPage === 'dashboard' ? theme.colors.primary : theme.colors.subtext} 
             />
             <Text style={[
               styles.navText,
-              currentPage === 'dashboard' && styles.activeNav,
-              darkMode ? styles.darkNavText : styles.lightNavText
+              { color: currentPage === 'dashboard' ? theme.colors.primary : theme.colors.subtext }
             ]}>
               Today
             </Text>
@@ -164,31 +217,29 @@ function AppContent() {
             <Ionicons 
               name={currentPage === 'week' ? 'calendar' : 'calendar-outline'} 
               size={24} 
-              color={currentPage === 'week' ? '#00AEEF' : darkMode ? '#D1D5DB' : '#6B7280'} 
+              color={currentPage === 'week' ? theme.colors.primary : theme.colors.subtext} 
             />
             <Text style={[
               styles.navText,
-              currentPage === 'week' && styles.activeNav,
-              darkMode ? styles.darkNavText : styles.lightNavText
+              { color: currentPage === 'week' ? theme.colors.primary : theme.colors.subtext }
             ]}>
               Week
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            onPress={() => handleNavigate('insights')} 
+            onPress={() => handleNavigate('progress')} 
             style={styles.navItem}
           >
             <Ionicons 
-              name={currentPage === 'insights' ? 'stats-chart' : 'stats-chart-outline'} 
+              name={currentPage === 'progress' ? 'stats-chart' : 'stats-chart-outline'} 
               size={24} 
-              color={currentPage === 'insights' ? '#00AEEF' : darkMode ? '#D1D5DB' : '#6B7280'} 
+              color={currentPage === 'progress' ? theme.colors.primary : theme.colors.subtext} 
             />
             <Text style={[
               styles.navText,
-              currentPage === 'insights' && styles.activeNav,
-              darkMode ? styles.darkNavText : styles.lightNavText
+              { color: currentPage === 'progress' ? theme.colors.primary : theme.colors.subtext }
             ]}>
-              Insights
+              Progress
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -198,12 +249,11 @@ function AppContent() {
             <Ionicons 
               name={currentPage === 'settings' ? 'settings' : 'settings-outline'} 
               size={24} 
-              color={currentPage === 'settings' ? '#00AEEF' : darkMode ? '#D1D5DB' : '#6B7280'} 
+              color={currentPage === 'settings' ? theme.colors.primary : theme.colors.subtext} 
             />
             <Text style={[
               styles.navText,
-              currentPage === 'settings' && styles.activeNav,
-              darkMode ? styles.darkNavText : styles.lightNavText
+              { color: currentPage === 'settings' ? theme.colors.primary : theme.colors.subtext }
             ]}>
               Settings
             </Text>
@@ -231,12 +281,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  darkContainer: {
-    backgroundColor: '#0D1B2A',
-  },
-  lightContainer: {
-    backgroundColor: '#F9FAFB',
-  },
   safeArea: {
     flex: 1,
   },
@@ -256,14 +300,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderTopWidth: 1,
   },
-  darkNavbar: {
-    backgroundColor: '#1F2937',
-    borderTopColor: '#374151',
-  },
-  lightNavbar: {
-    backgroundColor: '#FFFFFF',
-    borderTopColor: '#E5E7EB',
-  },
   navItem: {
     alignItems: 'center',
     paddingVertical: 4,
@@ -272,23 +308,20 @@ const styles = StyleSheet.create({
   navText: {
     fontSize: 12,
     marginTop: 4,
-  },
-  activeNav: {
-    color: '#00AEEF',
-  },
-  darkNavText: {
-    color: '#D1D5DB',
-  },
-  lightNavText: {
-    color: '#6B7280',
-  },
+  }
 });
 
 export default function App() {
+  const [darkMode, setDarkMode] = useState(false);
+  
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <AppContent />
+        <PremiumProvider>
+          <ThemeProvider initialDarkMode={darkMode}>
+            <AppContent />
+          </ThemeProvider>
+        </PremiumProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
