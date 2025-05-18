@@ -3,9 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { TaskCard } from '../components/TaskCard';
 import { TaskCreateModal } from '../components/TaskCreateModal';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
 import { API_URL, getApiUrl } from '../config/api';
-import { Ionicons } from '@expo/vector-icons';
 
 // Define task type
 interface Task {
@@ -21,8 +19,7 @@ interface Task {
 // Define the form data type for creating a task
 type TaskFormData = Omit<Task, 'id' | 'user_id'>;
 
-export const Dashboard = ({ onTaskClick }: { onTaskClick: (task: Task) => void }) => {
-  const { theme } = useTheme();
+export const Dashboard = ({ darkMode, onTaskClick }: { darkMode: boolean, onTaskClick: (task: Task) => void }) => {
   const { session } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,128 +98,62 @@ export const Dashboard = ({ onTaskClick }: { onTaskClick: (task: Task) => void }
       <ScrollView
         style={[
           styles.container,
-          { backgroundColor: theme.colors.background }
+          darkMode ? styles.darkContainer : styles.lightContainer
         ]}
         contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <View>
-            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-              Welcome back!
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.colors.subtext }]}>
-              Let's make today productive
-            </Text>
-          </View>
+          <Text style={[styles.headerTitle, darkMode ? styles.darkText : styles.lightText]}>
+            Welcome back!
+          </Text>
+          <Text style={darkMode ? styles.darkSubtext : styles.lightSubtext}>
+            Let's make today productive
+          </Text>
         </View>
 
         <View style={styles.statsContainer}>
           <View style={[
             styles.statsCard,
-            { 
-              backgroundColor: theme.colors.cardBackground,
-            }
+            darkMode ? styles.darkStatsCard : styles.lightStatsCard
           ]}>
             <View style={styles.statsContent}>
               <View>
-                <Text style={[styles.statsValue, { color: theme.colors.text }]}>
+                <Text style={[styles.statsValue, darkMode ? styles.darkText : styles.lightText]}>
                   85%
                 </Text>
-                <Text style={[styles.statsLabel, { color: theme.colors.subtext }]}>
+                <Text style={[styles.statsLabel, darkMode ? styles.darkSubtext : styles.lightSubtext]}>
                   Weekly Progress
                 </Text>
               </View>
-              <View style={[
-                styles.statsIconContainer,
-                { backgroundColor: theme.colors.primary + '15' }
-              ]}>
-                <Ionicons 
-                  name="trending-up" 
-                  size={24} 
-                  color={theme.colors.primary} 
-                />
+              <View style={styles.statsIconContainer}>
+                <View style={styles.statsIconBackground}>
+                  <View style={[
+                    styles.statsIconInner,
+                    darkMode ? styles.darkStatsIconInner : styles.lightStatsIconInner
+                  ]}>
+                    <Text style={styles.statsIconText}>📚</Text>
+                  </View>
+                </View>
               </View>
             </View>
-            <View style={styles.progressBarContainer}>
-              <View style={[
-                styles.progressBar,
-                { backgroundColor: theme.colors.background }
-              ]}>
-                <View 
-                  style={[
-                    styles.progressFill,
-                    { 
-                      backgroundColor: theme.colors.primary,
-                      width: '85%'
-                    }
-                  ]} 
-                />
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Today's Tasks
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.addTaskButton,
-                { backgroundColor: theme.colors.primary }
-              ]}
-              onPress={() => setShowCreateModal(true)}
-            >
-              <Ionicons 
-                name="add" 
-                size={20} 
-                color="#FFFFFF" 
-              />
-              <Text style={styles.addTaskText}>
-                Add Task
-              </Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.tasksList}>
             {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-              </View>
+              <ActivityIndicator size="large" color="#00AEEF" />
             ) : error ? (
-              <View style={styles.errorContainer}>
-                <Ionicons 
-                  name="alert-circle-outline" 
-                  size={24} 
-                  color={theme.colors.error} 
-                />
-                <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                  {error}
-                </Text>
-              </View>
+              <Text style={{ color: 'red', textAlign: 'center' }}>{error}</Text>
             ) : tasks.length === 0 ? (
-              <View style={[
-                styles.emptyState,
-                { backgroundColor: theme.colors.cardBackground }
-              ]}>
-                <Ionicons 
-                  name="document-text-outline" 
-                  size={32} 
-                  color={theme.colors.subtext} 
-                />
-                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-                  No tasks for today
-                </Text>
-                <Text style={[styles.emptyStateSubtext, { color: theme.colors.subtext }]}>
-                  Add a task to get started
-                </Text>
-              </View>
+              <Text style={{ textAlign: 'center', color: darkMode ? '#D1D5DB' : '#6B7280' }}>
+                No tasks for today. Add one!
+              </Text>
             ) : (
               tasks.map(task => (
                 <TaskCard
                   key={task.id}
                   task={task}
                   onPress={() => onTaskClick(task)}
+                  darkMode={darkMode}
                 />
               ))
             )}
@@ -230,38 +161,39 @@ export const Dashboard = ({ onTaskClick }: { onTaskClick: (task: Task) => void }
 
           <View style={[
             styles.quickStatsCard,
-            { 
-              backgroundColor: theme.colors.cardBackground,
-            }
+            darkMode ? styles.darkQuickStatsCard : styles.lightQuickStatsCard
           ]}>
             <View style={styles.quickStatsHeader}>
               <View>
-                <Text style={[styles.quickStatsTitle, { color: theme.colors.text }]}>
+                <Text style={[styles.quickStatsTitle, darkMode ? styles.darkText : styles.lightText]}>
                   Quick Stats
                 </Text>
-                <Text style={[styles.quickStatsSubtitle, { color: theme.colors.subtext }]}>
+                <Text style={[styles.quickStatsSubtitle, darkMode ? styles.darkSubtext : styles.lightSubtext]}>
                   Your study overview
                 </Text>
               </View>
               <TouchableOpacity
-                style={[
-                  styles.quickStatsButton,
-                  { backgroundColor: theme.colors.primary }
-                ]}
+                style={styles.quickStatsButton}
                 onPress={() => {/* Handle view all */}}
               >
                 <Text style={styles.quickStatsButtonText}>View All</Text>
-                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </ScrollView>
+      <TouchableOpacity
+        style={[styles.fab, darkMode ? styles.darkFab : styles.lightFab]}
+        onPress={() => setShowCreateModal(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
       <TaskCreateModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreate={createTask}
-        theme={theme}
+        darkMode={darkMode}
       />
     </View>
   );
@@ -273,126 +205,108 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 80,
+  },
+  darkContainer: {
+    backgroundColor: '#0D1B2A',
+  },
+  lightContainer: {
+    backgroundColor: '#F9FAFB',
   },
   header: {
     marginBottom: 24,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 4,
-    letterSpacing: 0.3,
   },
-  headerSubtitle: {
-    fontSize: 16,
-    letterSpacing: 0.2,
+  darkText: {
+    color: '#FFFFFF',
+  },
+  lightText: {
+    color: '#0D1B2A',
+  },
+  darkSubtext: {
+    color: '#D1D5DB',
+  },
+  lightSubtext: {
+    color: '#6B7280',
   },
   statsContainer: {
-    gap: 24,
+    gap: 16,
   },
   statsCard: {
-    borderRadius: 20,
-    padding: 20,
+    height: 96,
+    borderRadius: 12,
+    padding: 16,
+  },
+  darkStatsCard: {
+    backgroundColor: 'rgba(0, 174, 239, 0.2)',
+  },
+  lightStatsCard: {
+    backgroundColor: 'rgba(0, 174, 239, 0.1)',
   },
   statsContent: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
   },
   statsValue: {
     fontSize: 32,
     fontWeight: 'bold',
-    letterSpacing: 0.5,
+    marginBottom: 4,
   },
   statsLabel: {
-    fontSize: 15,
-    letterSpacing: 0.2,
+    fontSize: 14,
   },
   statsIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(0, 174, 239, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsIconBackground: {
     width: 48,
     height: 48,
     borderRadius: 24,
+  },
+  statsIconInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    margin: 8,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  progressBarContainer: {
-    marginTop: 8,
+  darkStatsIconInner: {
+    backgroundColor: '#0D1B2A',
   },
-  progressBar: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
+  lightStatsIconInner: {
+    backgroundColor: '#FFFFFF',
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  addTaskButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 4,
-    shadowColor: '#00AEEF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  addTaskText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+  statsIconText: {
+    fontSize: 16,
   },
   tasksList: {
-    gap: 12,
-  },
-  loadingContainer: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  errorContainer: {
-    padding: 32,
-    alignItems: 'center',
     gap: 8,
   },
-  errorText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  emptyState: {
-    padding: 32,
-    borderRadius: 20,
-    alignItems: 'center',
-    gap: 12,
-  },
-  emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    letterSpacing: 0.2,
-  },
   quickStatsCard: {
-    borderRadius: 20,
-    padding: 20,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  darkQuickStatsCard: {
+    backgroundColor: '#1F2937',
+  },
+  lightQuickStatsCard: {
+    backgroundColor: '#FFFFFF',
   },
   quickStatsHeader: {
     flexDirection: 'row',
@@ -400,27 +314,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   quickStatsTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 2,
   },
   quickStatsSubtitle: {
-    fontSize: 14,
-    letterSpacing: 0.2,
+    fontSize: 12,
   },
   quickStatsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#00AEEF',
   },
   quickStatsButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  fab: {
+    position: 'absolute',
+    right: 24,
+    bottom: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    zIndex: 10,
+  },
+  fabText: {
+    fontSize: 32,
+    color: '#fff',
+    fontWeight: 'bold',
+    marginTop: -2,
+  },
+  darkFab: {
+    backgroundColor: '#00AEEF',
+  },
+  lightFab: {
+    backgroundColor: '#00AEEF',
   },
 });

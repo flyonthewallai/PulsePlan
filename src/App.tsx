@@ -21,8 +21,6 @@ import { Insights } from './pages/Insights';
 import { AIModal } from './components/AIModal';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthStack } from './navigation/AuthStack';
-import { TaskCreateModal } from './components/TaskCreateModal';
-import { useTheme } from '@react-navigation/native';
 
 // Deep link configuration
 const linking = {
@@ -42,8 +40,6 @@ function AppContent() {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const { user, loading } = useAuth();
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
-  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Handle deep links
   useEffect(() => {
@@ -110,10 +106,6 @@ function AppContent() {
     setDarkMode(!darkMode);
   };
 
-  const createTask = (task: any) => {
-    // Implementation of createTask function
-  };
-
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'dashboard':
@@ -160,7 +152,7 @@ function AppContent() {
             style={styles.navItem}
           >
             <Ionicons 
-              name={currentPage === 'dashboard' ? 'grid' : 'grid-outline'} 
+              name={currentPage === 'dashboard' ? 'today' : 'today-outline'} 
               size={24} 
               color={currentPage === 'dashboard' ? '#00AEEF' : darkMode ? '#D1D5DB' : '#6B7280'} 
             />
@@ -169,7 +161,7 @@ function AppContent() {
               currentPage === 'dashboard' && styles.activeNav,
               darkMode ? styles.darkNavText : styles.lightNavText
             ]}>
-              Home
+              Today
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -177,7 +169,7 @@ function AppContent() {
             style={styles.navItem}
           >
             <Ionicons 
-              name={currentPage === 'week' ? 'time' : 'time-outline'} 
+              name={currentPage === 'week' ? 'calendar' : 'calendar-outline'} 
               size={24} 
               color={currentPage === 'week' ? '#00AEEF' : darkMode ? '#D1D5DB' : '#6B7280'} 
             />
@@ -190,28 +182,11 @@ function AppContent() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            onPress={() => handleNavigate('insights')} 
-            style={styles.navItem}
-          >
-            <Ionicons 
-              name={currentPage === 'insights' ? 'analytics' : 'analytics-outline'} 
-              size={24} 
-              color={currentPage === 'insights' ? '#00AEEF' : darkMode ? '#D1D5DB' : '#6B7280'} 
-            />
-            <Text style={[
-              styles.navText,
-              currentPage === 'insights' && styles.activeNav,
-              darkMode ? styles.darkNavText : styles.lightNavText
-            ]}>
-              Insights
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
             onPress={() => handleNavigate('settings')} 
             style={styles.navItem}
           >
             <Ionicons 
-              name={currentPage === 'settings' ? 'settings-outline' : 'settings-outline'} 
+              name={currentPage === 'settings' ? 'settings' : 'settings-outline'} 
               size={24} 
               color={currentPage === 'settings' ? '#00AEEF' : darkMode ? '#D1D5DB' : '#6B7280'} 
             />
@@ -237,12 +212,6 @@ function AppContent() {
           darkMode={darkMode}
         />
       )}
-      <TaskCreateModal
-        visible={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onCreate={createTask}
-        theme={theme}
-      />
     </View>
   );
 }
@@ -276,11 +245,6 @@ const styles = StyleSheet.create({
   },
   navbarContainer: {
     backgroundColor: 'transparent',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   lightContainer: {
     backgroundColor: '#F9FAFB',
@@ -292,38 +256,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
   lightNavbar: {
     backgroundColor: '#FFFFFF',
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
   darkNavbar: {
     backgroundColor: '#1F2937',
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   navItem: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1,
     paddingVertical: 8,
-    borderRadius: 12,
-    marginHorizontal: 4,
   },
   navText: {
     fontSize: 12,
-    marginTop: 4,
     fontWeight: '500',
+    marginTop: 4,
   },
-  activeNav: {
-    color: '#00AEEF',
+  lightNavText: {
+    color: '#6B7280',
   },
   darkNavText: {
     color: '#D1D5DB',
   },
-  lightNavText: {
-    color: '#6B7280',
+  activeNav: {
+    color: '#00AEEF',
   },
 });

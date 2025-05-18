@@ -1,15 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { TaskCard } from '../components/TaskCard';
-import { useTheme } from '../contexts/ThemeContext';
-import { Ionicons } from '@expo/vector-icons';
 
 export const WeekView = ({
-  onTaskClick
+  onTaskClick,
+  darkMode
 }) => {
-  const { theme } = useTheme();
   const [selectedDay, setSelectedDay] = useState(new Date());
-  const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() - date.getDay() + i);
@@ -18,24 +15,6 @@ export const WeekView = ({
 
   const isSelected = (day) => {
     return day.toDateString() === selectedDay.toDateString();
-  };
-
-  const handleDayPress = (day) => {
-    Animated.sequence([
-      Animated.spring(scaleAnim, {
-        toValue: 0.95,
-        useNativeDriver: true,
-        speed: 50,
-        bounciness: 4
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 50,
-        bounciness: 4
-      })
-    ]).start();
-    setSelectedDay(day);
   };
 
   const mockTasks = [
@@ -62,133 +41,68 @@ export const WeekView = ({
     <ScrollView 
       style={[
         styles.container,
-        { backgroundColor: theme.colors.background }
+        darkMode ? styles.darkContainer : styles.lightContainer
       ]}
       contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Week View
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.colors.subtext }]}>
-            Plan your week ahead
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.calendarButton,
-            { backgroundColor: theme.colors.cardBackground }
-          ]}
-          onPress={() => {/* Handle calendar */}}
-        >
-          <Ionicons name="calendar-outline" size={24} color={theme.colors.text} />
-        </TouchableOpacity>
+        <Text style={[styles.headerTitle, darkMode ? styles.darkText : styles.lightText]}>
+          Week View
+        </Text>
+        <Text style={darkMode ? styles.darkSubtext : styles.lightSubtext}>
+          Plan your week ahead
+        </Text>
       </View>
 
-      <Animated.View 
-        style={[
-          styles.daysContainer,
-          { transform: [{ scale: scaleAnim }] }
-        ]}
-      >
+      <View style={styles.daysContainer}>
         {days.map((day, index) => (
           <TouchableOpacity
             key={index}
             style={[
               styles.dayButton,
-              isSelected(day) && { 
-                backgroundColor: theme.colors.primary,
-                shadowColor: theme.colors.primary,
-                shadowOpacity: 0.3,
-              }
+              isSelected(day) && styles.selectedDay
             ]}
-            onPress={() => handleDayPress(day)}
-            activeOpacity={0.9}
+            onPress={() => setSelectedDay(day)}
           >
             <Text style={[
               styles.dayName,
-              { 
-                color: isSelected(day) ? '#FFFFFF' : theme.colors.text,
-                opacity: isSelected(day) ? 1 : 0.7
-              }
+              isSelected(day) ? styles.selectedDayText : (darkMode ? styles.darkText : styles.lightText)
             ]}>
               {day.toLocaleDateString('en-US', { weekday: 'short' })}
             </Text>
             <Text style={[
               styles.dayNumber,
-              { 
-                color: isSelected(day) ? '#FFFFFF' : theme.colors.text,
-                opacity: isSelected(day) ? 1 : 0.9
-              }
+              isSelected(day) ? styles.selectedDayText : (darkMode ? styles.darkText : styles.lightText)
             ]}>
               {day.getDate()}
             </Text>
             {isSelected(day) && (
-              <View style={[
-                styles.selectedIndicator,
-                { backgroundColor: '#FFFFFF' }
-              ]} />
+              <View style={styles.selectedIndicator} />
             )}
           </TouchableOpacity>
         ))}
-      </Animated.View>
+      </View>
 
       {days.findIndex(day => isSelected(day)) > 1 && (
         <View style={[
           styles.suggestionContainer,
-          { 
-            backgroundColor: theme.colors.cardBackground,
-            borderColor: theme.colors.primary + '30',
-            shadowColor: theme.colors.text,
-            shadowOpacity: 0.1,
-          }
+          darkMode ? styles.darkSuggestionContainer : styles.lightSuggestionContainer
         ]}>
           <View style={styles.suggestionContent}>
-            <View style={[
-              styles.suggestionIconContainer,
-              { backgroundColor: theme.colors.primary + '15' }
-            ]}>
-              <Ionicons 
-                name="bulb-outline" 
-                size={20} 
-                color={theme.colors.primary} 
-              />
+            <View style={styles.suggestionIconContainer}>
+              <Text style={styles.suggestionIcon}>💡</Text>
             </View>
             <View style={styles.suggestionTextContainer}>
-              <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>
+              <Text style={[styles.suggestionTitle, darkMode ? styles.darkText : styles.lightText]}>
                 Plan Ahead
               </Text>
-              <Text style={[styles.suggestionText, { color: theme.colors.subtext }]}>
+              <Text style={darkMode ? styles.darkSubtext : styles.lightSubtext}>
                 Consider scheduling tasks for later in the week
               </Text>
             </View>
           </View>
         </View>
       )}
-
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          {selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        </Text>
-        <TouchableOpacity
-          style={[
-            styles.addTaskButton,
-            { backgroundColor: theme.colors.primary + '15' }
-          ]}
-          onPress={() => {/* Handle add task */}}
-        >
-          <Ionicons 
-            name="add" 
-            size={20} 
-            color={theme.colors.primary} 
-          />
-          <Text style={[styles.addTaskText, { color: theme.colors.primary }]}>
-            Add Task
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       <View style={styles.tasksContainer}>
         {mockTasks.length > 0 ? (
@@ -198,28 +112,20 @@ export const WeekView = ({
                 key={task.id}
                 task={task}
                 onPress={() => onTaskClick(task)}
+                darkMode={darkMode}
               />
             ))}
           </View>
         ) : (
           <View style={[
             styles.emptyState,
-            { 
-              backgroundColor: theme.colors.cardBackground,
-              shadowColor: theme.colors.text,
-              shadowOpacity: 0.1,
-            }
+            darkMode ? styles.darkEmptyState : styles.lightEmptyState
           ]}>
-            <Ionicons 
-              name="calendar-outline" 
-              size={32} 
-              color={theme.colors.subtext} 
-            />
-            <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-              No tasks scheduled
+            <Text style={[styles.emptyStateText, darkMode ? styles.darkSubtext : styles.lightSubtext]}>
+              No tasks scheduled for this day
             </Text>
-            <Text style={[styles.emptyStateSubtext, { color: theme.colors.subtext }]}>
-              Add tasks to plan your day
+            <Text style={[styles.emptyStateSubtext, darkMode ? styles.darkSubtext : styles.lightSubtext]}>
+              Add tasks to get started
             </Text>
           </View>
         )}
@@ -234,147 +140,128 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 80,
+  },
+  darkContainer: {
+    backgroundColor: '#0D1B2A',
+  },
+  lightContainer: {
+    backgroundColor: '#F9FAFB',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 24,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 4,
-    letterSpacing: 0.3,
   },
-  headerSubtitle: {
-    fontSize: 16,
-    letterSpacing: 0.2,
+  darkText: {
+    color: '#FFFFFF',
   },
-  calendarButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 3,
+  lightText: {
+    color: '#0D1B2A',
+  },
+  darkSubtext: {
+    color: '#D1D5DB',
+  },
+  lightSubtext: {
+    color: '#6B7280',
   },
   daysContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 24,
-    paddingHorizontal: 4,
   },
   dayButton: {
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 16,
-    minWidth: 48,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 3,
+    padding: 8,
+    borderRadius: 8,
+  },
+  selectedDay: {
+    backgroundColor: '#00AEEF',
   },
   dayName: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
     marginBottom: 4,
-    letterSpacing: 0.2,
   },
   dayNumber: {
     fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontWeight: '500',
+  },
+  selectedDayText: {
+    color: '#FFFFFF',
   },
   selectedIndicator: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    marginTop: 6,
+    backgroundColor: '#00AEEF',
+    marginTop: 4,
   },
   suggestionContainer: {
     marginBottom: 24,
-    padding: 16,
-    borderRadius: 20,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
     borderStyle: 'dashed',
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 4,
+  },
+  darkSuggestionContainer: {
+    backgroundColor: '#1F2937',
+    borderColor: '#374151',
+  },
+  lightSuggestionContainer: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
   },
   suggestionContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   suggestionIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(201, 201, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+  },
+  suggestionIcon: {
+    fontSize: 16,
   },
   suggestionTextContainer: {
     flex: 1,
   },
   suggestionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     marginBottom: 2,
-    letterSpacing: 0.2,
-  },
-  suggestionText: {
-    fontSize: 14,
-    letterSpacing: 0.2,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  addTaskButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 4,
-  },
-  addTaskText: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.2,
   },
   tasksContainer: {
     flex: 1,
   },
   taskList: {
-    gap: 12,
+    gap: 8,
   },
   emptyState: {
-    padding: 32,
-    borderRadius: 20,
+    padding: 24,
+    borderRadius: 12,
     alignItems: 'center',
-    gap: 12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 4,
+    justifyContent: 'center',
+  },
+  darkEmptyState: {
+    backgroundColor: '#1F2937',
+  },
+  lightEmptyState: {
+    backgroundColor: '#FFFFFF',
   },
   emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600',
-    letterSpacing: 0.3,
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
   },
   emptyStateSubtext: {
     fontSize: 14,
-    letterSpacing: 0.2,
   },
 });

@@ -1,7 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { useTheme } from '../contexts/ThemeContext';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 const getSubjectColor = (subject) => {
   const colors = {
@@ -29,18 +27,15 @@ const getPriorityColor = (priority) => {
 
 const getStatusIcon = (status) => {
   const icons = {
-    'pending': 'time-outline',
-    'in_progress': 'sync-outline',
-    'completed': 'checkmark-circle-outline',
-    'default': 'document-text-outline'
+    'pending': '⏳',
+    'in_progress': '🔄',
+    'completed': '✅',
+    'default': '📝'
   };
   return icons[status] || icons.default;
 };
 
-export const TaskCard = ({ task, onPress }) => {
-  const { theme } = useTheme();
-  const scaleAnim = React.useRef(new Animated.Value(1)).current;
-  
+export const TaskCard = ({ task, onPress, darkMode }) => {
   // Safely parse due_date
   let timeString = '-';
   if (task.due_date) {
@@ -57,178 +52,101 @@ export const TaskCard = ({ task, onPress }) => {
       // leave timeString as '-'
     }
   }
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 4
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 4
-    }).start();
-  };
-
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity 
-        style={[
-          styles.container,
-          { 
-            backgroundColor: theme.colors.cardBackground,
-            borderLeftColor: getSubjectColor(task.subject),
-            borderLeftWidth: 4,
-            shadowColor: theme.colors.text,
-            shadowOpacity: 0.1,
-          }
-        ]}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={0.9}
-      >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={styles.titleContainer}>
-              <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
-                {task.title}
-              </Text>
-              <View style={[
-                styles.priorityBadge,
-                { backgroundColor: getPriorityColor(task.priority) + '15' }
-              ]}>
-                <Text style={[
-                  styles.priorityText,
-                  { color: getPriorityColor(task.priority) }
-                ]}>
-                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                </Text>
-              </View>
-            </View>
-            <View style={[
-              styles.statusContainer,
-              { backgroundColor: theme.colors.background + '80' }
-            ]}>
-              <Ionicons 
-                name={getStatusIcon(task.status)} 
-                size={20} 
-                color={theme.colors.text} 
-              />
-            </View>
-          </View>
-          
-          <View style={styles.footer}>
-            <View style={styles.subjectContainer}>
-              <Ionicons 
-                name="book-outline" 
-                size={14} 
-                color={theme.colors.subtext} 
-                style={styles.subjectIcon}
-              />
-              <Text style={[styles.subject, { color: theme.colors.subtext }]} numberOfLines={1}>
-                {task.subject}
-              </Text>
-            </View>
-            <View style={styles.timeContainer}>
-              <Ionicons 
-                name="time-outline" 
-                size={14} 
-                color={theme.colors.subtext} 
-                style={styles.timeIcon}
-              />
-              <Text style={[styles.time, { color: theme.colors.subtext }]}>
-                {timeString}
-              </Text>
-            </View>
-          </View>
+    <TouchableOpacity 
+      style={[
+        styles.container,
+        darkMode ? styles.darkContainer : styles.lightContainer
+      ]}
+      onPress={onPress}
+    >
+      <View style={[styles.subjectIndicator, { backgroundColor: getSubjectColor(task.subject) }]} />
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={[styles.title, darkMode ? styles.darkText : styles.lightText]}>
+            {task.title}
+          </Text>
+          <Text style={[styles.status, { color: getPriorityColor(task.priority) }]}>
+            {getStatusIcon(task.status)}
+          </Text>
         </View>
-      </TouchableOpacity>
-    </Animated.View>
+        <View style={styles.footer}>
+          <Text style={[styles.subject, darkMode ? styles.darkSubtext : styles.lightSubtext]}>
+            {task.subject}
+          </Text>
+          <Text style={[styles.time, darkMode ? styles.darkSubtext : styles.lightSubtext]}>
+            {timeString}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
     marginBottom: 12,
-    borderRadius: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 3,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  darkContainer: {
+    backgroundColor: '#1F2937',
+  },
+  lightContainer: {
+    backgroundColor: '#FFFFFF',
+  },
+  subjectIndicator: {
+    width: 4,
+    height: 48,
+    borderRadius: 2,
+    marginRight: 12,
   },
   content: {
-    padding: 16,
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  titleContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 12,
-    gap: 8,
   },
   title: {
     flex: 1,
     fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontWeight: '500',
+    marginRight: 8,
   },
-  priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  priorityText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  statusContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+  status: {
+    fontSize: 16,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  subjectContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 12,
-  },
-  subjectIcon: {
-    marginRight: 4,
+    marginTop: 4,
   },
   subject: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  timeIcon: {
-    marginRight: 4,
+    fontSize: 14,
   },
   time: {
-    fontSize: 13,
-    fontWeight: '500',
-  }
+    fontSize: 14,
+  },
+  darkText: {
+    color: '#FFFFFF',
+  },
+  lightText: {
+    color: '#0D1B2A',
+  },
+  darkSubtext: {
+    color: '#D1D5DB',
+  },
+  lightSubtext: {
+    color: '#6B7280',
+  },
 });
