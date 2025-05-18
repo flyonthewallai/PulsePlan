@@ -1,4 +1,4 @@
-# 🎵 PulsePlan – AI-Powered Academic Scheduler
+# 📆 PulsePlan – AI-Powered Academic Scheduler
 
 PulsePlan is a mobile-first, AI-powered academic planning assistant that syncs with Canvas, Google Calendar, Apple Calendar (EventKit), and Outlook to generate personalized, adaptive schedules for students. Powered by GPT-4o and real-time data from your academic sources, PulsePlan takes the stress out of time management so you can focus on what matters most.
 
