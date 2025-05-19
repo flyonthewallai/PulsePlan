@@ -1,93 +1,115 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, Session, User } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
+import { EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY } from '@env';
+
+// Debug: Log environment variables
+console.log('Environment variables:', {
+  fromEnv: {
+    supabaseUrl: EXPO_PUBLIC_SUPABASE_URL,
+    supabaseAnonKey: EXPO_PUBLIC_SUPABASE_ANON_KEY,
+  }
+});
 
 // Initialize Supabase client
-const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase credentials:', { supabaseUrl, supabaseAnonKey });
   throw new Error('Missing Supabase URL or Anon Key. Please check your environment variables.');
 }
 
 // Create a single instance of the Supabase client
-let supabaseInstance: ReturnType<typeof createClient> | null = null;
+let supabaseInstance: SupabaseClient | null = null;
 
-export const getSupabaseClient = () => {
+export const getSupabaseClient = (): SupabaseClient => {
   if (!supabaseInstance) {
-    console.log('Creating new Supabase client instance...');
-    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        storage: AsyncStorage,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: false,
-      },
-      // Add React Native specific headers
-      headers: {
-        'X-Client-Info': 'supabase-js-react-native',
-      },
-    });
-    
-    // Debug: Log available auth methods
-    console.log('Supabase auth methods:', Object.keys(supabaseInstance.auth));
+    try {
+      console.log('Attempting to create Supabase client with URL:', supabaseUrl);
+      supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+        // @ts-expect-error: 'auth' is valid in v1 but not in v2 types
+        auth: {
+          storage: AsyncStorage,
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: false,
+        },
+      });
+      
+      // Test the connection
+      void (async () => {
+        try {
+          await supabaseInstance?.from('_test_connection').select('*').limit(1);
+          console.log('Successfully connected to Supabase');
+        } catch (error: unknown) {
+          console.error('Supabase connection test failed:', {
+            error,
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            errorDetails: (error as any)?.details,
+            errorHint: (error as any)?.hint,
+            statusCode: (error as any)?.code
+          });
+        }
+      })();
+    } catch (error: unknown) {
+      console.error('Error creating Supabase client:', {
+        error,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        supabaseUrl,
+        hasAnonKey: !!supabaseAnonKey
+      });
+      throw error;
+    }
   }
   return supabaseInstance;
 };
 
 export const supabase = getSupabaseClient();
 
-// Debug: Log the actual client instance
-console.log('Supabase client instance:', {
-  hasAuth: !!supabase.auth,
-  authMethods: supabase.auth ? Object.keys(supabase.auth) : [],
-  version: supabase.supabaseUrl ? 'v1.x' : 'unknown'
-});
-
 // Auth helper functions
-export const signUp = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signUp({
+export const signUp = async (email: string, password: string): Promise<{ user: User | null; session: Session | null; error: any }> => {
+  const { user, session, error } = await supabase.auth.signUp({
     email,
     password,
   });
-  return { data, error };
+  return { user, session, error };
 };
 
-export const signIn = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signIn({
+export const signIn = async (email: string, password: string): Promise<{ user: User | null; session: Session | null; error: any }> => {
+  const { user, session, error } = await supabase.auth.signIn({
     email,
     password,
   });
-  return { data, error };
+  return { user, session, error };
 };
 
-export const signOut = async () => {
+export const signOut = async (): Promise<{ error: any }> => {
   const { error } = await supabase.auth.signOut();
   return { error };
 };
 
-export const resetPassword = async (email: string) => {
-  console.log('Attempting password reset with email:', email);
+export const resetPassword = async (email: string): Promise<{ data: any; error: any }> => {
   // Use a deep link URL that will open your app
   const redirectTo = 'rhythm://reset-password';
   const { data, error } = await supabase.auth.api.resetPasswordForEmail(email, { redirectTo });
   return { data, error };
 };
 
-export const updatePassword = async (newPassword: string) => {
-  const { data, error } = await supabase.auth.update({
+export const updatePassword = async (newPassword: string): Promise<{ user: User | null; error: any }> => {
+  const { user, error } = await supabase.auth.update({
     password: newPassword,
   });
-  return { data, error };
+  return { user, error };
 };
 
-export const getCurrentUser = () => {
+export const getCurrentUser = (): { user: User | null; error: null } => {
   const user = supabase.auth.user();
   return { user, error: null };
 };
 
-export const getSession = () => {
+export const getSession = (): { session: Session | null; error: null } => {
   const session = supabase.auth.session();
   return { session, error: null };
 }; 

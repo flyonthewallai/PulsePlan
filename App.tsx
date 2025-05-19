@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -23,6 +23,9 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { AuthStack } from './src/navigation/AuthStack';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PremiumProvider } from './src/contexts/PremiumContext';
+import { ProfileProvider } from './src/contexts/ProfileContext';
+import { TaskProvider } from './src/contexts/TaskContext';
 
 // Deep link configuration
 const linking = {
@@ -33,55 +36,6 @@ const linking = {
       AuthCallback: 'auth/callback',
     },
   },
-};
-
-// Premium context
-interface PremiumContextType {
-  isPremium: boolean;
-  togglePremium: () => Promise<void>;
-}
-
-const PremiumContext = createContext<PremiumContextType | undefined>(undefined);
-
-export const usePremium = () => {
-  const context = useContext(PremiumContext);
-  if (context === undefined) {
-    throw new Error('usePremium must be used within a PremiumProvider');
-  }
-  return context;
-};
-
-const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isPremium, setIsPremium] = useState(false);
-
-  useEffect(() => {
-    const checkPremiumStatus = async () => {
-      try {
-        const premiumStatus = await AsyncStorage.getItem('isPremiumUser');
-        setIsPremium(premiumStatus === 'true');
-      } catch (error) {
-        console.log('Error loading premium status:', error);
-      }
-    };
-    
-    checkPremiumStatus();
-  }, []);
-
-  const togglePremium = async () => {
-    try {
-      const newStatus = !isPremium;
-      await AsyncStorage.setItem('isPremiumUser', newStatus.toString());
-      setIsPremium(newStatus);
-    } catch (error) {
-      console.log('Error saving premium status:', error);
-    }
-  };
-
-  return (
-    <PremiumContext.Provider value={{ isPremium, togglePremium }}>
-      {children}
-    </PremiumContext.Provider>
-  );
 };
 
 function AppContent() {
@@ -130,11 +84,7 @@ function AppContent() {
 
   // Show auth screens if user is not authenticated
   if (!user) {
-    return (
-      <NavigationContainer linking={linking}>
-        <AuthStack />
-      </NavigationContainer>
-    );
+    return <AuthStack />;
   }
 
   const handleNavigate = (page: string) => {
@@ -153,15 +103,15 @@ function AppContent() {
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard onTaskClick={handleTaskClick} darkMode={darkMode} />;
+        return <Dashboard onTaskClick={handleTaskClick} />;
       case 'week':
-        return <WeekView onTaskClick={handleTaskClick} darkMode={darkMode} />;
+        return <WeekView onTaskClick={handleTaskClick} />;
       case 'settings':
-        return <Settings darkMode={darkMode} onToggleDarkMode={toggleDarkMode} />;
+        return <Settings onToggleDarkMode={toggleDarkMode} />;
       case 'progress':
-        return <Progress darkMode={darkMode} />;
+        return <Progress />;
       default:
-        return <Dashboard onTaskClick={handleTaskClick} darkMode={darkMode} />;
+        return <Dashboard onTaskClick={handleTaskClick} />;
     }
   };
 
@@ -169,97 +119,114 @@ function AppContent() {
     <View 
       style={[
         styles.container,
-        { backgroundColor: theme.colors.background }
+        { backgroundColor: theme.colors.cardBackground }
       ]}
     >
-      <StatusBar style={darkMode ? 'light' : 'dark'} />
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardAvoidingView}
-        >
-          <View style={styles.content}>
-            {renderCurrentPage()}
-          </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+      <View 
+        style={[
+          styles.innerContainer,
+          { backgroundColor: theme.colors.background }
+        ]}
+      >
+        <StatusBar style={darkMode ? 'light' : 'dark'} />
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardAvoidingView}
+          >
+            <View style={styles.content}>
+              {renderCurrentPage()}
+            </View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </View>
 
-      <SafeAreaView style={styles.navbarContainer} edges={['bottom']}>
-        <View 
-          style={[
-            styles.navbar,
-            { 
-              backgroundColor: theme.colors.cardBackground,
-              borderTopColor: theme.colors.border
-            }
-          ]}
+      <View 
+        style={[
+          styles.navbarContainer,
+          { backgroundColor: theme.colors.cardBackground }
+        ]}
+      >
+        <SafeAreaView 
+          edges={['bottom']}
+          style={{ backgroundColor: theme.colors.cardBackground }}
         >
-          <TouchableOpacity 
-            onPress={() => handleNavigate('dashboard')} 
-            style={styles.navItem}
+          <View 
+            style={[
+              styles.navbar,
+              { 
+                backgroundColor: theme.colors.cardBackground,
+                borderTopColor: theme.colors.border
+              }
+            ]}
           >
-            <Ionicons 
-              name={currentPage === 'dashboard' ? 'today' : 'today-outline'} 
-              size={24} 
-              color={currentPage === 'dashboard' ? theme.colors.primary : theme.colors.subtext} 
-            />
-            <Text style={[
-              styles.navText,
-              { color: currentPage === 'dashboard' ? theme.colors.primary : theme.colors.subtext }
-            ]}>
-              Today
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={() => handleNavigate('week')} 
-            style={styles.navItem}
-          >
-            <Ionicons 
-              name={currentPage === 'week' ? 'calendar' : 'calendar-outline'} 
-              size={24} 
-              color={currentPage === 'week' ? theme.colors.primary : theme.colors.subtext} 
-            />
-            <Text style={[
-              styles.navText,
-              { color: currentPage === 'week' ? theme.colors.primary : theme.colors.subtext }
-            ]}>
-              Week
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={() => handleNavigate('progress')} 
-            style={styles.navItem}
-          >
-            <Ionicons 
-              name={currentPage === 'progress' ? 'stats-chart' : 'stats-chart-outline'} 
-              size={24} 
-              color={currentPage === 'progress' ? theme.colors.primary : theme.colors.subtext} 
-            />
-            <Text style={[
-              styles.navText,
-              { color: currentPage === 'progress' ? theme.colors.primary : theme.colors.subtext }
-            ]}>
-              Progress
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={() => handleNavigate('settings')} 
-            style={styles.navItem}
-          >
-            <Ionicons 
-              name={currentPage === 'settings' ? 'settings' : 'settings-outline'} 
-              size={24} 
-              color={currentPage === 'settings' ? theme.colors.primary : theme.colors.subtext} 
-            />
-            <Text style={[
-              styles.navText,
-              { color: currentPage === 'settings' ? theme.colors.primary : theme.colors.subtext }
-            ]}>
-              Settings
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+            <TouchableOpacity 
+              onPress={() => handleNavigate('dashboard')} 
+              style={styles.navItem}
+            >
+              <Ionicons 
+                name={currentPage === 'dashboard' ? 'today' : 'today-outline'} 
+                size={24} 
+                color={currentPage === 'dashboard' ? theme.colors.primary : theme.colors.subtext} 
+              />
+              <Text style={[
+                styles.navText,
+                { color: currentPage === 'dashboard' ? theme.colors.primary : theme.colors.subtext }
+              ]}>
+                Today
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => handleNavigate('week')} 
+              style={styles.navItem}
+            >
+              <Ionicons 
+                name={currentPage === 'week' ? 'calendar' : 'calendar-outline'} 
+                size={24} 
+                color={currentPage === 'week' ? theme.colors.primary : theme.colors.subtext} 
+              />
+              <Text style={[
+                styles.navText,
+                { color: currentPage === 'week' ? theme.colors.primary : theme.colors.subtext }
+              ]}>
+                Week
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => handleNavigate('progress')} 
+              style={styles.navItem}
+            >
+              <Ionicons 
+                name={currentPage === 'progress' ? 'stats-chart' : 'stats-chart-outline'} 
+                size={24} 
+                color={currentPage === 'progress' ? theme.colors.primary : theme.colors.subtext} 
+              />
+              <Text style={[
+                styles.navText,
+                { color: currentPage === 'progress' ? theme.colors.primary : theme.colors.subtext }
+              ]}>
+                Progress
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => handleNavigate('settings')} 
+              style={styles.navItem}
+            >
+              <Ionicons 
+                name={currentPage === 'settings' ? 'settings' : 'settings-outline'} 
+                size={24} 
+                color={currentPage === 'settings' ? theme.colors.primary : theme.colors.subtext} 
+              />
+              <Text style={[
+                styles.navText,
+                { color: currentPage === 'settings' ? theme.colors.primary : theme.colors.subtext }
+              ]}>
+                Settings
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
 
       {showAIModal && (
         <AIModal
@@ -277,6 +244,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  innerContainer: {
+    flex: 1,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    overflow: 'hidden',
+  },
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -289,15 +262,23 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    marginBottom: 60, // Add space for the navbar
   },
   navbarContainer: {
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
     backgroundColor: 'transparent',
   },
   navbar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingBottom: 10,
     borderTopWidth: 1,
   },
   navItem: {
@@ -313,13 +294,42 @@ const styles = StyleSheet.create({
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Initialize theme from storage
+  useEffect(() => {
+    const initTheme = async () => {
+      try {
+        const savedDarkMode = await AsyncStorage.getItem('darkMode');
+        if (savedDarkMode !== null) {
+          setDarkMode(savedDarkMode === 'true');
+        }
+        setIsInitialized(true);
+      } catch (error) {
+        console.log('Error loading theme:', error);
+        setIsInitialized(true);
+      }
+    };
+    
+    initTheme();
+  }, []);
+
+  if (!isInitialized) {
+    return null; // Or a loading screen
+  }
   
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <PremiumProvider>
           <ThemeProvider initialDarkMode={darkMode}>
-            <AppContent />
+            <ProfileProvider>
+              <TaskProvider>
+                <NavigationContainer linking={linking}>
+                  <AppContent />
+                </NavigationContainer>
+              </TaskProvider>
+            </ProfileProvider>
           </ThemeProvider>
         </PremiumProvider>
       </AuthProvider>

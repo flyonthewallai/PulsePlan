@@ -160,27 +160,38 @@ export const AIModal = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
     justifyContent: 'flex-end',
   },
   modal: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     padding: 20,
     paddingBottom: 40,
+    shadowColor: '#00AEEF',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(209, 213, 219, 0.2)',
   },
   darkModal: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#1F2937F0', // 94% opacity for frosted effect
   },
   lightModal: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFFFFF0', // 94% opacity for frosted effect
   },
   handle: {
-    width: 48,
+    width: 40,
     height: 4,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: 'rgba(209, 213, 219, 0.6)',
     borderRadius: 2,
     alignSelf: 'center',
+    marginTop: 12,
     marginBottom: 16,
   },
   avatarContainer: {

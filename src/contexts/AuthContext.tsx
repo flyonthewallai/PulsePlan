@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, getSession, getCurrentUser, resetPassword as supabaseResetPassword } from '../lib/supabase';
+import { supabase, getSession, getCurrentUser, resetPassword as supabaseResetPassword, signIn as supabaseSignIn } from '../lib/supabase';
 import { API_URL } from '../config/api';
 
 type AuthContextType = {
@@ -26,13 +26,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (initialized) return;
     
     try {
-      const { session: currentSession, error: sessionError } = getSession();
+      const { session: currentSession, error: sessionError } = await getSession();
       if (sessionError) throw sessionError;
       
       setSession(currentSession);
       
       if (currentSession) {
-        const { user: currentUser, error: userError } = getCurrentUser();
+        const { user: currentUser, error: userError } = await getCurrentUser();
         if (userError) throw userError;
         setUser(currentUser);
       }
@@ -62,8 +62,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           async (event, newSession) => {
             if (!mounted) return;
             
-            setSession(newSession);
-            setUser(newSession?.user ?? null);
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              const { user: currentUser } = await getCurrentUser();
+              setUser(currentUser);
+              setSession(newSession);
+            } else if (event === 'SIGNED_OUT') {
+              setUser(null);
+              setSession(null);
+            }
             setLoading(false);
           }
         );
@@ -93,11 +99,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     session,
     loading,
     signIn: async (email: string, password: string) => {
-      const { error } = await supabase.auth.signIn({ email, password });
+      const { error } = await supabaseSignIn(email, password);
       return { error };
     },
     signUp: async (email: string, password: string) => {
-      // Sign up without email verification
       const { error } = await supabase.auth.signUp({ 
         email, 
         password,
@@ -118,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error };
     },
     signInWithMagicLink: async (email: string) => {
-      const { error } = await supabase.auth.signIn({
+      const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           shouldCreateUser: true

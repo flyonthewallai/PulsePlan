@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { usePremium } from '../../App';
+import { usePremium } from './PremiumContext';
 
 // Theme interfaces
 export interface ThemeColors {
@@ -56,7 +56,7 @@ export const themes: { [key: string]: Theme } = {
       secondary: '#FF6B6B',
       accent: '#F59E0B',
       background: '#0D1B2A',
-      cardBackground: '#1F2937',
+      cardBackground: '#1A2634',
       text: '#FFFFFF',
       subtext: '#D1D5DB',
       border: '#374151',
@@ -206,7 +206,6 @@ interface ThemeContextType {
   darkMode: boolean;
   setDarkMode: (isDark: boolean) => void;
   setTheme: (themeId: string) => void;
-  isPremium: boolean;
   availableThemes: Theme[];
 }
 
@@ -222,9 +221,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   children, 
   initialDarkMode
 }) => {
-  const { isPremium } = usePremium();
   const [darkMode, setDarkMode] = useState(initialDarkMode);
-  const [currentThemeId, setCurrentThemeId] = useState(initialDarkMode ? 'defaultDark' : 'defaultLight');
+  const [currentThemeId, setCurrentThemeId] = useState('defaultLight');
+  const { isPremium } = usePremium();
   
   // Get current theme object
   const theme = themes[currentThemeId] || (darkMode ? themes.defaultDark : themes.defaultLight);
@@ -309,12 +308,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   return (
     <ThemeContext.Provider
       value={{
-        theme,
+        theme: themes[currentThemeId],
         darkMode,
         setDarkMode: handleDarkModeChange,
         setTheme: handleThemeChange,
-        isPremium,
-        availableThemes,
+        availableThemes: Object.values(themes).filter(theme => !theme.premium || isPremium)
       }}
     >
       {children}
