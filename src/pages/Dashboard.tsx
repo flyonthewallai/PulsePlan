@@ -9,6 +9,10 @@ import { API_URL, getApiUrl } from '../config/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useProfile } from '../contexts/ProfileContext';
 import { useTasks, Task, CreateTaskData } from '../contexts/TaskContext';
+import { DailySchedule } from '../components/DailySchedule';
+import { useSettings, StudyTimeBlock } from '../contexts/SettingsContext';
+import { Task as TaskType } from '../types/task';
+import { AIChatModal } from '../components/AIChatModal';
 
 // Define the form data type for creating a task
 type TaskFormData = Omit<Task, 'id' | 'user_id'>;
@@ -18,8 +22,10 @@ export const Dashboard = ({ onTaskClick }: { onTaskClick: (task: Task) => void }
   const { session } = useAuth();
   const { profileData } = useProfile();
   const { tasks, loading, error, refreshTasks, createTask, updateTask } = useTasks();
+  const { workingHours, studyTimes } = useSettings();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showAIChat, setShowAIChat] = useState(false);
 
   const handleCreateTask = async (taskData: CreateTaskData) => {
     try {
@@ -66,6 +72,98 @@ export const Dashboard = ({ onTaskClick }: { onTaskClick: (task: Task) => void }
     const progress = Math.round((completedTasks.length / weeklyTasks.length) * 100);
     return Math.min(progress, 100); // Cap at 100%
   }, [tasks]);
+
+  // Get today's tasks and optimize their schedule
+  const todaysTasks = useMemo(() => {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+
+    // Filter tasks for today and sort by priority and duration
+    const filteredTasks: Task[] = tasks
+      .filter((task: Task) => {
+        const taskDate = new Date(task.due_date);
+        return (
+          taskDate.getDate() === today.getDate() &&
+          taskDate.getMonth() === today.getMonth() &&
+          taskDate.getFullYear() === today.getFullYear()
+        );
+      })
+      .sort((a: Task, b: Task) => {
+        // First sort by priority (high > medium > low)
+        const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+        const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+        if (priorityDiff !== 0) return priorityDiff;
+
+        // Then sort by estimated duration (shorter tasks first)
+        return (a.estimated_minutes || 0) - (b.estimated_minutes || 0);
+      });
+
+    // Get study times for today
+    const todaysStudyTimes: StudyTimeBlock[] = studyTimes
+      .filter((block: StudyTimeBlock) => block.days.includes(dayOfWeek))
+      .sort((a: StudyTimeBlock, b: StudyTimeBlock) => a.startHour - b.startHour);
+
+    // Schedule tasks considering study times
+    return filteredTasks.map((task: Task) => {
+      let optimalHour = workingHours.startHour;
+
+      // If we have study times for today, try to schedule during them
+      if (todaysStudyTimes.length > 0) {
+        // Find the first study block that can fit this task
+        const suitableStudyBlock = todaysStudyTimes.find((block: StudyTimeBlock) => {
+          const blockDuration = block.endHour - block.startHour;
+          return blockDuration >= (task.estimated_minutes || 0);
+        });
+
+        if (suitableStudyBlock) {
+          // Schedule at the start of the study block
+          optimalHour = suitableStudyBlock.startHour;
+        } else {
+          // If no suitable study block found, schedule after the last study block
+          const lastStudyBlock = todaysStudyTimes[todaysStudyTimes.length - 1];
+          optimalHour = Math.min(
+            lastStudyBlock.endHour + 1, 
+            workingHours.endHour - (task.estimated_minutes || 0)
+          );
+        }
+      } else {
+        // If no study times, use the original scheduling logic
+        // Start with high priority tasks early in the day
+        if (task.priority === 'high') {
+          optimalHour = workingHours.startHour;
+        } else if (task.priority === 'medium') {
+          // Place medium priority tasks after lunch
+          optimalHour = Math.max(workingHours.lunchBreakStart + 1, workingHours.startHour);
+        } else {
+          // Place low priority tasks later in the day
+          optimalHour = Math.max(workingHours.lunchBreakStart + 2, workingHours.startHour);
+        }
+
+        // Ensure we don't exceed working hours
+        if (optimalHour + (task.estimated_minutes || 0) > workingHours.endHour) {
+          optimalHour = Math.max(
+            workingHours.startHour, 
+            workingHours.endHour - (task.estimated_minutes || 0)
+          );
+        }
+      }
+
+      // Avoid scheduling during lunch break
+      if (optimalHour <= workingHours.lunchBreakStart && 
+          optimalHour + (task.estimated_minutes || 0) > workingHours.lunchBreakStart) {
+        optimalHour = workingHours.lunchBreakEnd + 1;
+      }
+
+      const scheduledDate = new Date(today);
+      scheduledDate.setHours(optimalHour, 0, 0, 0);
+
+      return {
+        ...task,
+        due_date: scheduledDate.toISOString(),
+        scheduledHour: optimalHour
+      };
+    });
+  }, [tasks, workingHours, studyTimes]);
 
   const buttonStyles = useMemo(() => ({
     addTaskButton: {
@@ -179,7 +277,7 @@ export const Dashboard = ({ onTaskClick }: { onTaskClick: (task: Task) => void }
 
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Today's Tasks
+              Today's Schedule
             </Text>
             <TouchableOpacity
               style={[
@@ -199,55 +297,50 @@ export const Dashboard = ({ onTaskClick }: { onTaskClick: (task: Task) => void }
             </TouchableOpacity>
           </View>
 
-          <View style={styles.tasksList}>
-            {loading && !tasks.length ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-              </View>
-            ) : error ? (
-              <View style={styles.errorContainer}>
-                <Ionicons 
-                  name="alert-circle-outline" 
-                  size={24} 
-                  color={theme.colors.error} 
-                />
-                <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                  {error}
-                </Text>
-                <TouchableOpacity
-                  style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
-                  onPress={refreshTasks}
-                >
-                  <Text style={styles.retryButtonText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : tasks.length === 0 ? (
-              <View style={[
-                styles.emptyState,
-                { backgroundColor: theme.colors.cardBackground }
-              ]}>
-                <Ionicons 
-                  name="document-text-outline" 
-                  size={32} 
-                  color={theme.colors.subtext} 
-                />
-                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-                  No tasks for today
-                </Text>
-                <Text style={[styles.emptyStateSubtext, { color: theme.colors.subtext }]}>
-                  Add a task to get started
-                </Text>
-              </View>
-            ) : (
-              tasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onPress={() => handleTaskPress(task)}
-                />
-              ))
-            )}
-          </View>
+          {loading && !tasks.length ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Ionicons 
+                name="alert-circle-outline" 
+                size={24} 
+                color={theme.colors.error} 
+              />
+              <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                {error}
+              </Text>
+              <TouchableOpacity
+                style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+                onPress={refreshTasks}
+              >
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : todaysTasks.length === 0 ? (
+            <View style={[
+              styles.emptyState,
+              { backgroundColor: theme.colors.cardBackground }
+            ]}>
+              <Ionicons 
+                name="document-text-outline" 
+                size={32} 
+                color={theme.colors.subtext} 
+              />
+              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+                No tasks for today
+              </Text>
+              <Text style={[styles.emptyStateSubtext, { color: theme.colors.subtext }]}>
+                Add a task to get started
+              </Text>
+            </View>
+          ) : (
+            <DailySchedule
+              tasks={todaysTasks}
+              onTaskPress={handleTaskPress}
+            />
+          )}
 
           <View style={[
             styles.quickStatsCard,
@@ -294,6 +387,21 @@ export const Dashboard = ({ onTaskClick }: { onTaskClick: (task: Task) => void }
         task={selectedTask}
         theme={theme}
         onStatusChange={handleTaskStatusChange}
+      />
+
+      <TouchableOpacity
+        style={[
+          buttonStyles.aiButton,
+          { bottom: 60 }
+        ]}
+        onPress={() => setShowAIChat(true)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="sparkles" size={28} color={theme.colors.primary} />
+      </TouchableOpacity>
+      <AIChatModal
+        visible={showAIChat}
+        onClose={() => setShowAIChat(false)}
       />
     </View>
   );

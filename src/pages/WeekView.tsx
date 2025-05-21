@@ -7,8 +7,9 @@ import { TaskCreateModal } from '../components/TaskCreateModal';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTasks, Task, CreateTaskData } from '../contexts/TaskContext';
 import { Ionicons } from '@expo/vector-icons';
+import { AIChatModal } from '../components/AIChatModal';
 
-export const WeekView = () => {
+export const WeekView = ({ onTaskClick }: { onTaskClick: (task: Task) => void }) => {
   const { theme } = useTheme();
   const { tasks, loading, error, refreshTasks, createTask, updateTask } = useTasks();
   const [selectedDay, setSelectedDay] = useState(new Date());
@@ -17,6 +18,8 @@ export const WeekView = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [showPlanAhead, setShowPlanAhead] = useState(false);
 
   // Get days of the week
   const days = useMemo(() => {
@@ -108,217 +111,8 @@ export const WeekView = () => {
     setIsRefreshing(false);
   };
 
-  return (
-    <>
-      <ScrollView 
-        style={[
-          styles.container,
-          { backgroundColor: theme.colors.background }
-        ]}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
-          />
-        }
-      >
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-              Week View
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.colors.subtext }]}>
-              Plan your week ahead
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.calendarButton,
-              { backgroundColor: theme.colors.cardBackground }
-            ]}
-            onPress={() => setShowMonthView(true)}
-          >
-            <Ionicons name="calendar-outline" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-        </View>
-
-        <Animated.View 
-          style={[
-            styles.daysContainer,
-            { transform: [{ scale: scaleAnim }] }
-          ]}
-        >
-          {days.map((day, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.dayButton,
-                isSelected(day) && { 
-                  backgroundColor: theme.colors.primary,
-                  shadowColor: theme.colors.primary,
-                  shadowOpacity: 0.3,
-                }
-              ]}
-              onPress={() => handleDayPress(day)}
-              activeOpacity={0.9}
-            >
-              <Text style={[
-                styles.dayName,
-                { 
-                  color: isSelected(day) ? '#FFFFFF' : theme.colors.text,
-                  opacity: isSelected(day) ? 1 : 0.7
-                }
-              ]}>
-                {day.toLocaleDateString('en-US', { weekday: 'short' })}
-              </Text>
-              <Text style={[
-                styles.dayNumber,
-                { 
-                  color: isSelected(day) ? '#FFFFFF' : theme.colors.text,
-                  opacity: isSelected(day) ? 1 : 0.9
-                }
-              ]}>
-                {day.getDate()}
-              </Text>
-              {isSelected(day) && (
-                <View style={[
-                  styles.selectedIndicator,
-                  { backgroundColor: '#FFFFFF' }
-                ]} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </Animated.View>
-
-        {days.findIndex(day => isSelected(day)) > 1 && (
-          <View style={[
-            styles.suggestionContainer,
-            { 
-              backgroundColor: theme.colors.cardBackground,
-              borderColor: theme.colors.primary + '30',
-              shadowColor: theme.colors.text,
-              shadowOpacity: 0.1,
-            }
-          ]}>
-            <View style={styles.suggestionContent}>
-              <View style={[
-                styles.suggestionIconContainer,
-                { backgroundColor: theme.colors.primary + '15' }
-              ]}>
-                <Ionicons 
-                  name="bulb-outline" 
-                  size={20} 
-                  color={theme.colors.primary} 
-                />
-              </View>
-              <View style={styles.suggestionTextContainer}>
-                <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>
-                  Plan Ahead
-                </Text>
-                <Text style={[styles.suggestionText, { color: theme.colors.subtext }]}>
-                  Consider scheduling tasks for later in the week
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            {selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.addTaskButton,
-              { backgroundColor: theme.colors.primary + '15' }
-            ]}
-            onPress={() => {/* Handle add task */}}
-          >
-            <Ionicons 
-              name="add" 
-              size={20} 
-              color={theme.colors.primary} 
-            />
-            <Text style={[styles.addTaskText, { color: theme.colors.primary }]}>
-              Add Task
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.tasksContainer}>
-          {error ? (
-            <View style={[
-              styles.emptyState,
-              { 
-                backgroundColor: theme.colors.cardBackground,
-                shadowColor: theme.colors.text,
-                shadowOpacity: 0.1,
-              }
-            ]}>
-              <Ionicons 
-                name="alert-circle-outline" 
-                size={32} 
-                color={theme.colors.error} 
-              />
-              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-                Error loading tasks
-              </Text>
-              <TouchableOpacity
-                style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
-                onPress={refreshTasks}
-              >
-                <Text style={styles.retryButtonText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : tasksForSelectedDay.length > 0 ? (
-            <View style={styles.taskList}>
-              {tasksForSelectedDay.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onPress={() => onTaskClick(task)}
-                />
-              ))}
-            </View>
-          ) : (
-            <View style={[
-              styles.emptyState,
-              { 
-                backgroundColor: theme.colors.cardBackground,
-                shadowColor: theme.colors.text,
-                shadowOpacity: 0.1,
-              }
-            ]}>
-              <Ionicons 
-                name="calendar-outline" 
-                size={32} 
-                color={theme.colors.subtext} 
-              />
-              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-                No tasks scheduled
-              </Text>
-              <Text style={[styles.emptyStateSubtext, { color: theme.colors.subtext }]}>
-                Add tasks to plan your day
-              </Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
-
-      <MonthView
-        visible={showMonthView}
-        onClose={() => setShowMonthView(false)}
-        tasks={tasks}
-        onDayPress={handleMonthViewDayPress}
-      />
-    </>
-  );
-};
-
-const styles = StyleSheet.create({
+  // Move styles into useMemo so theme is always available
+  const styles = useMemo(() => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -478,4 +272,243 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-});
+    aiButton: {
+      position: 'absolute',
+      bottom: 60,
+      right: 20,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.primary + '15',
+      shadowColor: theme.colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+  }), [theme]);
+
+  return (
+    <>
+      <ScrollView 
+        style={[
+          styles.container,
+          { backgroundColor: theme.colors.background }
+        ]}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
+        <View style={styles.header}>
+          <View>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+              Week View
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: theme.colors.subtext }]}>
+              Plan your week ahead
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.calendarButton,
+              { backgroundColor: theme.colors.cardBackground }
+            ]}
+            onPress={() => setShowMonthView(true)}
+          >
+            <Ionicons name="calendar-outline" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        <Animated.View 
+          style={[
+            styles.daysContainer,
+            { transform: [{ scale: scaleAnim }] }
+          ]}
+        >
+          {days.map((day, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.dayButton,
+                isSelected(day) && { 
+                  backgroundColor: theme.colors.primary,
+                  shadowColor: theme.colors.primary,
+                  shadowOpacity: 0.3,
+                }
+              ]}
+              onPress={() => handleDayPress(day)}
+              activeOpacity={0.9}
+            >
+              <Text style={[
+                styles.dayName,
+                { 
+                  color: isSelected(day) ? '#FFFFFF' : theme.colors.text,
+                  opacity: isSelected(day) ? 1 : 0.7
+                }
+              ]}>
+                {day.toLocaleDateString('en-US', { weekday: 'short' })}
+              </Text>
+              <Text style={[
+                styles.dayNumber,
+                { 
+                  color: isSelected(day) ? '#FFFFFF' : theme.colors.text,
+                  opacity: isSelected(day) ? 1 : 0.9
+                }
+              ]}>
+                {day.getDate()}
+              </Text>
+              {isSelected(day) && (
+                <View style={[
+                  styles.selectedIndicator,
+                  { backgroundColor: '#FFFFFF' }
+                ]} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </Animated.View>
+
+        {days.findIndex(day => isSelected(day)) > 1 && (
+          <View style={[
+            styles.suggestionContainer,
+            { 
+              backgroundColor: theme.colors.cardBackground,
+              borderColor: theme.colors.primary + '30',
+              shadowColor: theme.colors.text,
+              shadowOpacity: 0.1,
+            }
+          ]}>
+            <View style={styles.suggestionContent}>
+              <View style={[
+                styles.suggestionIconContainer,
+                { backgroundColor: theme.colors.primary + '15' }
+              ]}>
+                <Ionicons 
+                  name="bulb-outline" 
+                  size={20} 
+                  color={theme.colors.primary} 
+                />
+              </View>
+              <View style={styles.suggestionTextContainer}>
+                <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>
+                  Plan Ahead
+                </Text>
+                <Text style={[styles.suggestionText, { color: theme.colors.subtext }]}>
+                  Consider scheduling tasks for later in the week
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            {selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.addTaskButton,
+              { backgroundColor: theme.colors.primary + '15' }
+            ]}
+            onPress={() => setShowPlanAhead(true)}
+          >
+            <Ionicons name="bulb-outline" size={20} color={theme.colors.primary} />
+            <Text style={[styles.addTaskText, { color: theme.colors.primary }]}>Plan Ahead</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.tasksContainer}>
+          {error ? (
+            <View style={[
+              styles.emptyState,
+              { 
+                backgroundColor: theme.colors.cardBackground,
+                shadowColor: theme.colors.text,
+                shadowOpacity: 0.1,
+              }
+            ]}>
+              <Ionicons 
+                name="alert-circle-outline" 
+                size={32} 
+                color={theme.colors.error} 
+              />
+              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+                Error loading tasks
+              </Text>
+              <TouchableOpacity
+                style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+                onPress={refreshTasks}
+              >
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : tasksForSelectedDay.length > 0 ? (
+            <View style={styles.taskList}>
+              {tasksForSelectedDay.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onPress={() => onTaskClick(task)}
+                />
+              ))}
+            </View>
+          ) : (
+            <View style={[
+              styles.emptyState,
+              { 
+                backgroundColor: theme.colors.cardBackground,
+                shadowColor: theme.colors.text,
+                shadowOpacity: 0.1,
+              }
+            ]}>
+              <Ionicons 
+                name="calendar-outline" 
+                size={32} 
+                color={theme.colors.subtext} 
+              />
+              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+                No tasks scheduled
+              </Text>
+              <Text style={[styles.emptyStateSubtext, { color: theme.colors.subtext }]}>
+                Add tasks to plan your day
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      <MonthView
+        visible={showMonthView}
+        onClose={() => setShowMonthView(false)}
+        tasks={tasks}
+        onDayPress={handleMonthViewDayPress}
+      />
+      <TouchableOpacity
+        style={[
+          styles.aiButton,
+          { right: 20, left: undefined, bottom: 60, position: 'absolute' }
+        ]}
+        onPress={() => setShowAIChat(true)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="sparkles" size={28} color={theme.colors.primary} />
+      </TouchableOpacity>
+      <AIChatModal
+        visible={showAIChat}
+        onClose={() => setShowAIChat(false)}
+      />
+      <AIChatModal
+        visible={showPlanAhead}
+        onClose={() => setShowPlanAhead(false)}
+        planAheadMode={true}
+      />
+    </>
+  );
+};

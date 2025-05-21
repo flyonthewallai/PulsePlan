@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Task } from '../contexts/TaskContext';
 import { Theme } from '../contexts/ThemeContext';
+import { useModalAnimation } from '../hooks/useModalAnimation';
 
 interface TaskDetailsModalProps {
   visible: boolean;
@@ -41,6 +42,19 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 }) => {
   if (!task) return null;
 
+  const {
+    translateY,
+    opacity,
+    overlayOpacity,
+    handleClose,
+    modalHeight
+  } = useModalAnimation({
+    isVisible: visible,
+    onClose,
+    modalHeight: Dimensions.get('window').height * 0.8,
+    animationDuration: 300
+  });
+
   const priorityColor = getPriorityColor(task.priority, theme);
   const statusIcon = getStatusIcon(task.status);
 
@@ -48,27 +62,42 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
-      <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.35)' }]}>
-        <View style={[
-          styles.modalContent,
-          { 
-            backgroundColor: theme.colors.background + 'F0', // 94% opacity for frosted effect
-            shadowColor: theme.colors.primary,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.15,
-            shadowRadius: 24,
-            elevation: 12,
-            borderWidth: 1,
-            borderColor: theme.colors.border + '20',
-          }
-        ]}>
+      <Animated.View 
+        style={[
+          styles.modalOverlay,
+          { opacity: overlayOpacity }
+        ]}
+      >
+        <TouchableOpacity 
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          activeOpacity={1} 
+          onPress={handleClose}
+        />
+        <Animated.View 
+          style={[
+            styles.modalContent,
+            { 
+              backgroundColor: theme.colors.background + 'F0',
+              shadowColor: theme.colors.primary,
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.15,
+              shadowRadius: 24,
+              elevation: 12,
+              borderWidth: 1,
+              borderColor: theme.colors.border + '20',
+              transform: [{ translateY }],
+              opacity,
+              maxHeight: modalHeight
+            }
+          ]}
+        >
           <View style={styles.modalHeader}>
             <TouchableOpacity
               style={[styles.closeButton, { backgroundColor: theme.colors.cardBackground }]}
-              onPress={onClose}
+              onPress={handleClose}
             >
               <Ionicons name="close" size={24} color={theme.colors.text} />
             </TouchableOpacity>
@@ -159,8 +188,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               </View>
             </View>
           </ScrollView>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 };

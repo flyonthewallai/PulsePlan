@@ -63,9 +63,22 @@
           "image": "./assets/icon.png",
           "imageWidth": 200
         }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.rhythm.app",
+          "enableGooglePay": true
+        }
       ]
     ],
     "scheme": "rhythm",
-    "sdkVersion": "53.0.0"
+    "sdkVersion": "53.0.0",
+    "extra": {
+      "apiUrl": "http://localhost:3000",
+      "stripePublishableKey": "pk_test_51RPGvL4cCEE1fltDtwqgVQIxe7rCsReNaQhzka3UGxvZcjkEveCiYTUjfA2KgzTPPAB7vq3WvaC0b2AmK59c87ak00q8wxgUAz",
+      "supabaseUrl": "your-supabase-project-url",
+      "supabaseAnonKey": "your-supabase-anon-key"
+    }
   }
 } 

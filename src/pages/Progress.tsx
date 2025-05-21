@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, Platform } from 'react-native';
 import Svg, { Circle, Path, G, Rect } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const Progress = () => {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   // Sample data - would be replaced with real user data in production
   const weeklyData = {
     completed: 32,
@@ -457,27 +459,26 @@ export const Progress = () => {
   );
 
   return (
-    <ScrollView 
-      style={[
-        styles.container,
-        { backgroundColor: theme.colors.background }
-      ]}
-      contentContainerStyle={styles.contentContainer}
-    >
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-          Progress
-        </Text>
-        <Text style={[styles.headerSubtitle, { color: theme.colors.subtext }]}>
-          Your productivity insights and achievements
-        </Text>
-      </View>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <ScrollView 
+        style={[styles.scrollView, { backgroundColor: theme.colors.background }]}
+        contentContainerStyle={styles.contentContainer}
+      >
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+            Progress
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: theme.colors.subtext }]}>
+            Your productivity insights and achievements
+          </Text>
+        </View>
 
-      {renderWeeklyOverview()}
-      {renderFocusTrends()}
-      {renderAIRecommendations()}
-      {renderAchievements()}
-    </ScrollView>
+        {renderWeeklyOverview()}
+        {renderFocusTrends()}
+        {renderAIRecommendations()}
+        {renderAchievements()}
+      </ScrollView>
+    </View>
   );
 };
 
@@ -485,9 +486,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+  },
   contentContainer: {
     padding: 16,
-    paddingBottom: 80,
+    paddingBottom: 100,
   },
   header: {
     marginBottom: 24,
