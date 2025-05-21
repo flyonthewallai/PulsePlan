@@ -156,10 +156,42 @@ Backend route: `POST /generate_schedule`
 
 ## 💳 Payments (Stripe)
 
-- Freemium model: 1 week of scheduling free
-- \$3/month to unlock unlimited planning + GPT personalization
-- Stripe Checkout + webhook integration
-- User plan stored in Supabase via metadata
+### Setting up Stripe Subscriptions
+
+1. Create a Stripe account at [stripe.com](https://stripe.com)
+2. Create a subscription product and pricing plan in your Stripe dashboard
+3. Set up your Stripe API keys in the necessary environment files:
+
+#### For the Server
+
+Add the following to your server `.env` file:
+
+```
+STRIPE_SECRET_KEY=sk_test_yourStripeSecretKey
+STRIPE_WEBHOOK_SECRET=whsec_yourStripeWebhookSecret
+STRIPE_PREMIUM_PRICE_ID=price_yourStripePremiumPriceId
+```
+
+#### For the Client
+
+Update the `app.json` file with your Stripe publishable key:
+
+```json
+"extra": {
+  "apiUrl": "http://localhost:3000",
+  "stripePublishableKey": "pk_test_yourStripePublishableKey"
+}
+```
+
+4. Set up a webhook endpoint in your Stripe dashboard:
+
+   - URL: `https://your-api-domain.com/stripe/webhook`
+   - Events to listen for:
+     - `checkout.session.completed`
+     - `customer.subscription.deleted`
+
+5. Test the integration with Stripe test mode before going live
+   - Use test card numbers from the [Stripe documentation](https://stripe.com/docs/testing)
 
 ---
 

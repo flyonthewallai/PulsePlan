@@ -1,12 +1,16 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, Modal, TextInput, FlatList, KeyboardAvoidingView, Platform, Dimensions, PanResponder, Animated, ViewStyle, TextStyle, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, themes } from '../contexts/ThemeContext';
 import { usePremium } from '../contexts/PremiumContext';
 import { useProfile } from '../contexts/ProfileContext';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSettings } from '../contexts/SettingsContext';
+import { useModalAnimation } from '../hooks/useModalAnimation';
+import SubscriptionScreen from '../components/SubscriptionScreen';
 
 // Add type definitions for modal types
-type ModalType = 'profile' | 'notifications' | 'privacy' | 'canvas' | 'googleCalendar' | 'outlook' | 'studyTimes' | 'focusMode' | 'aiAssistant' | 'subscription' | 'restorePurchase' | 'themes' | null;
+type ModalType = 'profile' | 'notifications' | 'privacy' | 'canvas' | 'googleCalendar' | 'outlook' | 'studyTimes' | 'focusMode' | 'aiAssistant' | 'subscription' | 'restorePurchase' | 'themes' | 'workingHours' | null;
 
 // Add type definition for theme group
 interface ThemeGroup {
@@ -77,6 +81,26 @@ interface SettingsStyles {
   proFeatureText: TextStyle;
   deleteButton: ViewStyle;
   deleteButtonText: TextStyle;
+  timeInput: ViewStyle;
+  timeText: TextStyle;
+  timeButton: ViewStyle;
+  studyTimeBlock: ViewStyle;
+  studyTimeHeader: ViewStyle;
+  studyTimeTitle: TextStyle;
+  removeButton: ViewStyle;
+  timeRangeContainer: ViewStyle;
+  timeSeparator: TextStyle;
+  daysContainer: ViewStyle;
+  dayButton: ViewStyle;
+  dayButtonText: TextStyle;
+  addButton: ViewStyle;
+  addButtonText: TextStyle;
+  section: ViewStyle;
+  sectionTitle: TextStyle;
+  settingInfo: ViewStyle;
+  settingLabel: TextStyle;
+  settingDescription: TextStyle;
+  closeButton: ViewStyle;
 }
 
 // Add type definition for setting item
@@ -94,7 +118,9 @@ type IconName =
   | 'sparkles-outline'
   | 'star-outline'
   | 'refresh-circle-outline'
-  | 'color-palette-outline';
+  | 'color-palette-outline'
+  | 'restaurant-outline'
+  | 'card-outline';
 
 interface SettingItem {
   name: string;
@@ -121,14 +147,36 @@ interface PrivacySettings {
   syncAcrossDevices: boolean;
 }
 
+// Add working hours interface
+interface WorkingHours {
+  startHour: number;
+  endHour: number;
+  lunchBreakStart: number;
+  lunchBreakEnd: number;
+}
+
+// Add type definition for theme groups
+interface ThemeGroups {
+  [key: string]: ThemeGroup;
+}
+
+// Add type for study time block
+interface StudyTimeBlock {
+  id: string;
+  startHour: number;
+  endHour: number;
+  days: number[];
+}
+
 export const Settings = ({
   onToggleDarkMode
 }: {
   onToggleDarkMode: () => void;
 }) => {
   const { theme, darkMode, setTheme, availableThemes } = useTheme();
-  const { isPremium, togglePremium } = usePremium();
+  const { isPremium, initiateTestPayment, checkSubscriptionStatus } = usePremium();
   const { profileData, updateProfile } = useProfile();
+  const { workingHours, updateWorkingHours, studyTimes, addStudyTime, removeStudyTime, updateStudyTime } = useSettings();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [notificationSettings, setNotificationSettings] = useState({
     taskReminders: true,
@@ -148,37 +196,25 @@ export const Settings = ({
     showTaskDetails: true,
     syncAcrossDevices: true
   });
-  const pan = useRef(new Animated.ValueXY()).current;
-  const modalHeight = useRef(Dimensions.get('window').height * 0.8).current;
 
-  const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, gestureState) => {
-      return gestureState.dy > 0; // Only respond to downward gestures
-    },
-    onPanResponderMove: (_, gestureState) => {
-      if (gestureState.dy > 0) { // Only allow downward movement
-        pan.y.setValue(gestureState.dy);
-      }
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      if (gestureState.dy > modalHeight * 0.3) { // If dragged down more than 30% of modal height
-        Animated.timing(pan, {
-          toValue: { x: 0, y: modalHeight },
-          duration: 200,
-          useNativeDriver: true,
-        }).start(() => {
-          hideModal();
-          pan.setValue({ x: 0, y: 0 });
-        });
-      } else {
-        Animated.spring(pan, {
-          toValue: { x: 0, y: 0 },
-          useNativeDriver: true,
-        }).start();
-      }
-    },
-  }), [modalHeight]);
+  // Memoize the modal animation config so the animation only re-runs when activeModal changes
+  const modalAnimConfig = useMemo(
+    () => ({
+      isVisible: activeModal !== null,
+      onClose: () => setActiveModal(null),
+      modalHeight: Dimensions.get('window').height * 0.8,
+      animationDuration: 300,
+    }),
+    [activeModal]
+  );
+
+  const {
+    translateY,
+    opacity,
+    overlayOpacity,
+    handleClose,
+    modalHeight: modalHeightHook
+  } = useModalAnimation(modalAnimConfig);
 
   // Create styles after theme is available
   const styles = useMemo(() => {
@@ -285,7 +321,7 @@ export const Settings = ({
       },
       modalContainer: {
         width: '100%',
-        maxHeight: modalHeight,
+        maxHeight: Dimensions.get('window').height * 0.8,
         backgroundColor: theme.colors.background + 'F0', // 94% opacity for frosted effect
         borderRadius: 28,
         shadowColor: theme.colors.primary,
@@ -319,7 +355,6 @@ export const Settings = ({
       modalTitle: {
         fontSize: 20,
         fontWeight: '600',
-        color: theme.colors.text,
       },
       modalBody: {
         padding: 20,
@@ -501,8 +536,113 @@ export const Settings = ({
         fontWeight: '600',
         letterSpacing: 0.2,
       },
+      timeInput: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        gap: 8,
+      },
+      timeText: {
+        flex: 1,
+        fontSize: 16,
+        letterSpacing: 0.2,
+      },
+      timeButton: {
+        padding: 4,
+      },
+      studyTimeBlock: {
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+      },
+      studyTimeHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+      },
+      studyTimeTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+      },
+      removeButton: {
+        padding: 4,
+      },
+      timeRangeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+      },
+      timeSeparator: {
+        fontSize: 16,
+        fontWeight: '500',
+      },
+      daysContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 8,
+      },
+      dayButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+      },
+      dayButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+      },
+      addButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        gap: 8,
+      },
+      addButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+      },
+      section: {
+        marginBottom: 24,
+      },
+      sectionTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        marginBottom: 8,
+      },
+      settingInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      },
+      settingLabel: {
+        fontSize: 16,
+        fontWeight: '500',
+      },
+      settingDescription: {
+        fontSize: 14,
+        color: theme.colors.secondary,
+      },
+      closeButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 8,
+        elevation: 3,
+      },
     });
-  }, [theme, modalHeight]);
+  }, [theme]);
 
   // Early return if theme is not yet available
   if (!theme) {
@@ -518,7 +658,7 @@ export const Settings = ({
   };
 
   // Group themes by family (light/dark pairs)
-  const themeGroups: Record<string, ThemeGroup> = Object.values(availableThemes).reduce((groups, item) => {
+  const themeGroups: ThemeGroups = Object.values(availableThemes).reduce((groups: ThemeGroups, item) => {
     // Remove Light/Dark suffix to get base name
     const baseName = item.name.replace(' Light', '').replace(' Dark', '');
     if (!groups[baseName]) {
@@ -579,6 +719,10 @@ export const Settings = ({
         />
       )
     }, {
+      name: 'Working Hours',
+      icon: 'time-outline',
+      onPress: () => showModal('workingHours')
+    }, {
       name: 'Study Times',
       icon: 'time-outline',
       onPress: () => showModal('studyTimes')
@@ -601,15 +745,33 @@ export const Settings = ({
       customRight: (
         <Switch
           value={isPremium}
-          onValueChange={togglePremium}
+          onValueChange={() => {}}  // Read-only switch
           trackColor={{ false: '#E5E7EB', true: theme.colors.secondary }}
           thumbColor={isPremium ? '#FFFFFF' : '#FFFFFF'}
         />
       )
     }, {
-      name: 'Restore Purchase',
+      name: 'Test Pro Subscription',
+      icon: 'card-outline',
+      highlight: true,
+      onPress: async () => {
+        try {
+          await initiateTestPayment();
+          // Refresh subscription status after payment attempt
+          setTimeout(checkSubscriptionStatus, 2000);
+        } catch (error) {
+          console.error('Test subscription error:', error);
+        }
+      },
+      customRight: (
+        <View style={[styles.proBadge, { backgroundColor: theme.colors.primary }]}>
+          <Text style={styles.proBadgeText}>TEST</Text>
+        </View>
+      )
+    }, {
+      name: 'Refresh Status',
       icon: 'refresh-circle-outline',
-      onPress: () => showModal('restorePurchase')
+      onPress: checkSubscriptionStatus
     }]
   }, {
     title: 'Theme',
@@ -621,59 +783,50 @@ export const Settings = ({
     }]
   }];
 
+  // Wrap context handlers in useCallback to ensure stable references
+  const stableAddStudyTime = useCallback(addStudyTime, [addStudyTime]);
+  const stableRemoveStudyTime = useCallback(removeStudyTime, [removeStudyTime]);
+  const stableUpdateStudyTime = useCallback(updateStudyTime, [updateStudyTime]);
+
   const renderModalContent = () => {
     if (!activeModal) return null;
 
     const modalContent = (
-      <>
-        <View style={{ width: '100%' }} {...panResponder.panHandlers}>
-          <View style={styles.dragIndicator} />
+      <Animated.View 
+        style={[
+          styles.modalContainer,
+          {
+            transform: [{ translateY }],
+            opacity,
+            maxHeight: modalHeightHook
+          }
+        ]}
+      >
+        <View style={styles.modalHeader}>
+          <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
           {(() => {
             switch (activeModal) {
-              case 'profile':
-                return (
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Profile</Text>
-                  </View>
-                );
-              case 'notifications':
-                return (
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Notifications</Text>
-                  </View>
-                );
-              case 'focusMode':
-                return (
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Focus Mode</Text>
-                  </View>
-                );
-              case 'themes':
-                return (
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Choose Theme</Text>
-                  </View>
-                );
-              case 'subscription':
-                return (
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>PulsePlan Pro</Text>
-                  </View>
-                );
-              case 'privacy':
-                return (
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Privacy Settings</Text>
-                  </View>
-                );
-              default:
-                return (
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Settings</Text>
-                  </View>
-                );
+                case 'profile': return 'Profile';
+                case 'notifications': return 'Notifications';
+                case 'focusMode': return 'Focus Mode';
+                case 'themes': return 'Choose Theme';
+                case 'subscription': return 'PulsePlan Pro';
+                case 'privacy': return 'Privacy Settings';
+                case 'workingHours': return 'Working Hours';
+                case 'studyTimes': return 'Study Times';
+                default: return 'Settings';
             }
           })()}
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.closeButton,
+              { backgroundColor: theme.colors.cardBackground }
+            ]}
+            onPress={handleClose}
+          >
+            <Ionicons name="close" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
         </View>
         {(() => {
           switch (activeModal) {
@@ -898,35 +1051,7 @@ export const Settings = ({
               );
             case 'subscription':
               return (
-                <ScrollView>
-                  <View style={styles.modalBody}>
-                    <Text style={[styles.switchTitle, { marginBottom: 16 }]}>Premium Features</Text>
-                    <View style={styles.featureItem}>
-                      <Ionicons name="color-palette-outline" size={24} color={theme.colors.primary} />
-                      <Text style={styles.featureText}>Premium Themes</Text>
-                    </View>
-                    <View style={styles.featureItem}>
-                      <Ionicons name="analytics-outline" size={24} color={theme.colors.primary} />
-                      <Text style={styles.featureText}>Advanced Analytics</Text>
-                    </View>
-                    <View style={styles.featureItem}>
-                      <Ionicons name="cloud-upload-outline" size={24} color={theme.colors.primary} />
-                      <Text style={styles.featureText}>Cloud Backup</Text>
-                    </View>
-                    <View style={styles.featureItem}>
-                      <Ionicons name="infinite-outline" size={24} color={theme.colors.primary} />
-                      <Text style={styles.featureText}>Unlimited Tasks</Text>
-                    </View>
-                    <TouchableOpacity 
-                      style={[styles.upgradeButton, { backgroundColor: theme.colors.secondary }]}
-                      onPress={togglePremium}
-                    >
-                      <Text style={styles.upgradeButtonText}>
-                        {isPremium ? 'Manage Subscription' : 'Upgrade to Pro'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
+                <SubscriptionScreen onClose={hideModal} />
               );
             case 'privacy':
               return (
@@ -1060,22 +1185,339 @@ export const Settings = ({
                   </View>
                 </ScrollView>
               );
-            default:
+            case 'workingHours':
               return (
+                <ScrollView>
+                <View style={styles.modalBody}>
+                    <Text style={[styles.switchDescription, { 
+                      marginBottom: 24,
+                      lineHeight: 20
+                    }]}>
+                      Set your preferred working hours to optimize your daily schedule. Tasks will be scheduled within these hours.
+                    </Text>
+
+                    <View style={styles.formGroup}>
+                      <Text style={[styles.label, { color: theme.colors.text }]}>
+                        Start Time
+                      </Text>
+                      <View style={[
+                        styles.timeInput,
+                        { 
+                          backgroundColor: theme.colors.cardBackground,
+                          borderColor: theme.colors.border
+                        }
+                      ]}>
+                        <Ionicons 
+                          name="sunny-outline" 
+                          size={20} 
+                          color={theme.colors.text} 
+                        />
+                        <Text style={[styles.timeText, { color: theme.colors.text }]}>
+                          {workingHours.startHour}:00 {workingHours.startHour >= 12 ? 'PM' : 'AM'}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.timeButton}
+                          onPress={() => {
+                            const newHour = (workingHours.startHour + 1) % 24;
+                            if (newHour < workingHours.endHour) {
+                              updateWorkingHours({ ...workingHours, startHour: newHour });
+                            }
+                          }}
+                        >
+                          <Ionicons name="chevron-up" size={20} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.timeButton}
+                          onPress={() => {
+                            const newHour = (workingHours.startHour - 1 + 24) % 24;
+                            if (newHour < workingHours.endHour) {
+                              updateWorkingHours({ ...workingHours, startHour: newHour });
+                            }
+                          }}
+                        >
+                          <Ionicons name="chevron-down" size={20} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                </View>
+                    </View>
+
+                    <View style={styles.formGroup}>
+                      <Text style={[styles.label, { color: theme.colors.text }]}>
+                        End Time
+                      </Text>
+                      <View style={[
+                        styles.timeInput,
+                        { 
+                          backgroundColor: theme.colors.cardBackground,
+                          borderColor: theme.colors.border
+                        }
+                      ]}>
+                        <Ionicons 
+                          name="moon-outline" 
+                          size={20} 
+                          color={theme.colors.text} 
+                        />
+                        <Text style={[styles.timeText, { color: theme.colors.text }]}>
+                          {workingHours.endHour}:00 {workingHours.endHour >= 12 ? 'PM' : 'AM'}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.timeButton}
+                          onPress={() => {
+                            const newHour = (workingHours.endHour + 1) % 24;
+                            if (newHour > workingHours.startHour) {
+                              updateWorkingHours({ ...workingHours, endHour: newHour });
+                            }
+                          }}
+                        >
+                          <Ionicons name="chevron-up" size={20} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.timeButton}
+                          onPress={() => {
+                            const newHour = (workingHours.endHour - 1 + 24) % 24;
+                            if (newHour > workingHours.startHour) {
+                              updateWorkingHours({ ...workingHours, endHour: newHour });
+                            }
+                          }}
+                        >
+                          <Ionicons name="chevron-down" size={20} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <View style={styles.formGroup}>
+                      <Text style={[styles.label, { color: theme.colors.text }]}>
+                        Lunch Break
+                      </Text>
+                      <View style={[
+                        styles.timeInput,
+                        { 
+                          backgroundColor: theme.colors.cardBackground,
+                          borderColor: theme.colors.border
+                        }
+                      ]}>
+                        <Ionicons 
+                          name="restaurant-outline" 
+                          size={20} 
+                          color={theme.colors.text} 
+                        />
+                        <Text style={[styles.timeText, { color: theme.colors.text }]}>
+                          {workingHours.lunchBreakStart}:00 - {workingHours.lunchBreakEnd}:00
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.timeButton}
+                          onPress={() => {
+                            const newStart = (workingHours.lunchBreakStart + 1) % 24;
+                            const newEnd = (workingHours.lunchBreakEnd + 1) % 24;
+                            if (newStart < newEnd && newStart >= workingHours.startHour && newEnd <= workingHours.endHour) {
+                              updateWorkingHours({ 
+                                ...workingHours, 
+                                lunchBreakStart: newStart,
+                                lunchBreakEnd: newEnd
+                              });
+                            }
+                          }}
+                        >
+                          <Ionicons name="chevron-up" size={20} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.timeButton}
+                          onPress={() => {
+                            const newStart = (workingHours.lunchBreakStart - 1 + 24) % 24;
+                            const newEnd = (workingHours.lunchBreakEnd - 1 + 24) % 24;
+                            if (newStart < newEnd && newStart >= workingHours.startHour && newEnd <= workingHours.endHour) {
+                              updateWorkingHours({ 
+                                ...workingHours, 
+                                lunchBreakStart: newStart,
+                                lunchBreakEnd: newEnd
+                              });
+                            }
+                          }}
+                        >
+                          <Ionicons name="chevron-down" size={20} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <TouchableOpacity 
+                      style={[styles.saveButton, { marginTop: 24 }]}
+                      onPress={async () => {
+                        try {
+                          await updateWorkingHours(workingHours);
+                          setActiveModal(null);
+                        } catch (error) {
+                          Alert.alert('Error', 'Could not save working hours. Please try again.');
+                        }
+                      }}
+                    >
+                      <Text style={styles.saveButtonText}>Save Working Hours</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              );
+            case 'studyTimes':
+              return (
+                <ScrollView>
+                  <View style={styles.modalBody}>
+                    <Text style={[styles.switchDescription, { 
+                      marginBottom: 24,
+                      lineHeight: 20
+                    }]}>
+                      Set your preferred study times to help optimize your schedule. Tasks will be prioritized during these hours.
+                    </Text>
+
+                    {studyTimes.map((block, index) => (
+                      <View 
+                        key={block.id}
+                        style={[
+                          styles.studyTimeBlock,
+                          { 
+                            backgroundColor: theme.colors.cardBackground,
+                            borderColor: theme.colors.border
+                          }
+                        ]}
+                      >
+                        <View style={styles.studyTimeHeader}>
+                          <Text style={[styles.studyTimeTitle, { color: theme.colors.text }]}>Study Block {index + 1}</Text>
+                          <TouchableOpacity onPress={() => stableRemoveStudyTime(block.id)} style={styles.removeButton}>
+                            <Ionicons name="close-circle" size={24} color={theme.colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.formGroup}>
+                          <Text style={[styles.label, { color: theme.colors.text }]}>Time Range</Text>
+                          <View style={styles.timeRangeContainer}>
+                            <View style={[styles.timeInput, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }]}> 
+                              <TouchableOpacity
+                                style={styles.timeButton}
+                                onPress={() => {
+                                  const newHour = (block.startHour - 1 + 24) % 24;
+                                  if (newHour < block.endHour) {
+                                    stableUpdateStudyTime(block.id, { ...block, startHour: newHour });
+                                  }
+                                }}
+                              >
+                                <Ionicons name="chevron-down" size={20} color={theme.colors.primary} />
+                              </TouchableOpacity>
+                              <Text style={[styles.timeText, { color: theme.colors.text, minWidth: 48, textAlign: 'center' }]}> {block.startHour}:00 {block.startHour >= 12 ? 'PM' : 'AM'} </Text>
+                              <TouchableOpacity
+                                style={styles.timeButton}
+                                onPress={() => {
+                                  const newHour = (block.startHour + 1) % 24;
+                                  if (newHour < block.endHour) {
+                                    stableUpdateStudyTime(block.id, { ...block, startHour: newHour });
+                                  }
+                                }}
+                              >
+                                <Ionicons name="chevron-up" size={20} color={theme.colors.primary} />
+                              </TouchableOpacity>
+                            </View>
+                            <Text style={[styles.timeSeparator, { color: theme.colors.text }]}>to</Text>
+                            <View style={[styles.timeInput, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }]}> 
+                              <TouchableOpacity
+                                style={styles.timeButton}
+                                onPress={() => {
+                                  const newHour = (block.endHour - 1 + 24) % 24;
+                                  if (newHour > block.startHour) {
+                                    stableUpdateStudyTime(block.id, { ...block, endHour: newHour });
+                                  }
+                                }}
+                              >
+                                <Ionicons name="chevron-down" size={20} color={theme.colors.primary} />
+                              </TouchableOpacity>
+                              <Text style={[styles.timeText, { color: theme.colors.text, minWidth: 48, textAlign: 'center' }]}> {block.endHour}:00 {block.endHour >= 12 ? 'PM' : 'AM'} </Text>
+                              <TouchableOpacity
+                                style={styles.timeButton}
+                                onPress={() => {
+                                  const newHour = (block.endHour + 1) % 24;
+                                  if (newHour > block.startHour) {
+                                    stableUpdateStudyTime(block.id, { ...block, endHour: newHour });
+                                  }
+                                }}
+                              >
+                                <Ionicons name="chevron-up" size={20} color={theme.colors.primary} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                        <View style={styles.formGroup}>
+                          <Text style={[styles.label, { color: theme.colors.text }]}>Days</Text>
+                          <View style={styles.daysContainer}>
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, dayIndex) => {
+                              const selected = block.days.includes(dayIndex);
+                              return (
+                                <TouchableOpacity
+                                  key={day}
+                                  style={[
+                                    styles.dayButton,
+                                    {
+                                      backgroundColor: 'transparent',
+                                      borderColor: selected ? theme.colors.primary : theme.colors.border,
+                                    }
+                                  ]}
+                                  onPress={() => {
+                                    const newDays = selected
+                                      ? block.days.filter(d => d !== dayIndex)
+                                      : [...block.days, dayIndex].sort();
+                                    stableUpdateStudyTime(block.id, { ...block, days: newDays });
+                                  }}
+                                >
+                                  <Text style={[
+                                    styles.dayButtonText,
+                                    { color: selected ? theme.colors.primary : theme.colors.text }
+                                  ]}>
+                                    {day}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+
+                    <TouchableOpacity
+                      style={[
+                        styles.addButton,
+                        { 
+                          backgroundColor: theme.colors.primary + '15',
+                          borderColor: theme.colors.primary
+                        }
+                      ]}
+                      onPress={() => {
+                        const now = new Date();
+                        stableAddStudyTime({
+                          startHour: now.getHours(),
+                          endHour: (now.getHours() + 2) % 24,
+                          days: [now.getDay()]
+                        });
+                      }}
+                    >
+                      <Ionicons name="add-circle-outline" size={24} color={theme.colors.primary} />
+                      <Text style={[styles.addButtonText, { color: theme.colors.primary }]}>
+                        Add Study Block
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.saveButton, { marginTop: 24 }]}
+                      onPress={() => setActiveModal(null)}
+                    >
+                      <Text style={styles.saveButtonText}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              );
+            default:
+    return (
                 <View style={styles.modalBody}>
                   <Text style={{ color: theme.colors.text }}>Settings content coming soon...</Text>
                 </View>
               );
           }
         })()}
-      </>
-    );
-
-    return (
-      <Animated.View style={styles.modalContainer}>
-        {modalContent}
       </Animated.View>
     );
+
+    return modalContent;
   };
 
   return (
@@ -1166,24 +1608,22 @@ export const Settings = ({
       <Modal
         visible={activeModal !== null}
         transparent={true}
-        onRequestClose={hideModal}
-        animationType="fade"
+        animationType="none"
+        onRequestClose={handleClose}
       >
-        <View style={styles.modalOverlay}>
+          <Animated.View 
+            style={[
+            styles.modalOverlay,
+            { opacity: overlayOpacity }
+            ]} 
+          >
           <TouchableOpacity 
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
             activeOpacity={1} 
-            onPress={hideModal}
+            onPress={handleClose}
           />
-          <Animated.View 
-            style={[
-              styles.modalContainer,
-              { transform: [{ translateY: pan.y }] }
-            ]} 
-          >
             {renderModalContent()}
           </Animated.View>
-        </View>
       </Modal>
     </View>
   );

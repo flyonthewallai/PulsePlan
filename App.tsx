@@ -26,6 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PremiumProvider } from './src/contexts/PremiumContext';
 import { ProfileProvider } from './src/contexts/ProfileContext';
 import { TaskProvider } from './src/contexts/TaskContext';
+import { SettingsProvider } from './src/contexts/SettingsContext';
 
 // Deep link configuration
 const linking = {
@@ -325,9 +326,11 @@ export default function App() {
           <ThemeProvider initialDarkMode={darkMode}>
             <ProfileProvider>
               <TaskProvider>
-                <NavigationContainer linking={linking}>
-                  <AppContent />
-                </NavigationContainer>
+                <SettingsProvider>
+                  <NavigationContainer linking={linking}>
+                    <AppContent />
+                  </NavigationContainer>
+                </SettingsProvider>
               </TaskProvider>
             </ProfileProvider>
           </ThemeProvider>

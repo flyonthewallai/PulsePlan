@@ -6,7 +6,8 @@ import calendarRoutes from './routes/calendarRoutes';
 import schedulingRoutes from './routes/schedulingRoutes';
 import stripeRoutes from './routes/stripeRoutes';
 import tasksRoutes from './routes/tasksRoutes';
-import scheduleBlocksRoutes from './routes/scheduleBlocksRoutes';
+import scheduleBlocksRouter from './routes/scheduleBlocks';
+import chatRoutes from './routes/chat';
 
 // Load environment variables
 dotenv.config();
@@ -17,15 +18,17 @@ const PORT = process.env.PORT || 5000;
 
 // CORS configuration
 const corsOptions = {
-  origin: [
-    'http://localhost:19006',  // Expo web
-    'exp://localhost:19000',   // Expo Go
-    'exp://10.0.0.4:19000',   // Expo Go on your IP
-    'exp://192.168.1.*:19000' // Any local network IP
-  ],
+  origin: process.env.NODE_ENV === 'development'
+    ? '*' // Allow all origins in development
+    : [
+        'http://localhost:19006',  // Expo web
+        'exp://localhost:19000',   // Expo Go
+        'exp://10.0.0.4:19000',   // Expo Go on your IP
+        'exp://192.168.1.*:19000' // Any local network IP
+      ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 };
 
 // Middleware
@@ -43,7 +46,8 @@ app.use('/calendar', calendarRoutes);
 app.use('/scheduling', schedulingRoutes);
 app.use('/stripe', stripeRoutes);
 app.use('/tasks', tasksRoutes);
-app.use('/schedule_blocks', scheduleBlocksRoutes);
+app.use('/schedule-blocks', scheduleBlocksRouter);
+app.use('/chat', chatRoutes);
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {

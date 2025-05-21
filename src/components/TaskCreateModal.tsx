@@ -18,6 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { Task, CreateTaskData } from '../contexts/TaskContext';
+import { useModalAnimation } from '../hooks/useModalAnimation';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MODAL_MAX_HEIGHT = SCREEN_HEIGHT * 0.85; // 85% of screen height
@@ -78,11 +79,25 @@ interface TaskCreateModalStyles {
   createButton: ViewStyle;
   buttonText: TextStyle;
   keyboardAvoidingContainer: ViewStyle;
+  datePickerContainer: ViewStyle;
+  datePicker: ViewStyle;
+  datePickerButton: ViewStyle;
+  datePickerButtonText: TextStyle;
 }
 
 export const TaskCreateModal = ({ visible, onClose, onCreate, theme }: TaskCreateModalProps) => {
-  const translateY = React.useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const opacity = React.useRef(new Animated.Value(0)).current;
+  const {
+    translateY,
+    opacity,
+    overlayOpacity,
+    handleClose,
+    modalHeight
+  } = useModalAnimation({
+    isVisible: visible,
+    onClose,
+    modalHeight: MODAL_MAX_HEIGHT,
+    animationDuration: 300
+  });
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [subject, setSubject] = useState(SUBJECT_OPTIONS[0].id);
@@ -92,38 +107,7 @@ export const TaskCreateModal = ({ visible, onClose, onCreate, theme }: TaskCreat
   const [status, setStatus] = useState<'pending' | 'in_progress' | 'completed'>('pending');
   const [error, setError] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
-
-  React.useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.spring(translateY, {
-          toValue: 0,
-          useNativeDriver: true,
-          speed: 50,
-          bounciness: 4
-        }),
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true
-        })
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.spring(translateY, {
-          toValue: SCREEN_HEIGHT,
-          useNativeDriver: true,
-          speed: 50,
-          bounciness: 4
-        }),
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true
-        })
-      ]).start();
-    }
-  }, [visible]);
+  const [tempDueDate, setTempDueDate] = useState<Date | null>(null);
 
   const handleCreate = () => {
     if (!title.trim() || !subject || !dueDate || !status) {
@@ -151,8 +135,12 @@ export const TaskCreateModal = ({ visible, onClose, onCreate, theme }: TaskCreat
   };
 
   const handleDateChange = (event: any, selectedDate: any) => {
-    setShowDatePicker(false);
-    if (selectedDate) setDueDate(selectedDate);
+    if (Platform.OS === 'ios') {
+      if (selectedDate) setTempDueDate(selectedDate);
+    } else {
+      setShowDatePicker(false);
+      if (selectedDate) setDueDate(selectedDate);
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -182,539 +170,616 @@ export const TaskCreateModal = ({ visible, onClose, onCreate, theme }: TaskCreat
       borderWidth: 1,
       borderColor: theme.colors.border + '20',
       backgroundColor: theme.colors.background + 'F0', // 94% opacity for frosted effect
+    }
+  }), [theme]);
+
+  const styles = React.useMemo(() => StyleSheet.create({
+    keyboardAvoidingContainer: {
+      flex: 1,
     },
-    handle: {
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.35)',
+      justifyContent: 'flex-end',
+    },
+    modalTouchable: {
+      width: '100%',
+    },
+    scrollView: {
+      maxHeight: MODAL_MAX_HEIGHT - 40,
+    },
+    scrollViewContent: {
+      flexGrow: 1,
+      paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    },
+    modal: {
+      padding: 20,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      letterSpacing: 0.3,
+    },
+    closeButton: {
       width: 40,
-      height: 4,
-      backgroundColor: theme.colors.border + '60',
-      borderRadius: 2,
-      alignSelf: 'center',
-      marginTop: 12,
-      marginBottom: 16,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    form: {
+      gap: 20,
+    },
+    inputContainer: {
+      gap: 8,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: '600',
+      letterSpacing: 0.2,
+    },
+    input: {
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 16,
+      letterSpacing: 0.2,
+    },
+    textArea: {
+      height: 100,
+      textAlignVertical: 'top',
+    },
+    subjectsContainer: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingVertical: 4,
+    },
+    subjectOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 12,
+      borderWidth: 1,
+      gap: 6,
+    },
+    subjectText: {
+      fontSize: 14,
+      fontWeight: '500',
+      letterSpacing: 0.2,
+    },
+    dateButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      gap: 8,
+    },
+    dateText: {
+      fontSize: 16,
+      letterSpacing: 0.2,
+    },
+    durationInput: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      gap: 8,
+    },
+    priorityContainer: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    priorityOption: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      gap: 6,
+    },
+    priorityText: {
+      fontSize: 14,
+      fontWeight: '500',
+      letterSpacing: 0.2,
+    },
+    statusContainer: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    statusOption: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      gap: 6,
+    },
+    statusText: {
+      fontSize: 14,
+      fontWeight: '500',
+      letterSpacing: 0.2,
+    },
+    errorContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: '#FEE2E2',
+    },
+    errorText: {
+      fontSize: 14,
+      fontWeight: '500',
+      letterSpacing: 0.2,
+    },
+    buttonContainer: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 8,
+    },
+    button: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+      borderRadius: 12,
+      gap: 8,
+    },
+    cancelButton: {
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    createButton: {
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    buttonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      letterSpacing: 0.2,
+    },
+    datePickerContainer: {
+      marginTop: 8,
+      borderRadius: 12,
+      borderWidth: 1,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.cardBackground,
+      borderColor: theme.colors.border,
+    },
+    datePicker: {
+      height: 200,
+    },
+    datePickerButton: {
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: theme.colors.primary,
+      borderRadius: 12,
+      margin: 16,
+      backgroundColor: 'transparent',
+    },
+    datePickerButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      letterSpacing: 0.2,
+      color: theme.colors.primary,
     },
   }), [theme]);
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardAvoidingContainer}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <TouchableOpacity 
-          style={styles.overlay} 
-          activeOpacity={1} 
-          onPress={onClose}
+        <Animated.View 
+          style={[
+            styles.overlay,
+            { opacity: overlayOpacity }
+          ]}
         >
           <TouchableOpacity 
+            style={styles.overlay} 
             activeOpacity={1} 
-            onPress={(e) => e.stopPropagation()}
-            style={styles.modalTouchable}
+            onPress={handleClose}
           >
-            <Animated.View 
-              style={[
-                themeStyles.modalContainer,
-                { 
-                  transform: [{ translateY }],
-                  opacity,
-                  maxHeight: MODAL_MAX_HEIGHT
-                }
-              ]}
+            <TouchableOpacity 
+              activeOpacity={1} 
+              onPress={(e) => e.stopPropagation()}
+              style={styles.modalTouchable}
             >
-              <View style={themeStyles.handle} />
-              <ScrollView 
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollViewContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={true}
-                bounces={true}
+              <Animated.View 
+                style={[
+                  themeStyles.modalContainer,
+                  { 
+                    transform: [{ translateY }],
+                    opacity,
+                    maxHeight: modalHeight
+                  }
+                ]}
               >
-                <View style={styles.modal}>
-                  <View style={styles.header}>
-                    <Text style={[styles.title, { color: theme.colors.text }]}>
-                      Create Task
-                    </Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.closeButton,
-                        { backgroundColor: theme.colors.cardBackground }
-                      ]}
-                      onPress={onClose}
-                    >
-                      <Ionicons name="close" size={24} color={theme.colors.text} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.form}>
-                    <View style={styles.inputContainer}>
-                      <Text style={[styles.label, { color: theme.colors.text }]}>
-                        Title
+                <ScrollView 
+                  style={styles.scrollView}
+                  contentContainerStyle={styles.scrollViewContent}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={true}
+                  bounces={true}
+                >
+                  <View style={styles.modal}>
+                    <View style={styles.header}>
+                      <Text style={[styles.title, { color: theme.colors.text }]}>
+                        Create Task
                       </Text>
-                      <TextInput
+                      <TouchableOpacity
                         style={[
-                          styles.input,
-                          { 
-                            backgroundColor: theme.colors.cardBackground,
-                            color: theme.colors.text,
-                            borderColor: theme.colors.border
-                          }
+                          styles.closeButton,
+                          { backgroundColor: theme.colors.cardBackground }
                         ]}
-                        placeholder="Enter task title"
-                        placeholderTextColor={theme.colors.subtext}
-                        value={title}
-                        onChangeText={setTitle}
-                      />
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                      <Text style={[styles.label, { color: theme.colors.text }]}>
-                        Description
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          styles.textArea,
-                          { 
-                            backgroundColor: theme.colors.cardBackground,
-                            color: theme.colors.text,
-                            borderColor: theme.colors.border
-                          }
-                        ]}
-                        placeholder="Enter task description"
-                        placeholderTextColor={theme.colors.subtext}
-                        value={description}
-                        onChangeText={setDescription}
-                        multiline
-                        numberOfLines={3}
-                      />
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                      <Text style={[styles.label, { color: theme.colors.text }]}>
-                        Subject
-                      </Text>
-                      <ScrollView 
-                        horizontal 
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.subjectsContainer}
+                        onPress={handleClose}
                       >
-                        {SUBJECT_OPTIONS.map(option => (
-                          <TouchableOpacity
-                            key={option.id}
-                            style={[
-                              styles.subjectOption,
-                              subject === option.id && {
-                                backgroundColor: theme.colors.primary + '15',
-                                borderColor: theme.colors.primary
-                              }
-                            ]}
-                            onPress={() => setSubject(option.id)}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons 
-                              name={option.icon} 
-                              size={20} 
-                              color={subject === option.id ? theme.colors.primary : theme.colors.text} 
-                            />
-                            <Text style={[
-                              styles.subjectText,
-                              { 
-                                color: subject === option.id ? theme.colors.primary : theme.colors.text,
-                                opacity: subject === option.id ? 1 : 0.7
-                              }
-                            ]}>
-                              {option.id}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                      <Text style={[styles.label, { color: theme.colors.text }]}>
-                        Due Date
-                      </Text>
-                      <TouchableOpacity 
-                        style={[
-                          styles.dateButton,
-                          { 
-                            backgroundColor: theme.colors.cardBackground,
-                            borderColor: theme.colors.border
-                          }
-                        ]}
-                        onPress={() => setShowDatePicker(true)}
-                      >
-                        <Ionicons 
-                          name="calendar-outline" 
-                          size={20} 
-                          color={theme.colors.text} 
-                        />
-                        <Text style={[styles.dateText, { color: theme.colors.text }]}>
-                          {dueDate.toLocaleString()}
-                        </Text>
+                        <Ionicons name="close" size={24} color={theme.colors.text} />
                       </TouchableOpacity>
-                      {showDatePicker && (
-                        <DateTimePicker
-                          value={dueDate}
-                          mode="datetime"
-                          display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                          onChange={handleDateChange}
-                        />
-                      )}
                     </View>
 
-                    <View style={styles.inputContainer}>
-                      <Text style={[styles.label, { color: theme.colors.text }]}>
-                        Estimated Duration
-                      </Text>
-                      <View style={[
-                        styles.durationInput,
-                        { 
-                          backgroundColor: theme.colors.cardBackground,
-                          borderColor: theme.colors.border
-                        }
-                      ]}>
-                        <Ionicons 
-                          name="time-outline" 
-                          size={20} 
-                          color={theme.colors.text} 
-                        />
+                    <View style={styles.form}>
+                      <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>
+                          Title
+                        </Text>
                         <TextInput
                           style={[
                             styles.input,
                             { 
+                              backgroundColor: theme.colors.cardBackground,
                               color: theme.colors.text,
-                              borderWidth: 0,
-                              backgroundColor: 'transparent'
+                              borderColor: theme.colors.border
                             }
                           ]}
-                          placeholder="Enter duration in minutes"
+                          placeholder="Enter task title"
                           placeholderTextColor={theme.colors.subtext}
-                          value={estimatedMinutes}
-                          onChangeText={setEstimatedMinutes}
-                          keyboardType="numeric"
+                          value={title}
+                          onChangeText={setTitle}
                         />
                       </View>
-                    </View>
 
-                    <View style={styles.inputContainer}>
-                      <Text style={[styles.label, { color: theme.colors.text }]}>
-                        Priority
-                      </Text>
-                      <View style={styles.priorityContainer}>
-                        {(['low', 'medium', 'high'] as const).map(opt => (
-                          <TouchableOpacity
-                            key={opt}
-                            style={[
-                              styles.priorityOption,
+                      <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>
+                          Description
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            styles.textArea,
+                            { 
+                              backgroundColor: theme.colors.cardBackground,
+                              color: theme.colors.text,
+                              borderColor: theme.colors.border
+                            }
+                          ]}
+                          placeholder="Enter task description"
+                          placeholderTextColor={theme.colors.subtext}
+                          value={description}
+                          onChangeText={setDescription}
+                          multiline
+                          numberOfLines={3}
+                        />
+                      </View>
+
+                      <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>
+                          Subject
+                        </Text>
+                        <ScrollView 
+                          horizontal 
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.subjectsContainer}
+                        >
+                          {SUBJECT_OPTIONS.map(option => (
+                            <TouchableOpacity
+                              key={option.id}
+                              style={[
+                                styles.subjectOption,
+                                subject === option.id && {
+                                  backgroundColor: theme.colors.primary + '15',
+                                  borderColor: theme.colors.primary
+                                }
+                              ]}
+                              onPress={() => setSubject(option.id)}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons 
+                                name={option.icon} 
+                                size={20} 
+                                color={subject === option.id ? theme.colors.primary : theme.colors.text} 
+                              />
+                              <Text style={[
+                                styles.subjectText,
+                                { 
+                                  color: subject === option.id ? theme.colors.primary : theme.colors.text,
+                                  opacity: subject === option.id ? 1 : 0.7
+                                }
+                              ]}>
+                                {option.id}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+
+                      <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>
+                          Due Date
+                        </Text>
+                        <TouchableOpacity 
+                          style={[
+                            styles.dateButton,
+                            { 
+                              backgroundColor: theme.colors.cardBackground,
+                              borderColor: theme.colors.border
+                            }
+                          ]}
+                          onPress={() => setShowDatePicker(true)}
+                        >
+                          <Ionicons 
+                            name="calendar-outline" 
+                            size={20} 
+                            color={theme.colors.text} 
+                          />
+                          <Text style={[styles.dateText, { color: theme.colors.text }]}>
+                            {dueDate.toLocaleString()}
+                          </Text>
+                        </TouchableOpacity>
+                        {showDatePicker && (
+                          Platform.OS === 'ios' ? (
+                            <View style={[
+                              styles.datePickerContainer,
                               { 
-                                backgroundColor: priority === opt 
-                                  ? getPriorityColor(opt) + '15'
-                                  : theme.colors.cardBackground,
-                                borderColor: priority === opt 
-                                  ? getPriorityColor(opt)
-                                  : theme.colors.border
+                                backgroundColor: theme.colors.cardBackground,
+                                borderColor: theme.colors.border
+                              }
+                            ]}>
+                              <DateTimePicker
+                                value={tempDueDate || dueDate}
+                                mode="datetime"
+                                display="spinner"
+                                onChange={handleDateChange}
+                                textColor={theme.colors.text}
+                                style={styles.datePicker}
+                                themeVariant={theme.dark ? 'dark' : 'light'}
+                              />
+                              <TouchableOpacity
+                                style={[
+                                  styles.datePickerButton,
+                                  { 
+                                    paddingVertical: 12,
+                                    paddingHorizontal: 24,
+                                    alignItems: 'center',
+                                    borderWidth: 1.5,
+                                    borderColor: theme.colors.primary,
+                                    borderRadius: 12,
+                                    margin: 16,
+                                    backgroundColor: 'transparent'
+                                  }
+                                ]}
+                                onPress={() => {
+                                  setShowDatePicker(false);
+                                  if (tempDueDate) setDueDate(tempDueDate);
+                                  setTempDueDate(null);
+                                }}
+                              >
+                                <Text style={[styles.datePickerButtonText, { color: theme.colors.primary }]}>
+                                  Done
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <DateTimePicker
+                              value={dueDate}
+                              mode="datetime"
+                              display="default"
+                              onChange={handleDateChange}
+                              textColor={theme.colors.text}
+                              themeVariant={theme.dark ? 'dark' : 'light'}
+                            />
+                          )
+                        )}
+                      </View>
+
+                      <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>
+                          Estimated Duration
+                        </Text>
+                        <View style={[
+                          styles.durationInput,
+                          { 
+                            backgroundColor: theme.colors.cardBackground,
+                            borderColor: theme.colors.border
+                          }
+                        ]}>
+                          <Ionicons 
+                            name="time-outline" 
+                            size={20} 
+                            color={theme.colors.text} 
+                          />
+                          <TextInput
+                            style={[
+                              styles.input,
+                              { 
+                                color: theme.colors.text,
+                                borderWidth: 0,
+                                backgroundColor: 'transparent'
                               }
                             ]}
-                            onPress={() => setPriority(opt)}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons 
-                              name={
-                                opt === 'high' ? 'arrow-up-circle-outline' :
-                                opt === 'medium' ? 'remove-circle-outline' :
-                                'arrow-down-circle-outline'
-                              }
-                              size={20}
-                              color={getPriorityColor(opt)}
-                            />
-                            <Text style={[
-                              styles.priorityText,
-                              { color: getPriorityColor(opt) }
-                            ]}>
-                              {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
+                            placeholder="Enter duration in minutes"
+                            placeholderTextColor={theme.colors.subtext}
+                            value={estimatedMinutes}
+                            onChangeText={setEstimatedMinutes}
+                            keyboardType="numeric"
+                          />
+                        </View>
                       </View>
-                    </View>
 
-                    <View style={styles.inputContainer}>
-                      <Text style={[styles.label, { color: theme.colors.text }]}>
-                        Status
-                      </Text>
-                      <View style={styles.statusContainer}>
-                        {(['pending', 'in_progress', 'completed'] as const).map(opt => (
-                          <TouchableOpacity
-                            key={opt}
-                            style={[
-                              styles.statusOption,
-                              { 
-                                backgroundColor: status === opt 
-                                  ? theme.colors.primary + '15'
-                                  : theme.colors.cardBackground,
-                                borderColor: status === opt 
-                                  ? theme.colors.primary
-                                  : theme.colors.border
-                              }
-                            ]}
-                            onPress={() => setStatus(opt)}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons 
-                              name={
-                                opt === 'pending' ? 'time-outline' :
-                                opt === 'in_progress' ? 'sync-outline' :
-                                'checkmark-circle-outline'
-                              }
-                              size={20}
-                              color={status === opt ? theme.colors.primary : theme.colors.text}
-                            />
-                            <Text style={[
-                              styles.statusText,
-                              { 
-                                color: status === opt ? theme.colors.primary : theme.colors.text,
-                                opacity: status === opt ? 1 : 0.7
-                              }
-                            ]}>
-                              {opt.split('_').map(word => 
-                                word.charAt(0).toUpperCase() + word.slice(1)
-                              ).join(' ')}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
+                      <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>
+                          Priority
+                        </Text>
+                        <View style={styles.priorityContainer}>
+                          {(['low', 'medium', 'high'] as const).map(opt => (
+                            <TouchableOpacity
+                              key={opt}
+                              style={[
+                                styles.priorityOption,
+                                { 
+                                  backgroundColor: priority === opt 
+                                    ? getPriorityColor(opt) + '15'
+                                    : theme.colors.cardBackground,
+                                  borderColor: priority === opt 
+                                    ? getPriorityColor(opt)
+                                    : theme.colors.border
+                                }
+                              ]}
+                              onPress={() => setPriority(opt)}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons 
+                                name={
+                                  opt === 'high' ? 'arrow-up-circle-outline' :
+                                  opt === 'medium' ? 'remove-circle-outline' :
+                                  'arrow-down-circle-outline'
+                                }
+                                size={20}
+                                color={getPriorityColor(opt)}
+                              />
+                              <Text style={[
+                                styles.priorityText,
+                                { color: getPriorityColor(opt) }
+                              ]}>
+                                {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
                       </View>
-                    </View>
 
-                    {error ? (
-                      <View style={styles.errorContainer}>
-                        <Ionicons name="alert-circle-outline" size={20} color={theme.colors.error} />
-                        <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                          {error}
+                      <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>
+                          Status
                         </Text>
+                        <View style={styles.statusContainer}>
+                          {(['pending', 'in_progress', 'completed'] as const).map(opt => (
+                            <TouchableOpacity
+                              key={opt}
+                              style={[
+                                styles.statusOption,
+                                { 
+                                  backgroundColor: status === opt 
+                                    ? theme.colors.primary + '15'
+                                    : theme.colors.cardBackground,
+                                  borderColor: status === opt 
+                                    ? theme.colors.primary
+                                    : theme.colors.border
+                                }
+                              ]}
+                              onPress={() => setStatus(opt)}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons 
+                                name={
+                                  opt === 'pending' ? 'time-outline' :
+                                  opt === 'in_progress' ? 'sync-outline' :
+                                  'checkmark-circle-outline'
+                                }
+                                size={20}
+                                color={status === opt ? theme.colors.primary : theme.colors.text}
+                              />
+                              <Text style={[
+                                styles.statusText,
+                                { 
+                                  color: status === opt ? theme.colors.primary : theme.colors.text,
+                                  opacity: status === opt ? 1 : 0.7
+                                }
+                              ]}>
+                                {opt.split('_').map(word => 
+                                  word.charAt(0).toUpperCase() + word.slice(1)
+                                ).join(' ')}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
                       </View>
-                    ) : null}
 
-                    <View style={styles.buttonContainer}>
-                      <TouchableOpacity 
-                        style={[
-                          styles.button,
-                          styles.cancelButton,
-                          { backgroundColor: theme.colors.cardBackground }
-                        ]} 
-                        onPress={onClose}
-                      >
-                        <Text style={[styles.buttonText, { color: theme.colors.text }]}>
-                          Cancel
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[
-                          styles.button,
-                          styles.createButton,
-                          { backgroundColor: theme.colors.primary }
-                        ]} 
-                        onPress={handleCreate}
-                      >
-                        <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>
-                          Create Task
-                        </Text>
-                        <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
-                      </TouchableOpacity>
+                      {error ? (
+                        <View style={styles.errorContainer}>
+                          <Ionicons name="alert-circle-outline" size={20} color={theme.colors.error} />
+                          <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                            {error}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      <View style={styles.buttonContainer}>
+                        <TouchableOpacity 
+                          style={[
+                            styles.button,
+                            styles.cancelButton,
+                            { 
+                              backgroundColor: 'transparent',
+                              borderWidth: 1.5,
+                              borderColor: theme.colors.primary
+                            }
+                          ]} 
+                          onPress={handleClose}
+                        >
+                          <Text style={[styles.buttonText, { color: theme.colors.primary }]}>
+                            Cancel
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[
+                            styles.button,
+                            styles.createButton,
+                            { 
+                              backgroundColor: theme.colors.primary,
+                              borderWidth: 0
+                            }
+                          ]} 
+                          onPress={handleCreate}
+                        >
+                          <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>
+                            Create Task
+                          </Text>
+                          <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
-                </View>
-              </ScrollView>
-            </Animated.View>
+                </ScrollView>
+              </Animated.View>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
-};
-
-const styles = StyleSheet.create<TaskCreateModalStyles>({
-  keyboardAvoidingContainer: {
-    flex: 1,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    justifyContent: 'flex-end',
-  },
-  modalTouchable: {
-    width: '100%',
-  },
-  scrollView: {
-    maxHeight: MODAL_MAX_HEIGHT - 40,
-  },
-  scrollViewContent: {
-    flexGrow: 1,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20, // Increased padding for better keyboard avoidance
-  },
-  modal: {
-    padding: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    letterSpacing: 0.3,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  form: {
-    gap: 20,
-  },
-  inputContainer: {
-    gap: 8,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 16,
-    letterSpacing: 0.2,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  subjectsContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingVertical: 4,
-  },
-  subjectOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
-  },
-  subjectText: {
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 8,
-  },
-  dateText: {
-    fontSize: 16,
-    letterSpacing: 0.2,
-  },
-  durationInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 8,
-  },
-  priorityContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  priorityOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
-  },
-  priorityText: {
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  statusOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#FEE2E2',
-  },
-  errorText: {
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  button: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  cancelButton: {
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  createButton: {
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-}); 
+}; 
