@@ -1,12 +1,30 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StripeProvider } from '@stripe/stripe-react-native';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { Alert, Linking } from 'react-native';
 import { supabase, getCurrentUser } from '../lib/supabase';
 
 const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:3000';
 const PUBLISHABLE_KEY = Constants.expoConfig?.extra?.stripePublishableKey;
+
+// Define StripeProvider props type
+interface StripeProviderProps {
+  publishableKey?: string;
+  merchantIdentifier?: string;
+  children: React.ReactNode;
+}
+
+// Import Stripe only on native platforms
+let StripeProvider: React.FC<StripeProviderProps> = ({ children }) => <>{children}</>;
+if (Platform.OS !== 'web') {
+  try {
+    const StripeReactNative = require('@stripe/stripe-react-native');
+    StripeProvider = StripeReactNative.StripeProvider;
+  } catch (error) {
+    console.warn('Stripe React Native not available:', error);
+  }
+}
 
 interface PremiumContextType {
   isPremium: boolean;
