@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme, themes } from '../contexts/ThemeContext';
 import { usePremium } from '../contexts/PremiumContext';
 import { useProfile } from '../contexts/ProfileContext';
+import { useAuth } from '../contexts/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSettings } from '../contexts/SettingsContext';
 import { useModalAnimation } from '../hooks/useModalAnimation';
@@ -177,6 +178,7 @@ export const Settings = ({
   const { isPremium, initiateTestPayment, checkSubscriptionStatus } = usePremium();
   const { profileData, updateProfile } = useProfile();
   const { workingHours, updateWorkingHours, studyTimes, addStudyTime, removeStudyTime, updateStudyTime } = useSettings();
+  const { signOut } = useAuth();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [notificationSettings, setNotificationSettings] = useState({
     taskReminders: true,
@@ -1603,6 +1605,67 @@ export const Settings = ({
           <Text style={[styles.footerText, { color: theme.colors.subtext }]}>PulsePlan v1.0.0</Text>
           <Text style={[styles.footerText, { color: theme.colors.subtext }]}>© {new Date().getFullYear()} PulsePlan App</Text>
         </View>
+
+        {/* Logout button */}
+        <TouchableOpacity
+          style={[
+            styles.deleteButton,
+            {
+              marginTop: 20,
+              marginHorizontal: 16,
+              marginBottom: 30,
+              backgroundColor: 'transparent',
+              borderWidth: 1.5,
+              borderColor: theme.colors.error || '#FF3B30',
+              zIndex: 9999, // Make sure it's on top
+              elevation: 10, // Android elevation
+            }
+          ]}
+          activeOpacity={0.7}
+          onPress={() => {
+            console.log('🔴 LOGOUT BUTTON PRESSED - This should appear in console');
+            
+            // Test direct logout without Alert first
+            const testDirectLogout = async () => {
+              console.log('🔴 Starting direct logout test...');
+              try {
+                await signOut();
+                console.log('🔴 Direct logout completed successfully');
+              } catch (error) {
+                console.error('🔴 Direct logout error:', error);
+              }
+            };
+            
+            // For now, let's test direct logout
+            testDirectLogout();
+            
+            // Also show the alert
+            Alert.alert(
+              'Log Out',
+              'Are you sure you want to log out?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Log Out',
+                  style: 'destructive',
+                  onPress: async () => {
+                    console.log('🔴 Alert confirmed - starting logout...');
+                    try {
+                      await signOut();
+                      console.log('🔴 Alert logout completed successfully');
+                    } catch (error) {
+                      console.error('🔴 Alert logout error:', error);
+                      Alert.alert('Error', 'Failed to sign out. Please try again.');
+                    }
+                  }
+                }
+              ]
+            );
+          }}
+        >
+          <Ionicons name="log-out-outline" size={20} color={theme.colors.error || '#FF3B30'} />
+          <Text style={styles.deleteButtonText}>Log Out</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <Modal

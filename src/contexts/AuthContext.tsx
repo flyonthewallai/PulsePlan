@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, getSession, getCurrentUser, resetPassword as supabaseResetPassword, signIn as supabaseSignIn } from '../lib/supabase';
 import { API_URL } from '../config/api';
 
@@ -16,6 +17,32 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Local storage keys
+const USER_STORAGE_KEY = 'pulseplan_user';
+const SESSION_STORAGE_KEY = 'pulseplan_session';
+
+// Helper functions for local storage
+const clearLocalAuth = async () => {
+  try {
+    await AsyncStorage.multiRemove([USER_STORAGE_KEY, SESSION_STORAGE_KEY]);
+  } catch (error) {
+    console.warn('Error clearing local auth storage:', error);
+  }
+};
+
+const saveLocalAuth = async (user: User | null, session: Session | null) => {
+  try {
+    if (user && session) {
+      await AsyncStorage.multiSet([
+        [USER_STORAGE_KEY, JSON.stringify(user)],
+        [SESSION_STORAGE_KEY, JSON.stringify(session)]
+      ]);
+    }
+  } catch (error) {
+    console.warn('Error saving local auth storage:', error);
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -26,19 +53,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (initialized) return;
     
     try {
-      const { session: currentSession, error: sessionError } = await getSession();
-      if (sessionError) throw sessionError;
+      // Set a timeout for initialization to prevent hanging
+      const initPromise = (async () => {
+        const { session: currentSession, error: sessionError } = await getSession();
+        if (sessionError) throw sessionError;
+        
+        setSession(currentSession);
+        
+        if (currentSession) {
+          const { user: currentUser, error: userError } = await getCurrentUser();
+          if (userError) throw userError;
+          setUser(currentUser);
+        }
+      })();
       
-      setSession(currentSession);
+      // Timeout after 10 seconds
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
+      );
       
-      if (currentSession) {
-        const { user: currentUser, error: userError } = await getCurrentUser();
-        if (userError) throw userError;
-        setUser(currentUser);
-      }
+      await Promise.race([initPromise, timeoutPromise]);
     } catch (error) {
-      console.error('Error initializing auth:', error);
-      // Reset state on error
+      console.warn('Error initializing auth (continuing with logged out state):', error);
+      // Reset state on error - user will need to log in
       setSession(null);
       setUser(null);
     } finally {
@@ -58,25 +95,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await initializeAuth();
 
         // Set up auth state change listener
-        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-          async (event, newSession) => {
-            if (!mounted) return;
-            
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-              const { user: currentUser } = await getCurrentUser();
-              setUser(currentUser);
-              setSession(newSession);
-            } else if (event === 'SIGNED_OUT') {
-              setUser(null);
-              setSession(null);
+        try {
+          const { data: authSubscription } = supabase.auth.onAuthStateChange(
+            async (event, newSession) => {
+              if (!mounted) return;
+              
+              try {
+                if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                  const { user: currentUser } = await getCurrentUser();
+                  setUser(currentUser);
+                  setSession(newSession);
+                } else if (event === 'SIGNED_OUT') {
+                  setUser(null);
+                  setSession(null);
+                }
+              } catch (error) {
+                console.warn('Error handling auth state change:', error);
+              }
+              setLoading(false);
             }
-            setLoading(false);
-          }
-        );
-        
-        subscription = authSubscription;
+          );
+          
+          subscription = authSubscription;
+        } catch (error) {
+          console.warn('Error setting up auth state listener:', error);
+          // Continue without the listener - app will still work
+        }
       } catch (error) {
-        console.error('Error setting up auth:', error);
+        console.warn('Error setting up auth:', error);
         if (mounted) {
           setLoading(false);
         }
@@ -105,30 +151,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp: async (email: string, password: string) => {
       const { error } = await supabase.auth.signUp({ 
         email, 
-        password,
-        options: {
-          data: {
-            email_confirmed: true // Mark email as confirmed
-          }
-        }
+        password
       });
       return { error };
     },
     signOut: async () => {
-      const { error } = await supabase.auth.signOut();
-      return { error };
+      try {
+        // Always clear local state first to ensure logout works
+        setUser(null);
+        setSession(null);
+        
+        // Clear local storage
+        await clearLocalAuth();
+        
+        // Try to sign out from Supabase, but don't fail if it doesn't work
+        const { error } = await supabase.auth.signOut();
+        
+        // Log the error but don't throw it - we've already logged out locally
+        if (error) {
+          console.warn('Supabase signOut error (user still logged out locally):', error);
+        }
+        
+        return { error: null }; // Always return success since local logout worked
+      } catch (error) {
+        // Even if everything fails, we've cleared local state
+        console.warn('SignOut error (user still logged out locally):', error);
+        
+        // Try to clear local storage as a last resort
+        try {
+          await clearLocalAuth();
+        } catch (storageError) {
+          console.warn('Error clearing local storage during failed logout:', storageError);
+        }
+        
+        return { error: null }; // Return success since local logout worked
+      }
     },
     resetPassword: async (email: string) => {
       const { error } = await supabaseResetPassword(email);
       return { error };
     },
     signInWithMagicLink: async (email: string) => {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: true
-        }
-      });
+      const { error } = await supabase.auth.api.sendMagicLinkEmail(email);
       return { error };
     },
   };
