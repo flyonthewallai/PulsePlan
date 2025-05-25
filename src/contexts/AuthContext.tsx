@@ -8,11 +8,13 @@ type AuthContextType = {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  hasCompletedOnboarding: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
   resetPassword: (email: string) => Promise<{ error: any }>;
   signInWithMagicLink: (email: string) => Promise<{ error: any }>;
+  completeOnboarding: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,11 +22,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Local storage keys
 const USER_STORAGE_KEY = 'pulseplan_user';
 const SESSION_STORAGE_KEY = 'pulseplan_session';
+const ONBOARDING_STORAGE_KEY = 'pulseplan_onboarding_completed';
 
 // Helper functions for local storage
 const clearLocalAuth = async () => {
   try {
-    await AsyncStorage.multiRemove([USER_STORAGE_KEY, SESSION_STORAGE_KEY]);
+    await AsyncStorage.multiRemove([USER_STORAGE_KEY, SESSION_STORAGE_KEY, ONBOARDING_STORAGE_KEY]);
   } catch (error) {
     console.warn('Error clearing local auth storage:', error);
   }
@@ -43,11 +46,32 @@ const saveLocalAuth = async (user: User | null, session: Session | null) => {
   }
 };
 
+const checkOnboardingStatus = async (userId: string): Promise<boolean> => {
+  try {
+    const key = `${ONBOARDING_STORAGE_KEY}_${userId}`;
+    const completed = await AsyncStorage.getItem(key);
+    console.log(`🔍 Checking onboarding for user ${userId}: key=${key}, value=${completed}`);
+    return completed === 'true';
+  } catch (error) {
+    console.warn('Error checking onboarding status:', error);
+    return false;
+  }
+};
+
+const setOnboardingCompleted = async (userId: string): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(`${ONBOARDING_STORAGE_KEY}_${userId}`, 'true');
+  } catch (error) {
+    console.warn('Error setting onboarding completed:', error);
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
 
   const initializeAuth = useCallback(async () => {
     if (initialized) return;
@@ -64,6 +88,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const { user: currentUser, error: userError } = await getCurrentUser();
           if (userError) throw userError;
           setUser(currentUser);
+          
+          // Check onboarding status for the user
+          if (currentUser) {
+            const onboardingCompleted = await checkOnboardingStatus(currentUser.id);
+            setHasCompletedOnboarding(onboardingCompleted);
+          }
         }
       })();
       
@@ -105,9 +135,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   const { user: currentUser } = await getCurrentUser();
                   setUser(currentUser);
                   setSession(newSession);
+                  
+                  // Check onboarding status for newly signed in user
+                  if (currentUser) {
+                    const onboardingCompleted = await checkOnboardingStatus(currentUser.id);
+                    setHasCompletedOnboarding(onboardingCompleted);
+                  }
                 } else if (event === 'SIGNED_OUT') {
                   setUser(null);
                   setSession(null);
+                  setHasCompletedOnboarding(false);
                 }
               } catch (error) {
                 console.warn('Error handling auth state change:', error);
@@ -144,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     session,
     loading,
+    hasCompletedOnboarding,
     signIn: async (email: string, password: string) => {
       const { error } = await supabaseSignIn(email, password);
       return { error };
@@ -194,6 +232,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithMagicLink: async (email: string) => {
       const { error } = await supabase.auth.api.sendMagicLinkEmail(email);
       return { error };
+    },
+    completeOnboarding: async () => {
+      if (user) {
+        await setOnboardingCompleted(user.id);
+        setHasCompletedOnboarding(true);
+      }
     },
   };
 

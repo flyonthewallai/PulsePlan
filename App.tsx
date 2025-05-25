@@ -43,7 +43,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [showAIModal, setShowAIModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
-  const { user, loading } = useAuth();
+  const { user, loading, hasCompletedOnboarding } = useAuth();
   const { theme, darkMode, setDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -86,6 +86,11 @@ function AppContent() {
   // Show auth screens if user is not authenticated
   if (!user) {
     return <AuthStack />;
+  }
+
+  // Show onboarding if user is authenticated but hasn't completed onboarding
+  if (user && !hasCompletedOnboarding) {
+    return <Onboarding onComplete={() => {}} />;
   }
 
   const handleNavigate = (page: string) => {

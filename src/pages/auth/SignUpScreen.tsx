@@ -12,6 +12,7 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,13 +27,48 @@ type AuthStackParamList = {
 
 type SignUpScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'SignUp'>;
 
+interface PasswordRequirement {
+  text: string;
+  met: boolean;
+}
+
 export const SignUpScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { signUp } = useAuth();
   const navigation = useNavigation<SignUpScreenNavigationProp>();
+
+  // Password strength calculation
+  const getPasswordStrength = (password: string) => {
+    let score = 0;
+    if (password.length >= 8) score += 1;
+    if (password.length >= 12) score += 1;
+    if (/[a-z]/.test(password)) score += 1;
+    if (/[A-Z]/.test(password)) score += 1;
+    if (/[0-9]/.test(password)) score += 1;
+    if (/[^A-Za-z0-9]/.test(password)) score += 1;
+    
+    if (score < 3) return { strength: 'Weak', color: '#EF4444' };
+    if (score < 5) return { strength: 'Medium', color: '#F59E0B' };
+    return { strength: 'Strong', color: '#10B981' };
+  };
+
+  // Password requirements
+  const getPasswordRequirements = (password: string): PasswordRequirement[] => [
+    { text: 'At least 8 characters', met: password.length >= 8 },
+    { text: 'Contains lowercase letter', met: /[a-z]/.test(password) },
+    { text: 'Contains uppercase letter', met: /[A-Z]/.test(password) },
+    { text: 'Contains number', met: /[0-9]/.test(password) },
+    { text: 'Contains special character', met: /[^A-Za-z0-9]/.test(password) },
+  ];
+
+  const passwordStrength = getPasswordStrength(password);
+  const passwordRequirements = getPasswordRequirements(password);
+  const isPasswordValid = password.length >= 8 && passwordRequirements.slice(1, 4).some(req => req.met);
 
   const handleSignUp = async () => {
     if (!email || !password || !confirmPassword) {
@@ -45,8 +81,8 @@ export const SignUpScreen = () => {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
+    if (!isPasswordValid) {
+      Alert.alert('Error', 'Password must be at least 8 characters and contain at least one letter and one number');
       return;
     }
 
@@ -59,8 +95,8 @@ export const SignUpScreen = () => {
       } else {
         Alert.alert(
           'Success',
-          'Please check your email to confirm your account',
-          [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+          'Account created successfully! Please check your email to confirm your account, then you\'ll be guided through setting up your personalized experience.',
+          [{ text: 'OK' }]
         );
       }
     } catch (error) {
@@ -108,30 +144,108 @@ export const SignUpScreen = () => {
             
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Create a password"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="password-new"
-                placeholderTextColor="#9CA3AF"
-              />
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Create a password"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoComplete="password-new"
+                  placeholderTextColor="#9CA3AF"
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Password Strength Indicator */}
+              {password.length > 0 && (
+                <View style={styles.passwordFeedback}>
+                  <View style={styles.strengthContainer}>
+                    <Text style={styles.strengthLabel}>Password Strength: </Text>
+                    <Text style={[styles.strengthText, { color: passwordStrength.color }]}>
+                      {passwordStrength.strength}
+                    </Text>
+                  </View>
+                  
+                  {/* Strength Bar */}
+                  <View style={styles.strengthBar}>
+                    <View 
+                      style={[
+                        styles.strengthFill, 
+                        { 
+                          width: passwordStrength.strength === 'Weak' ? '33%' : 
+                                passwordStrength.strength === 'Medium' ? '66%' : '100%',
+                          backgroundColor: passwordStrength.color 
+                        }
+                      ]} 
+                    />
+                  </View>
+                  
+                  {/* Requirements List */}
+                  <View style={styles.requirementsList}>
+                    {passwordRequirements.map((requirement, index) => (
+                      <View key={index} style={styles.requirementItem}>
+                        <Ionicons 
+                          name={requirement.met ? 'checkmark-circle' : 'close-circle'} 
+                          size={16} 
+                          color={requirement.met ? '#10B981' : '#EF4444'} 
+                        />
+                        <Text style={[
+                          styles.requirementText,
+                          { color: requirement.met ? '#10B981' : '#6B7280' }
+                        ]}>
+                          {requirement.text}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
             </View>
             
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Confirm Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="password-new"
-                placeholderTextColor="#9CA3AF"
-              />
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  autoComplete="password-new"
+                  placeholderTextColor="#9CA3AF"
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <Ionicons name={showConfirmPassword ? 'eye' : 'eye-off'} size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Password Match Indicator */}
+              {confirmPassword.length > 0 && (
+                <View style={styles.matchIndicator}>
+                  <Ionicons 
+                    name={password === confirmPassword ? 'checkmark-circle' : 'close-circle'} 
+                    size={16} 
+                    color={password === confirmPassword ? '#10B981' : '#EF4444'} 
+                  />
+                  <Text style={[
+                    styles.matchText,
+                    { color: password === confirmPassword ? '#10B981' : '#EF4444' }
+                  ]}>
+                    {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
+                  </Text>
+                </View>
+              )}
             </View>
             
             <TouchableOpacity
@@ -251,5 +365,69 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#00AEEF',
     fontWeight: '600',
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+  },
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  passwordFeedback: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  strengthContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  strengthLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginRight: 8,
+  },
+  strengthText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  strengthBar: {
+    height: 8,
+    width: '100%',
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  strengthFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  requirementsList: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  requirementText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  matchIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  matchText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 8,
   },
 }); 

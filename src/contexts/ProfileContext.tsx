@@ -1,11 +1,32 @@
 import React, { createContext, useState, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+interface UserPreferences {
+  userType: 'student' | 'professional' | 'educator' | '';
+  studyPreferences: {
+    preferredStudyTimes: string[];
+    sessionDuration: number;
+    breakDuration: number;
+  };
+  integrations: {
+    canvas: boolean;
+    googleCalendar: boolean;
+    outlook: boolean;
+  };
+  notifications: {
+    deadlineReminders: boolean;
+    studyReminders: boolean;
+    weeklyReports: boolean;
+  };
+}
+
 interface ProfileData {
   name: string;
   email: string;
   school: string;
   major: string;
+  userType?: 'student' | 'professional' | 'educator' | '';
+  preferences?: UserPreferences;
 }
 
 interface ProfileContextType {
