@@ -71,24 +71,33 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLastSync(parseInt(lastSyncData));
         }
 
-        // Then fetch fresh data if online and authenticated
-        if (mounted && session?.access_token && isOnline) {
+        // Only try to fetch from API if we have a session and are online
+        // and the API URL doesn't point to a non-existent server
+        if (mounted && session?.access_token && isOnline && !API_URL.includes('api.pulseplan.app')) {
           setLoading(true);
-          const res = await fetch(`${API_URL}/tasks`, {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          });
+          
+          try {
+            const res = await fetch(`${API_URL}/tasks`, {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+              },
+            });
 
-          if (!res.ok) {
-            throw new Error(`Failed to fetch tasks: ${res.status}`);
-          }
+            if (!res.ok) {
+              throw new Error(`Failed to fetch tasks: ${res.status}`);
+            }
 
-          const data = await res.json();
-          if (mounted) {
-            setTasks(data);
-            await updateCache(data);
+            const data = await res.json();
+            if (mounted) {
+              setTasks(data);
+              await updateCache(data);
+            }
+          } catch (fetchError) {
+            console.warn('API server not available, using cached data:', fetchError);
+            // Don't throw error, just use cached data
           }
+        } else {
+          console.log('Skipping API call - using cached data only');
         }
       } catch (err) {
         console.error('Error in initial data load:', err);

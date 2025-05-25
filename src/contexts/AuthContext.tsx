@@ -50,7 +50,6 @@ const checkOnboardingStatus = async (userId: string): Promise<boolean> => {
   try {
     const key = `${ONBOARDING_STORAGE_KEY}_${userId}`;
     const completed = await AsyncStorage.getItem(key);
-    console.log(`🔍 Checking onboarding for user ${userId}: key=${key}, value=${completed}`);
     return completed === 'true';
   } catch (error) {
     console.warn('Error checking onboarding status:', error);

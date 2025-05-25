@@ -4,25 +4,39 @@ import { Platform } from 'react-native';
 
 // Get the API URL based on environment and platform
 const constructBaseApiUrl = () => {
-  // If we have an environment variable, use it
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    const host = process.env.EXPO_PUBLIC_API_URL;
-    const port = process.env.EXPO_PUBLIC_API_PORT || '5000';
-    return `http://${host}:${port}`;
+  // Check for environment variables from .env file
+  const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
+  
+  if (envApiUrl) {
+    console.log('Using API URL from environment:', envApiUrl);
+    return envApiUrl;
   }
 
-  // Otherwise use platform-specific defaults for development
+  // Check app.json extra config
+  const appConfigApiUrl = Constants.expoConfig?.extra?.apiUrl;
+  if (appConfigApiUrl) {
+    console.log('Using API URL from app.json:', appConfigApiUrl);
+    return appConfigApiUrl;
+  }
+
+  // Development defaults
   if (__DEV__) {
+    if (Platform.OS === 'web') {
+      return 'http://localhost:5000';
+    }
     if (Platform.OS === 'ios') {
       return 'http://localhost:5000';
     }
     if (Platform.OS === 'android') {
       return 'http://10.0.2.2:5000';
     }
+    // Default for other platforms
+    return 'http://localhost:5000';
   }
 
-  // Production fallback
-  return 'https://api.pulseplan.app';
+  // Production fallback - disable for now since server doesn't exist
+  console.warn('⚠️ No API server configured. API calls will fail.');
+  return 'http://localhost:5000'; // Changed from production URL
 };
 
 export const API_URL = constructBaseApiUrl();
@@ -37,7 +51,7 @@ if (__DEV__) {
     apiUrl: API_URL,
     platform: Platform.OS,
     envApiUrl: process.env.EXPO_PUBLIC_API_URL,
-    envApiPort: process.env.EXPO_PUBLIC_API_PORT,
+    appConfigApiUrl: Constants.expoConfig?.extra?.apiUrl,
     isPhysicalDevice: Platform.OS === 'ios' || Platform.OS === 'android'
   });
 } 
