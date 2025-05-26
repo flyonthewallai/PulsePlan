@@ -123,7 +123,7 @@ export const Progress = () => {
                     { backgroundColor: [theme.colors.primary, theme.colors.secondary, theme.colors.success, theme.colors.accent][index % 4] + '10' }
                   ]}>
                     <Ionicons 
-                      name={['book', 'school', 'person', 'cafe'][index % 4]} 
+                      name={['book-outline', 'school-outline', 'person-outline', 'cafe-outline'][index % 4] as any} 
                       size={14} 
                       color={[theme.colors.primary, theme.colors.secondary, theme.colors.success, theme.colors.accent][index % 4]} 
                     />
@@ -361,7 +361,7 @@ export const Progress = () => {
           >
             <View style={[styles.recommendationIcon, { backgroundColor: theme.colors.primary + '15' }]}>
               <Ionicons 
-                name={recommendation.icon} 
+                name={recommendation.icon as any} 
                 size={24} 
                 color={theme.colors.primary} 
               />
@@ -439,7 +439,7 @@ export const Progress = () => {
               ]}
             >
               <Ionicons 
-                name={badge.icon} 
+                name={badge.icon as any} 
                 size={24} 
                 color={badge.earned ? badge.color : theme.colors.subtext} 
               />
