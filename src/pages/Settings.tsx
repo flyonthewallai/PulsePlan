@@ -7,8 +7,42 @@ import { useProfile } from '../contexts/ProfileContext';
 import { useAuth } from '../contexts/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSettings } from '../contexts/SettingsContext';
-import { useModalAnimation } from '../hooks/useModalAnimation';
+// import { useModalAnimation } from '../hooks/useModalAnimation';
 import SubscriptionScreen from '../components/SubscriptionScreen';
+
+// Temporary inline hook to bypass import issue
+const useModalAnimation = ({ isVisible, onClose, modalHeight = Dimensions.get('window').height * 0.8, animationDuration = 300 }: {
+  isVisible: boolean;
+  onClose?: () => void;
+  modalHeight?: number;
+  animationDuration?: number;
+}) => {
+  const translateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isVisible) {
+      translateY.setValue(Dimensions.get('window').height);
+      opacity.setValue(0);
+      overlayOpacity.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: 0, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 1, duration: animationDuration, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: Dimensions.get('window').height, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 0, duration: animationDuration, useNativeDriver: true }),
+      ]).start(() => onClose?.());
+    }
+  }, [isVisible, animationDuration, onClose]);
+
+  return { translateY, opacity, overlayOpacity, handleClose: () => onClose?.(), modalHeight };
+};
 
 // Add type definitions for modal types
 type ModalType = 'profile' | 'notifications' | 'privacy' | 'canvas' | 'googleCalendar' | 'outlook' | 'studyTimes' | 'focusMode' | 'aiAssistant' | 'subscription' | 'restorePurchase' | 'themes' | 'workingHours' | null;

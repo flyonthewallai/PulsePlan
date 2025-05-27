@@ -125,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Set up auth state change listener
         try {
-          const { data: authSubscription } = supabase.auth.onAuthStateChange(
+          const { data: authListener } = supabase.auth.onAuthStateChange(
             async (event, newSession) => {
               if (!mounted) return;
               
@@ -152,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           );
           
-          subscription = authSubscription;
+          subscription = authListener.subscription;
         } catch (error) {
           console.warn('Error setting up auth state listener:', error);
           // Continue without the listener - app will still work
@@ -186,7 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error };
     },
     signUp: async (email: string, password: string) => {
-      const { error } = await supabase.auth.signUp({ 
+      const { data, error } = await supabase.auth.signUp({ 
         email, 
         password
       });
@@ -229,7 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error };
     },
     signInWithMagicLink: async (email: string) => {
-      const { error } = await supabase.auth.api.sendMagicLinkEmail(email);
+      const { error } = await supabase.auth.signInWithOtp({ email });
       return { error };
     },
     completeOnboarding: async () => {

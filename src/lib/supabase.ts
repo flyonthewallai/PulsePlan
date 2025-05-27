@@ -42,16 +42,14 @@ export const getSupabaseClient = (): SupabaseClient => {
       // Return a mock client for development
       return {
         auth: {
-          signUp: async () => ({ user: null, session: null, error: { message: 'Supabase not configured' } }),
-          signIn: async () => ({ user: null, session: null, error: { message: 'Supabase not configured' } }),
+          signUp: async () => ({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
+          signInWithPassword: async () => ({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
           signOut: async () => ({ error: null }),
-          session: () => null,
-          user: () => null,
-          api: {
-            resetPasswordForEmail: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
-          },
-          update: async () => ({ user: null, error: { message: 'Supabase not configured' } }),
-          onAuthStateChange: () => ({ data: null, unsubscribe: () => {} }),
+          getSession: async () => ({ data: { session: null }, error: null }),
+          getUser: async () => ({ data: { user: null }, error: null }),
+          resetPasswordForEmail: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+          updateUser: async () => ({ data: { user: null }, error: { message: 'Supabase not configured' } }),
+          onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } }, error: null }),
         },
         from: () => ({
           select: () => ({ data: [], error: null }),
@@ -65,10 +63,12 @@ export const getSupabaseClient = (): SupabaseClient => {
     try {
       console.log('✅ Creating Supabase client with URL:', supabaseUrl);
       supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-        localStorage: AsyncStorage,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: false,
+        auth: {
+          storage: AsyncStorage,
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: false,
+        },
       });
       
       console.log('✅ Supabase client created successfully');
@@ -87,14 +87,14 @@ export const getSupabaseClient = (): SupabaseClient => {
 
 export const supabase = getSupabaseClient();
 
-// Supabase v1 Auth helper functions
+// Supabase v2 Auth helper functions
 export const signUp = async (email: string, password: string) => {
   try {
-    const { user, session, error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
-    return { user, session, error };
+    return { user: data.user, session: data.session, error };
   } catch (error) {
     console.error('SignUp error:', error);
     return { user: null, session: null, error };
@@ -103,11 +103,11 @@ export const signUp = async (email: string, password: string) => {
 
 export const signIn = async (email: string, password: string) => {
   try {
-    const { user, session, error } = await supabase.auth.signIn({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { user, session, error };
+    return { user: data.user, session: data.session, error };
   } catch (error) {
     console.error('SignIn error:', error);
     return { user: null, session: null, error };
@@ -127,7 +127,7 @@ export const signOut = async () => {
 export const resetPassword = async (email: string) => {
   try {
     const redirectTo = 'rhythm://reset-password';
-    const { data, error } = await supabase.auth.api.resetPasswordForEmail(email, { 
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, { 
       redirectTo 
     });
     return { data, error };
@@ -139,30 +139,30 @@ export const resetPassword = async (email: string) => {
 
 export const updatePassword = async (newPassword: string) => {
   try {
-    const { user, error } = await supabase.auth.update({
+    const { data, error } = await supabase.auth.updateUser({
       password: newPassword,
     });
-    return { user, error };
+    return { user: data.user, error };
   } catch (error) {
     console.error('Update password error:', error);
     return { user: null, error };
   }
 };
 
-export const getCurrentUser = () => {
+export const getCurrentUser = async () => {
   try {
-    const user = supabase.auth.user();
-    return { user, error: null };
+    const { data, error } = await supabase.auth.getUser();
+    return { user: data.user, error };
   } catch (error) {
     console.error('Get current user error:', error);
     return { user: null, error };
   }
 };
 
-export const getSession = () => {
+export const getSession = async () => {
   try {
-    const session = supabase.auth.session();
-    return { session, error: null };
+    const { data, error } = await supabase.auth.getSession();
+    return { session: data.session, error };
   } catch (error) {
     console.error('Get session error:', error);
     return { session: null, error };

@@ -3,7 +3,41 @@ import { View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView, Animated, 
 import { Ionicons } from '@expo/vector-icons';
 import { Task } from '../contexts/TaskContext';
 import { Theme } from '../contexts/ThemeContext';
-import { useModalAnimation } from '../hooks/useModalAnimation';
+// import { useModalAnimation } from '../hooks/useModalAnimation';
+
+// Temporary inline hook to bypass import issue
+const useModalAnimation = ({ isVisible, onClose, modalHeight = Dimensions.get('window').height * 0.8, animationDuration = 300 }: {
+  isVisible: boolean;
+  onClose?: () => void;
+  modalHeight?: number;
+  animationDuration?: number;
+}) => {
+  const translateY = React.useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  const opacity = React.useRef(new Animated.Value(0)).current;
+  const overlayOpacity = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (isVisible) {
+      translateY.setValue(Dimensions.get('window').height);
+      opacity.setValue(0);
+      overlayOpacity.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: 0, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 1, duration: animationDuration, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: Dimensions.get('window').height, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 0, duration: animationDuration, useNativeDriver: true }),
+      ]).start(() => onClose?.());
+    }
+  }, [isVisible, animationDuration, onClose]);
+
+  return { translateY, opacity, overlayOpacity, handleClose: () => onClose?.(), modalHeight };
+};
 
 interface TaskDetailsModalProps {
   visible: boolean;

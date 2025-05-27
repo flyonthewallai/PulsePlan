@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 import { API_URL } from '../config/api';
-import NetInfo from '@react-native-community/netinfo';
+// TODO: Fix NetInfo import issue after merge
+// import NetInfo from '@react-native-community/netinfo';
 
 // Define task type
 export interface Task {
@@ -46,12 +47,16 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [lastSync, setLastSync] = useState<number>(0);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Monitor network status
+  // Monitor network status - temporarily disabled due to NetInfo import issue
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOnline(state.isConnected ?? false);
-    });
-    return () => unsubscribe();
+    // TODO: Re-enable NetInfo when import issue is fixed
+    // const unsubscribe = NetInfo.addEventListener(state => {
+    //   setIsOnline(state.isConnected ?? false);
+    // });
+    // return () => unsubscribe();
+    
+    // For now, assume we're always online
+    setIsOnline(true);
   }, []);
 
   // Load initial data

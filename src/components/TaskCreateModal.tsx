@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Modal, 
   View, 
@@ -18,7 +18,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { Task, CreateTaskData } from '../contexts/TaskContext';
-import { useModalAnimation } from '../hooks/useModalAnimation';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MODAL_MAX_HEIGHT = SCREEN_HEIGHT * 0.85; // 85% of screen height
@@ -84,6 +83,40 @@ interface TaskCreateModalStyles {
   datePickerButton: ViewStyle;
   datePickerButtonText: TextStyle;
 }
+
+// Temporary inline hook to bypass import issue
+const useModalAnimation = ({ isVisible, onClose, modalHeight = Dimensions.get('window').height * 0.8, animationDuration = 300 }: {
+  isVisible: boolean;
+  onClose?: () => void;
+  modalHeight?: number;
+  animationDuration?: number;
+}) => {
+  const translateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isVisible) {
+      translateY.setValue(Dimensions.get('window').height);
+      opacity.setValue(0);
+      overlayOpacity.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: 0, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 1, duration: animationDuration, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: Dimensions.get('window').height, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: animationDuration, useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 0, duration: animationDuration, useNativeDriver: true }),
+      ]).start(() => onClose?.());
+    }
+  }, [isVisible, animationDuration, onClose]);
+
+  return { translateY, opacity, overlayOpacity, handleClose: () => onClose?.(), modalHeight };
+};
 
 export const TaskCreateModal = ({ visible, onClose, onCreate, theme }: TaskCreateModalProps) => {
   const {
