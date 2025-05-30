@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight, Mail } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -146,14 +145,13 @@ export default function AuthScreen() {
       <StatusBar barStyle="light-content" />
       
       <View style={styles.logoContainer}>
-        <LinearGradient
-          colors={[colors.primaryBlue, colors.accentPurple]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.logoBackground}
-        >
-          <Text style={styles.logoText}>PP</Text>
-        </LinearGradient>
+        <View style={styles.logoBackground}>
+          <Image 
+            source={require('@/assets/images/icon.png')} 
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </View>
         <Text style={styles.appName}>PulsePlan</Text>
       </View>
 
@@ -253,12 +251,7 @@ export default function AuthScreen() {
       <View style={styles.footer}>
         {activeTab === 'login' ? (
           <>
-            <LinearGradient
-              colors={[colors.primaryBlue, colors.accentPurple]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.authButton}
-            >
+            <View style={styles.authButton}>
               <TouchableOpacity
                 style={styles.authButtonTouchable}
                 onPress={handleSignIn}
@@ -273,7 +266,7 @@ export default function AuthScreen() {
                   </>
                 )}
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
 
             <View style={styles.orContainer}>
               <View style={styles.divider} />
@@ -291,12 +284,7 @@ export default function AuthScreen() {
             </TouchableOpacity>
           </>
         ) : (
-          <LinearGradient
-            colors={[colors.primaryBlue, colors.accentPurple]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.authButton}
-          >
+          <View style={styles.authButton}>
             <TouchableOpacity
               style={styles.authButtonTouchable}
               onPress={handleSignUp}
@@ -311,7 +299,7 @@ export default function AuthScreen() {
                 </>
               )}
             </TouchableOpacity>
-          </LinearGradient>
+          </View>
         )}
       </View>
     </SafeAreaView>
@@ -330,17 +318,17 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   logoBackground: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
+    width: 120,
+    height: 120,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: -10,
   },
-  logoText: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#fff',
+  logoImage: {
+    width: 120,
+    height: 120,
   },
   appName: {
     fontSize: 24,
@@ -401,6 +389,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   authButton: {
+    backgroundColor: colors.primaryBlue,
     borderRadius: 28,
   },
   authButtonTouchable: {
