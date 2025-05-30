@@ -8,13 +8,14 @@ import stripeRoutes from './routes/stripeRoutes';
 import tasksRoutes from './routes/tasksRoutes';
 import scheduleBlocksRouter from './routes/scheduleBlocks';
 import chatRoutes from './routes/chat';
+import { findAvailablePort } from './utils/portUtils';
 
 // Load environment variables
 dotenv.config();
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || '5000');
 
 // CORS configuration
 const corsOptions = {
@@ -57,9 +58,36 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Google OAuth callback URL: ${process.env.GOOGLE_REDIRECT_URL}`);
-  console.log(`Microsoft OAuth callback URL: ${process.env.MICROSOFT_REDIRECT_URL}`);
-}); 
+// Start server with port handling
+async function startServer() {
+  try {
+    const availablePort = await findAvailablePort(PORT);
+    
+    app.listen(availablePort, () => {
+      console.log(`🚀 Server successfully started on port ${availablePort}`);
+      if (availablePort !== PORT) {
+        console.log(`⚠️  Note: Default port ${PORT} was in use, using ${availablePort} instead`);
+      }
+      
+      // Fix OAuth URLs to use the correct port
+      const googleUrl = process.env.GOOGLE_REDIRECT_URL 
+        ? process.env.GOOGLE_REDIRECT_URL.replace(/:\d+/, `:${availablePort}`)
+        : `http://localhost:${availablePort}/auth/google/callback`;
+      
+      const microsoftUrl = process.env.MICROSOFT_REDIRECT_URL 
+        ? process.env.MICROSOFT_REDIRECT_URL.replace(/:\d+/, `:${availablePort}`)
+        : `http://localhost:${availablePort}/auth/microsoft/callback`;
+      
+      console.log(`🔗 Google OAuth callback URL: ${googleUrl}`);
+      console.log(`🔗 Microsoft OAuth callback URL: ${microsoftUrl}`);
+      console.log(`🏥 Health check: http://localhost:${availablePort}/health`);
+      console.log(`📊 API Base URL: http://localhost:${availablePort}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer(); 

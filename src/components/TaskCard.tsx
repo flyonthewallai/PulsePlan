@@ -1,234 +1,225 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { useTheme } from '../contexts/ThemeContext';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { 
+  Calculator, 
+  FlaskConical, 
+  Library, 
+  Book, 
+  GraduationCap, 
+  Clock, 
+  MoreHorizontal, 
+  Check 
+} from 'lucide-react-native';
+import { colors } from '../constants/theme';
+import { Task } from '../contexts/TaskContext';
 
-const getSubjectColor = (subject) => {
-  const colors = {
-    'Mathematics': '#3B82F6',
-    'Physics': '#8B5CF6',
-    'Biology': '#10B981',
-    'English': '#F59E0B',
-    'History': '#EF4444',
-    'Computer Science': '#EC4899',
-    'Chemistry': '#6366F1',
-    'default': '#6B7280'
-  };
-  return colors[subject] || colors.default;
-};
+interface TaskCardProps {
+  task: Task;
+  isFirst?: boolean;
+  isLast?: boolean;
+}
 
-const getPriorityColor = (priority) => {
-  const colors = {
-    'high': '#EF4444',
-    'medium': '#F59E0B',
-    'low': '#10B981',
-    'default': '#6B7280'
-  };
-  return colors[priority] || colors.default;
-};
-
-const getStatusIcon = (status) => {
-  const icons = {
-    'pending': 'time-outline',
-    'in_progress': 'sync-outline',
-    'completed': 'checkmark-circle-outline',
-    'default': 'document-text-outline'
-  };
-  return icons[status] || icons.default;
-};
-
-export const TaskCard = ({ task, onPress }) => {
-  const { theme } = useTheme();
-  const scaleAnim = React.useRef(new Animated.Value(1)).current;
-  
-  // Safely parse due_date
-  let timeString = '-';
-  if (task.due_date) {
-    try {
-      const dateObj = typeof task.due_date === 'string' ? new Date(task.due_date) : task.due_date;
-      if (!isNaN(dateObj.getTime())) {
-        timeString = dateObj.toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        });
-      }
-    } catch (e) {
-      // leave timeString as '-'
+export default function TaskCard({ task, isFirst, isLast }: TaskCardProps) {
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return '#FF5757';
+      case 'medium': return '#FFD60A'; 
+      case 'low': return '#30D158';
+      default: return colors.textSecondary;
     }
-  }
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 4
-    }).start();
   };
 
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 4
-    }).start();
+  const getSubjectIcon = (subject: string) => {
+    const iconProps = { size: 12, color: colors.textSecondary };
+    
+    switch (subject.toLowerCase()) {
+      case 'math': return <Calculator {...iconProps} />;
+      case 'science': return <FlaskConical {...iconProps} />;
+      case 'history': return <Library {...iconProps} />;
+      case 'english': return <Book {...iconProps} />;
+      case 'psychology': return <GraduationCap {...iconProps} />;
+      default: return <Book {...iconProps} />;
+    }
   };
+
+  const formatTime = (dueDate: string) => {
+    try {
+      const date = new Date(dueDate);
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      return ''; // fallback if parsing fails
+    }
+  };
+
+  const formatDuration = (minutes?: number) => {
+    if (!minutes) return '';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    
+    if (hours > 0 && mins > 0) {
+      return `${hours}h ${mins}m`;
+    } else if (hours > 0) {
+      return `${hours}h`;
+    } else {
+      return `${mins} min`;
+    }
+  };
+
+  const isCompleted = task.status === 'completed';
 
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity 
-        style={[
-          styles.container,
-          { 
-            backgroundColor: theme.colors.cardBackground,
-            borderLeftColor: getSubjectColor(task.subject),
-            borderLeftWidth: 4,
-            shadowColor: theme.colors.text,
-            shadowOpacity: 0.1,
-          }
-        ]}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={0.9}
-      >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={styles.titleContainer}>
-              <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
-                {task.title}
-              </Text>
-              <View style={[
-                styles.priorityBadge,
-                { backgroundColor: getPriorityColor(task.priority) + '15' }
-              ]}>
-                <Text style={[
-                  styles.priorityText,
-                  { color: getPriorityColor(task.priority) }
-                ]}>
-                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                </Text>
-              </View>
-            </View>
-            <View style={[
-              styles.statusContainer,
-              { backgroundColor: theme.colors.background + '80' }
-            ]}>
-              <Ionicons 
-                name={getStatusIcon(task.status)} 
-                size={20} 
-                color={theme.colors.text} 
-              />
-            </View>
+    <View style={[
+      styles.container,
+      isFirst && styles.firstCard,
+      isLast && styles.lastCard
+    ]}>
+      <View style={[styles.leftBorder, { backgroundColor: getPriorityColor(task.priority) }]} />
+      
+      {/* Menu button - on left */}
+      <TouchableOpacity style={styles.menuButton}>
+        <MoreHorizontal size={16} color={colors.textSecondary} />
+      </TouchableOpacity>
+      
+      <View style={styles.content}>
+        <Text style={[
+          styles.title,
+          isCompleted && styles.titleCompleted
+        ]}>
+          {task.title}
+        </Text>
+        
+        <View style={styles.details}>
+          <View style={styles.subjectContainer}>
+            {getSubjectIcon(task.subject)}
+            <Text style={styles.subject}>{task.subject}</Text>
           </View>
           
-          <View style={styles.footer}>
-            <View style={styles.subjectContainer}>
-              <Ionicons 
-                name="book-outline" 
-                size={14} 
-                color={theme.colors.subtext} 
-                style={styles.subjectIcon}
-              />
-              <Text style={[styles.subject, { color: theme.colors.subtext }]} numberOfLines={1}>
-                {task.subject}
-              </Text>
-            </View>
-            <View style={styles.timeContainer}>
-              <Ionicons 
-                name="time-outline" 
-                size={14} 
-                color={theme.colors.subtext} 
-                style={styles.timeIcon}
-              />
-              <Text style={[styles.time, { color: theme.colors.subtext }]}>
-                {timeString}
-              </Text>
-            </View>
+          <View style={styles.timeContainer}>
+            <Clock size={12} color={colors.textSecondary} />
+            <Text style={styles.time}>{formatTime(task.due_date)}</Text>
           </View>
+          
+          <Text style={styles.duration}>{formatDuration(task.estimated_minutes)}</Text>
         </View>
+      </View>
+      
+      {/* Completion checkbox - on right */}
+      <TouchableOpacity style={[
+        styles.checkbox,
+        isCompleted && styles.checkboxCompleted
+      ]}>
+        {isCompleted && (
+          <Check size={14} color="#fff" />
+        )}
       </TouchableOpacity>
-    </Animated.View>
+    </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 16,
-    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 3,
+    marginBottom: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    position: 'relative',
+    shadowColor: 'rgba(0, 0, 0, 0.3)',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  firstCard: {
+    marginTop: 4,
+  },
+  lastCard: {
+    marginBottom: 16,
+  },
+  leftBorder: {
+    position: 'absolute',
+    left: 0,
+    top: '25%',
+    bottom: '25%',
+    width: 4,
+    borderRadius: 2,
+  },
+  menuButton: {
+    padding: 6,
+    marginRight: 10,
   },
   content: {
-    padding: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  titleContainer: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 12,
-    gap: 8,
   },
   title: {
-    flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 6,
     letterSpacing: 0.2,
   },
-  priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  titleCompleted: {
+    textDecorationLine: 'line-through',
+    color: colors.textSecondary,
+    opacity: 0.7,
   },
-  priorityText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  statusContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  footer: {
+  details: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   subjectContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
     marginRight: 12,
-  },
-  subjectIcon: {
-    marginRight: 4,
   },
   subject: {
     fontSize: 13,
+    color: colors.textSecondary,
+    marginLeft: 4,
     fontWeight: '500',
   },
   timeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  timeIcon: {
-    marginRight: 4,
+    marginRight: 12,
   },
   time: {
     fontSize: 13,
+    color: colors.textSecondary,
+    marginLeft: 4,
     fontWeight: '500',
-  }
+  },
+  duration: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    fontWeight: '500',
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#4A4A4A',
+    marginLeft: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  },
+  checkboxCompleted: {
+    backgroundColor: colors.primaryBlue,
+    borderColor: colors.primaryBlue,
+  },
 });

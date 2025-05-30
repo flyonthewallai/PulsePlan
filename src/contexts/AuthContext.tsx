@@ -1,149 +1,160 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, getSession, getCurrentUser, resetPassword as supabaseResetPassword, signIn as supabaseSignIn } from '../lib/supabase';
-import { API_URL } from '../config/api';
+import { useRouter, useSegments } from 'expo-router';
+import { supabaseAuth, onAuthStateChange, getSession } from '@/lib/supabase-rn';
 
-type AuthContextType = {
+interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
-  signOut: () => Promise<{ error: any }>;
-  resetPassword: (email: string) => Promise<{ error: any }>;
-  signInWithMagicLink: (email: string) => Promise<{ error: any }>;
+  isAuthenticated: boolean;
+  error: string | null;
+  refreshAuth: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  session: null,
+  loading: true,
+  isAuthenticated: false,
+  error: null,
+  refreshAuth: async () => {},
+});
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const router = useRouter();
+  const segments = useSegments();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const initializeAuth = useCallback(async () => {
-    if (initialized) return;
-    
+  const refreshAuth = async () => {
     try {
-      const { session: currentSession, error: sessionError } = await getSession();
-      if (sessionError) throw sessionError;
+      console.log('🔄 Refreshing auth state...');
+      const { session, error: sessionError } = await getSession();
       
-      setSession(currentSession);
-      
-      if (currentSession) {
-        const { user: currentUser, error: userError } = await getCurrentUser();
-        if (userError) throw userError;
-        setUser(currentUser);
+      if (sessionError) {
+        console.error('Error refreshing session:', sessionError);
+        setError('Failed to refresh authentication session');
+        setSession(null);
+        setUser(null);
+        console.log('🔄 Auth state set to unauthenticated due to error');
+      } else {
+        console.log('🔄 Auth refresh result:', { 
+          hasSession: !!session, 
+          userEmail: session?.user?.email || 'none',
+          sessionKeys: session ? Object.keys(session) : []
+        });
+        setSession(session);
+        setUser(session?.user ?? null);
+        setError(null);
+        console.log('🔄 Auth state updated:', {
+          hasUser: !!(session?.user),
+          userEmail: session?.user?.email || 'none'
+        });
       }
     } catch (error) {
-      console.error('Error initializing auth:', error);
-      // Reset state on error
+      console.error('Error refreshing auth:', error);
+      setError('Authentication refresh failed');
       setSession(null);
       setUser(null);
-    } finally {
-      setLoading(false);
-      setInitialized(true);
+      console.log('🔄 Auth state set to unauthenticated due to exception');
     }
-  }, [initialized]);
+  };
+
+  // Navigation logic in auth context
+  useEffect(() => {
+    if (loading) {
+      console.log('⏳ Auth still loading, skipping navigation...');
+      return;
+    }
+
+    const isInAuthGroup = segments[0] === '(tabs)';
+    const isOnAuthPage = segments[0] === 'auth';
+    const isOnIndexPage = segments.length === 0;
+    
+    console.log('🔀 Auth Context Navigation Check:', { 
+      hasUser: !!user, 
+      isAuthenticated: !!user,
+      segments,
+      isInAuthGroup,
+      isOnAuthPage,
+      isOnIndexPage,
+      userEmail: user?.email || 'none'
+    });
+
+    if (!user) {
+      // User not authenticated
+      if (isInAuthGroup) {
+        console.log('🔒 User not authenticated, redirecting from tabs to auth...');
+        router.replace('/auth');
+      } else if (!isOnAuthPage && !isOnIndexPage) {
+        console.log('🔒 User not authenticated, redirecting to auth...');
+        router.replace('/auth');
+      } else {
+        console.log('👤 User not authenticated but already on auth/index page');
+      }
+    } else {
+      // User is authenticated
+      if (!isInAuthGroup) {
+        console.log('✅ User authenticated, redirecting to home...');
+        router.replace('/(tabs)/home');
+      } else {
+        console.log('🏠 User authenticated and already in tabs');
+      }
+    }
+  }, [user, loading, segments, router]);
 
   useEffect(() => {
-    let mounted = true;
-    let subscription: { unsubscribe: () => void } | null = null;
+    // Validate Supabase client
+    if (!supabaseAuth) {
+      console.error('Supabase client not properly initialized');
+      setError('Authentication service not available. Please check your configuration.');
+      setLoading(false);
+      return;
+    }
 
-    const setupAuth = async () => {
-      if (!mounted) return;
-
+    // Get initial session
+    const getInitialSession = async () => {
       try {
-        await initializeAuth();
-
-        // Set up auth state change listener
-        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-          async (event, newSession) => {
-            if (!mounted) return;
-            
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-              const { user: currentUser } = await getCurrentUser();
-              setUser(currentUser);
-              setSession(newSession);
-            } else if (event === 'SIGNED_OUT') {
-              setUser(null);
-              setSession(null);
-            }
-            setLoading(false);
-          }
-        );
-        
-        subscription = authSubscription;
+        console.log('Getting initial session...');
+        await refreshAuth();
       } catch (error) {
-        console.error('Error setting up auth:', error);
-        if (mounted) {
-          setLoading(false);
-        }
+        console.error('Error getting initial session:', error);
+        setError('Authentication initialization failed');
+      } finally {
+        setLoading(false);
       }
     };
 
-    setupAuth();
+    getInitialSession();
 
-    // Cleanup subscription on unmount
-    return () => {
-      mounted = false;
-      if (subscription) {
-        subscription.unsubscribe();
-      }
-    };
-  }, [initializeAuth]);
+    // For now, we'll skip the auth state listener since it's not implemented in our RN client
+    // This can be added later with a polling mechanism if needed
+    console.log('Auth context initialized with React Native client');
+  }, []);
 
   const value = {
     user,
     session,
     loading,
-    signIn: async (email: string, password: string) => {
-      const { error } = await supabaseSignIn(email, password);
-      return { error };
-    },
-    signUp: async (email: string, password: string) => {
-      const { error } = await supabase.auth.signUp({ 
-        email, 
-        password,
-        options: {
-          data: {
-            email_confirmed: true // Mark email as confirmed
-          }
-        }
-      });
-      return { error };
-    },
-    signOut: async () => {
-      const { error } = await supabase.auth.signOut();
-      return { error };
-    },
-    resetPassword: async (email: string) => {
-      const { error } = await supabaseResetPassword(email);
-      return { error };
-    },
-    signInWithMagicLink: async (email: string) => {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: true
-        }
-      });
-      return { error };
-    },
+    isAuthenticated: !!user,
+    error,
+    refreshAuth,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }; 

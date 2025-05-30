@@ -1,785 +1,744 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Modal, 
   View, 
   Text, 
-  TextInput, 
-  TouchableOpacity, 
   StyleSheet, 
-  Platform, 
-  KeyboardAvoidingView, 
-  ScrollView, 
-  ViewStyle, 
-  TextStyle,
-  Animated,
-  Dimensions
+  Modal, 
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  Keyboard,
+  Alert,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../contexts/ThemeContext';
-import { Task, CreateTaskData } from '../contexts/TaskContext';
-import { useModalAnimation } from '../hooks/useModalAnimation';
+import { Book, Calendar, Clock, Flag } from 'lucide-react-native';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const MODAL_MAX_HEIGHT = SCREEN_HEIGHT * 0.85; // 85% of screen height
+import { colors } from '../constants/theme';
+import { useTasks, CreateTaskData } from '../contexts/TaskContext';
 
-const SUBJECT_OPTIONS = [
-  { id: 'Mathematics', icon: 'calculator-outline' },
-  { id: 'Physics', icon: 'flash-outline' },
-  { id: 'Biology', icon: 'leaf-outline' },
-  { id: 'English', icon: 'book-outline' },
-  { id: 'History', icon: 'time-outline' },
-  { id: 'Computer Science', icon: 'code-outline' },
-  { id: 'Chemistry', icon: 'flask-outline' },
-  { id: 'Other', icon: 'ellipsis-horizontal-outline' }
-];
-
-interface TaskCreateModalProps {
+type TaskCreateModalProps = {
   visible: boolean;
   onClose: () => void;
-  onCreate: (task: CreateTaskData) => void;
-  theme: any; // Replace with proper theme type
-}
+  initialDate?: Date;
+  initialTime?: Date;
+  initialTimeEstimate?: string;
+};
 
-// Define the style types with proper React Native style types
-interface TaskCreateModalStyles {
-  overlay: ViewStyle;
-  modalTouchable: ViewStyle;
-  modalContainer: ViewStyle;
-  handle: ViewStyle;
-  keyboardAvoidingView: ViewStyle;
-  scrollView: ViewStyle;
-  scrollViewContent: ViewStyle;
-  modal: ViewStyle;
-  header: ViewStyle;
-  title: TextStyle;
-  closeButton: ViewStyle;
-  form: ViewStyle;
-  inputContainer: ViewStyle;
-  label: TextStyle;
-  input: TextStyle;
-  textArea: TextStyle;
-  subjectsContainer: ViewStyle;
-  subjectOption: ViewStyle;
-  subjectText: TextStyle;
-  dateButton: ViewStyle;
-  dateText: TextStyle;
-  durationInput: ViewStyle;
-  priorityContainer: ViewStyle;
-  priorityOption: ViewStyle;
-  priorityText: TextStyle;
-  statusContainer: ViewStyle;
-  statusOption: ViewStyle;
-  statusText: TextStyle;
-  errorContainer: ViewStyle;
-  errorText: TextStyle;
-  buttonContainer: ViewStyle;
-  button: ViewStyle;
-  cancelButton: ViewStyle;
-  createButton: ViewStyle;
-  buttonText: TextStyle;
-  keyboardAvoidingContainer: ViewStyle;
-  datePickerContainer: ViewStyle;
-  datePicker: ViewStyle;
-  datePickerButton: ViewStyle;
-  datePickerButtonText: TextStyle;
-}
-
-export const TaskCreateModal = ({ visible, onClose, onCreate, theme }: TaskCreateModalProps) => {
-  const {
-    translateY,
-    opacity,
-    overlayOpacity,
-    handleClose,
-    modalHeight
-  } = useModalAnimation({
-    isVisible: visible,
-    onClose,
-    modalHeight: MODAL_MAX_HEIGHT,
-    animationDuration: 300
-  });
+export default function TaskCreateModal({ visible, onClose, initialDate, initialTime, initialTimeEstimate }: TaskCreateModalProps) {
+  const { createTask, loading } = useTasks();
+  const [isCreating, setIsCreating] = useState(false);
+  
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [subject, setSubject] = useState(SUBJECT_OPTIONS[0].id);
-  const [dueDate, setDueDate] = useState(new Date());
-  const [estimatedMinutes, setEstimatedMinutes] = useState('');
-  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
-  const [status, setStatus] = useState<'pending' | 'in_progress' | 'completed'>('pending');
-  const [error, setError] = useState('');
+  const [subject, setSubject] = useState('');
+  const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [selectedDate, setSelectedDate] = useState(initialDate || new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [tempDueDate, setTempDueDate] = useState<Date | null>(null);
-
-  const handleCreate = () => {
-    if (!title.trim() || !subject || !dueDate || !status) {
-      setError('Please fill all required fields.');
+  const [selectedTime, setSelectedTime] = useState(initialTime || new Date());
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [timeEstimate, setTimeEstimate] = useState(initialTimeEstimate || '60');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [currentFocusedInput, setCurrentFocusedInput] = useState<string | null>(null);
+  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
+  
+  // Local subjects - later we can sync these with Supabase
+  const [localSubjects] = useState([
+    { id: '1', name: 'Mathematics', color: '#FF6B6B' },
+    { id: '2', name: 'Computer Science', color: '#4ECDC4' },
+    { id: '3', name: 'Physics', color: '#45B7D1' },
+    { id: '4', name: 'Chemistry', color: '#96CEB4' },
+    { id: '5', name: 'Biology', color: '#FFEAA7' },
+    { id: '6', name: 'History', color: '#DDA0DD' },
+    { id: '7', name: 'English', color: '#98D8C8' },
+    { id: '8', name: 'Psychology', color: '#F7DC6F' },
+  ]);
+  
+  const scrollViewRef = useRef<ScrollView>(null);
+  const titleInputRef = useRef<TextInput>(null);
+  const subjectInputRef = useRef<TextInput>(null);
+  const dateInputRef = useRef<TextInput>(null);
+  const timeEstimateInputRef = useRef<TextInput>(null);
+  const modalRef = useRef<View>(null);
+  
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener('keyboardWillShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      // Simple scroll when keyboard appears
+      scrollViewRef.current?.scrollTo({
+        y: 100,
+        animated: true
+      });
+    });
+    
+    const keyboardWillHide = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardHeight(0);
+      // Reset scroll position when keyboard hides
+      scrollViewRef.current?.scrollTo({
+        y: 0,
+        animated: true
+      });
+    });
+    
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
+  
+  const handleInputFocus = (inputName: string) => {
+    setCurrentFocusedInput(inputName);
+  };
+  
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (selectedDate) {
+      setSelectedDate(selectedDate);
+    }
+  };
+  
+  const handleTimeChange = (event: any, selectedTime?: Date) => {
+    if (selectedTime) {
+      setSelectedTime(selectedTime);
+    }
+  };
+  
+  const showDatePickerModal = () => {
+    setShowDatePicker(true);
+  };
+  
+  const showTimePickerModal = () => {
+    setShowTimePicker(true);
+  };
+  
+  const hideDatePicker = () => {
+    setShowDatePicker(false);
+  };
+  
+  const hideTimePicker = () => {
+    setShowTimePicker(false);
+  };
+  
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+  
+  const formatTime = (time: Date) => {
+    return time.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+  
+  const handleSubjectSelect = (subjectName: string) => {
+    setSubject(subjectName);
+    setShowSubjectPicker(false);
+  };
+  
+  const getSelectedSubject = () => {
+    return localSubjects.find(s => s.name === subject);
+  };
+  
+  const handleSave = async () => {
+    // Validation
+    if (!title.trim()) {
+      Alert.alert('Error', 'Please enter a task title');
       return;
     }
-    setError('');
-    onCreate({
-      title: title.trim(),
-      description: description.trim(),
-      subject,
-      due_date: dueDate.toISOString(),
-      estimated_minutes: estimatedMinutes ? Number(estimatedMinutes) : undefined,
-      status,
-      priority,
-    });
-    // Reset form
+    
+    if (!subject) {
+      Alert.alert('Error', 'Please select a subject');
+      return;
+    }
+
+    setIsCreating(true);
+    
+    try {
+      // Combine date and time into a single due_date
+      const dueDateTime = new Date(selectedDate);
+      dueDateTime.setHours(selectedTime.getHours());
+      dueDateTime.setMinutes(selectedTime.getMinutes());
+      
+      const taskData: CreateTaskData = {
+        title: title.trim(),
+        description: '', // We can add a description field later
+        subject,
+        due_date: dueDateTime.toISOString(),
+        estimated_minutes: timeEstimate ? parseInt(timeEstimate) : undefined,
+        status: 'pending',
+        priority,
+      };
+
+      await createTask(taskData);
+      
+      // Reset form and close modal
+      resetForm();
+      onClose();
+      
+      Alert.alert('Success', 'Task created successfully!');
+    } catch (error) {
+      console.error('Error creating task:', error);
+      Alert.alert('Error', 'Failed to create task. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+  
+  const resetForm = () => {
     setTitle('');
-    setDescription('');
-    setSubject(SUBJECT_OPTIONS[0].id);
-    setDueDate(new Date());
-    setEstimatedMinutes('');
+    setSubject('');
     setPriority('medium');
-    setStatus('pending');
+    setSelectedDate(initialDate || new Date());
+    setSelectedTime(initialTime || new Date());
+    setTimeEstimate(initialTimeEstimate || '60');
+    setCurrentFocusedInput(null);
   };
-
-  const handleDateChange = (event: any, selectedDate: any) => {
-    if (Platform.OS === 'ios') {
-      if (selectedDate) setTempDueDate(selectedDate);
-    } else {
-      setShowDatePicker(false);
-      if (selectedDate) setDueDate(selectedDate);
+  
+  // Reset form when modal opens or initial values change
+  useEffect(() => {
+    if (visible) {
+      resetForm();
+    }
+  }, [visible, initialDate, initialTime, initialTimeEstimate]);
+  
+  const getPriorityColor = (value: string) => {
+    switch (value) {
+      case 'high':
+        return colors.taskColors.high;
+      case 'medium':
+        return colors.taskColors.medium;
+      case 'low':
+        return colors.taskColors.low;
+      default:
+        return colors.taskColors.default;
     }
   };
-
-  const getPriorityColor = (priority: string) => {
-    const colors = {
-      'high': '#EF4444',
-      'medium': '#F59E0B',
-      'low': '#10B981',
-      'default': '#6B7280'
-    };
-    return colors[priority] || colors.default;
-  };
-
-  // Create theme-dependent styles
-  const themeStyles = React.useMemo(() => ({
-    modalContainer: {
-      width: '100%',
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
-      shadowColor: theme.colors.primary,
-      shadowOffset: { 
-        width: 0, 
-        height: 8 
-      },
-      shadowOpacity: 0.15,
-      shadowRadius: 24,
-      elevation: 12,
-      borderWidth: 1,
-      borderColor: theme.colors.border + '20',
-      backgroundColor: theme.colors.background + 'F0', // 94% opacity for frosted effect
-    }
-  }), [theme]);
-
-  const styles = React.useMemo(() => StyleSheet.create({
-    keyboardAvoidingContainer: {
-      flex: 1,
-    },
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.35)',
-      justifyContent: 'flex-end',
-    },
-    modalTouchable: {
-      width: '100%',
-    },
-    scrollView: {
-      maxHeight: MODAL_MAX_HEIGHT - 40,
-    },
-    scrollViewContent: {
-      flexGrow: 1,
-      paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    },
-    modal: {
-      padding: 20,
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 24,
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      letterSpacing: 0.3,
-    },
-    closeButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      justifyContent: 'center',
-      alignItems: 'center',
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 8,
-      elevation: 3,
-    },
-    form: {
-      gap: 20,
-    },
-    inputContainer: {
-      gap: 8,
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: '600',
-      letterSpacing: 0.2,
-    },
-    input: {
-      borderWidth: 1,
-      borderRadius: 12,
-      padding: 12,
-      fontSize: 16,
-      letterSpacing: 0.2,
-    },
-    textArea: {
-      height: 100,
-      textAlignVertical: 'top',
-    },
-    subjectsContainer: {
-      flexDirection: 'row',
-      gap: 8,
-      paddingVertical: 4,
-    },
-    subjectOption: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 12,
-      borderWidth: 1,
-      gap: 6,
-    },
-    subjectText: {
-      fontSize: 14,
-      fontWeight: '500',
-      letterSpacing: 0.2,
-    },
-    dateButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-      gap: 8,
-    },
-    dateText: {
-      fontSize: 16,
-      letterSpacing: 0.2,
-    },
-    durationInput: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-      gap: 8,
-    },
-    priorityContainer: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    priorityOption: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-      gap: 6,
-    },
-    priorityText: {
-      fontSize: 14,
-      fontWeight: '500',
-      letterSpacing: 0.2,
-    },
-    statusContainer: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    statusOption: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-      gap: 6,
-    },
-    statusText: {
-      fontSize: 14,
-      fontWeight: '500',
-      letterSpacing: 0.2,
-    },
-    errorContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      padding: 12,
-      borderRadius: 12,
-      backgroundColor: '#FEE2E2',
-    },
-    errorText: {
-      fontSize: 14,
-      fontWeight: '500',
-      letterSpacing: 0.2,
-    },
-    buttonContainer: {
-      flexDirection: 'row',
-      gap: 12,
-      marginTop: 8,
-    },
-    button: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 16,
-      borderRadius: 12,
-      gap: 8,
-    },
-    cancelButton: {
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 8,
-      elevation: 3,
-    },
-    createButton: {
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 8,
-      elevation: 3,
-    },
-    buttonText: {
-      fontSize: 16,
-      fontWeight: '600',
-      letterSpacing: 0.2,
-    },
-    datePickerContainer: {
-      marginTop: 8,
-      borderRadius: 12,
-      borderWidth: 1,
-      overflow: 'hidden',
-      backgroundColor: theme.colors.cardBackground,
-      borderColor: theme.colors.border,
-    },
-    datePicker: {
-      height: 200,
-    },
-    datePickerButton: {
-      paddingVertical: 12,
-      paddingHorizontal: 24,
-      alignItems: 'center',
-      borderWidth: 1.5,
-      borderColor: theme.colors.primary,
-      borderRadius: 12,
-      margin: 16,
-      backgroundColor: 'transparent',
-    },
-    datePickerButtonText: {
-      fontSize: 16,
-      fontWeight: '600',
-      letterSpacing: 0.2,
-      color: theme.colors.primary,
-    },
-  }), [theme]);
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardAvoidingContainer}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <Animated.View 
-          style={[
-            styles.overlay,
-            { opacity: overlayOpacity }
-          ]}
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View ref={modalRef} style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={styles.cancelButton}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={styles.modalTitle}>New Task</Text>
+          <TouchableOpacity onPress={handleSave} disabled={isCreating}>
+            <Text style={[
+              styles.modalSaveButton,
+              isCreating && styles.modalSaveButtonDisabled
+            ]}>
+              {isCreating ? 'Creating...' : 'Create'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.modalContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Task Title</Text>
+            <TextInput
+              ref={titleInputRef}
+              style={styles.modalInput}
+              placeholder="What do you need to do?"
+              placeholderTextColor={colors.textSecondary}
+              value={title}
+              onChangeText={setTitle}
+              onFocus={() => handleInputFocus('title')}
+              autoFocus
+            />
+          </View>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Subject</Text>
+            <TouchableOpacity 
+              style={styles.subjectPicker}
+              onPress={() => setShowSubjectPicker(true)}
+            >
+              <Book size={20} color={colors.textSecondary} />
+              <View style={styles.subjectPickerContent}>
+                {subject ? (
+                  <View style={styles.selectedSubject}>
+                    <View 
+                      style={[
+                        styles.subjectColorDot, 
+                        { backgroundColor: getSelectedSubject()?.color || colors.textSecondary }
+                      ]} 
+                    />
+                    <Text style={styles.selectedSubjectText}>{subject}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.subjectPlaceholder}>Select subject</Text>
+                )}
+              </View>
+              <Text style={styles.dropdownArrow}>▼</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Priority</Text>
+            <View style={styles.prioritySelector}>
+              {(['high', 'medium', 'low'] as const).map((value) => (
+                <TouchableOpacity
+                  key={value}
+                  style={[
+                    styles.priorityButton,
+                    priority === value && styles.selectedPriorityButton,
+                    { borderColor: getPriorityColor(value) },
+                  ]}
+                  onPress={() => setPriority(value)}
+                >
+                  <View 
+                    style={[
+                      styles.priorityDot,
+                      { backgroundColor: getPriorityColor(value) },
+                    ]} 
+                  />
+                  <Text 
+                    style={[
+                      styles.priorityText,
+                      priority === value && styles.selectedPriorityText,
+                    ]}
+                  >
+                    {value.charAt(0).toUpperCase() + value.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          
+          <View style={styles.inputRow}>
+            <View style={[styles.inputGroup, styles.inputHalf]}>
+              <Text style={styles.inputLabel}>Due Date</Text>
+              <View style={styles.inputWithIcon}>
+                <Calendar size={20} color={colors.textSecondary} />
+                <TouchableOpacity
+                  style={styles.iconInput}
+                  onPress={showDatePickerModal}
+                >
+                  <Text style={styles.selectedDateText}>{formatDate(selectedDate)}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <View style={[styles.inputGroup, styles.inputHalf]}>
+              <Text style={styles.inputLabel}>Due Time</Text>
+              <View style={styles.inputWithIcon}>
+                <Clock size={20} color={colors.textSecondary} />
+                <TouchableOpacity
+                  style={styles.iconInput}
+                  onPress={showTimePickerModal}
+                >
+                  <Text style={styles.selectedDateText}>{formatTime(selectedTime)}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Time Estimate</Text>
+            <View style={styles.inputWithIcon}>
+              <Flag size={20} color={colors.textSecondary} />
+              <TextInput
+                ref={timeEstimateInputRef}
+                style={styles.iconInput}
+                placeholder="How long will it take? (min)"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="number-pad"
+                value={timeEstimate}
+                onChangeText={setTimeEstimate}
+                onFocus={() => handleInputFocus('timeEstimate')}
+              />
+            </View>
+          </View>
+          
+          {/* Add some bottom padding for better UX */}
+          <View style={styles.bottomPadding} />
+        </ScrollView>
+      </View>
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <Modal
+          visible={showDatePicker}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={hideDatePicker}
         >
           <TouchableOpacity 
-            style={styles.overlay} 
-            activeOpacity={1} 
-            onPress={handleClose}
+            style={styles.datePickerOverlay}
+            activeOpacity={1}
+            onPress={hideDatePicker}
           >
-            <TouchableOpacity 
-              activeOpacity={1} 
-              onPress={(e) => e.stopPropagation()}
-              style={styles.modalTouchable}
-            >
-              <Animated.View 
-                style={[
-                  themeStyles.modalContainer,
-                  { 
-                    transform: [{ translateY }],
-                    opacity,
-                    maxHeight: modalHeight
-                  }
-                ]}
-              >
-                <ScrollView 
-                  style={styles.scrollView}
-                  contentContainerStyle={styles.scrollViewContent}
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={true}
-                  bounces={true}
-                >
-                  <View style={styles.modal}>
-                    <View style={styles.header}>
-                      <Text style={[styles.title, { color: theme.colors.text }]}>
-                        Create Task
-                      </Text>
-                      <TouchableOpacity
-                        style={[
-                          styles.closeButton,
-                          { backgroundColor: theme.colors.cardBackground }
-                        ]}
-                        onPress={handleClose}
-                      >
-                        <Ionicons name="close" size={24} color={theme.colors.text} />
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.form}>
-                      <View style={styles.inputContainer}>
-                        <Text style={[styles.label, { color: theme.colors.text }]}>
-                          Title
-                        </Text>
-                        <TextInput
-                          style={[
-                            styles.input,
-                            { 
-                              backgroundColor: theme.colors.cardBackground,
-                              color: theme.colors.text,
-                              borderColor: theme.colors.border
-                            }
-                          ]}
-                          placeholder="Enter task title"
-                          placeholderTextColor={theme.colors.subtext}
-                          value={title}
-                          onChangeText={setTitle}
-                        />
-                      </View>
-
-                      <View style={styles.inputContainer}>
-                        <Text style={[styles.label, { color: theme.colors.text }]}>
-                          Description
-                        </Text>
-                        <TextInput
-                          style={[
-                            styles.input,
-                            styles.textArea,
-                            { 
-                              backgroundColor: theme.colors.cardBackground,
-                              color: theme.colors.text,
-                              borderColor: theme.colors.border
-                            }
-                          ]}
-                          placeholder="Enter task description"
-                          placeholderTextColor={theme.colors.subtext}
-                          value={description}
-                          onChangeText={setDescription}
-                          multiline
-                          numberOfLines={3}
-                        />
-                      </View>
-
-                      <View style={styles.inputContainer}>
-                        <Text style={[styles.label, { color: theme.colors.text }]}>
-                          Subject
-                        </Text>
-                        <ScrollView 
-                          horizontal 
-                          showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={styles.subjectsContainer}
-                        >
-                          {SUBJECT_OPTIONS.map(option => (
-                            <TouchableOpacity
-                              key={option.id}
-                              style={[
-                                styles.subjectOption,
-                                subject === option.id && {
-                                  backgroundColor: theme.colors.primary + '15',
-                                  borderColor: theme.colors.primary
-                                }
-                              ]}
-                              onPress={() => setSubject(option.id)}
-                              activeOpacity={0.8}
-                            >
-                              <Ionicons 
-                                name={option.icon} 
-                                size={20} 
-                                color={subject === option.id ? theme.colors.primary : theme.colors.text} 
-                              />
-                              <Text style={[
-                                styles.subjectText,
-                                { 
-                                  color: subject === option.id ? theme.colors.primary : theme.colors.text,
-                                  opacity: subject === option.id ? 1 : 0.7
-                                }
-                              ]}>
-                                {option.id}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </ScrollView>
-                      </View>
-
-                      <View style={styles.inputContainer}>
-                        <Text style={[styles.label, { color: theme.colors.text }]}>
-                          Due Date
-                        </Text>
-                        <TouchableOpacity 
-                          style={[
-                            styles.dateButton,
-                            { 
-                              backgroundColor: theme.colors.cardBackground,
-                              borderColor: theme.colors.border
-                            }
-                          ]}
-                          onPress={() => setShowDatePicker(true)}
-                        >
-                          <Ionicons 
-                            name="calendar-outline" 
-                            size={20} 
-                            color={theme.colors.text} 
-                          />
-                          <Text style={[styles.dateText, { color: theme.colors.text }]}>
-                            {dueDate.toLocaleString()}
-                          </Text>
-                        </TouchableOpacity>
-                        {showDatePicker && (
-                          Platform.OS === 'ios' ? (
-                            <View style={[
-                              styles.datePickerContainer,
-                              { 
-                                backgroundColor: theme.colors.cardBackground,
-                                borderColor: theme.colors.border
-                              }
-                            ]}>
-                              <DateTimePicker
-                                value={tempDueDate || dueDate}
-                                mode="datetime"
-                                display="spinner"
-                                onChange={handleDateChange}
-                                textColor={theme.colors.text}
-                                style={styles.datePicker}
-                                themeVariant={theme.dark ? 'dark' : 'light'}
-                              />
-                              <TouchableOpacity
-                                style={[
-                                  styles.datePickerButton,
-                                  { 
-                                    paddingVertical: 12,
-                                    paddingHorizontal: 24,
-                                    alignItems: 'center',
-                                    borderWidth: 1.5,
-                                    borderColor: theme.colors.primary,
-                                    borderRadius: 12,
-                                    margin: 16,
-                                    backgroundColor: 'transparent'
-                                  }
-                                ]}
-                                onPress={() => {
-                                  setShowDatePicker(false);
-                                  if (tempDueDate) setDueDate(tempDueDate);
-                                  setTempDueDate(null);
-                                }}
-                              >
-                                <Text style={[styles.datePickerButtonText, { color: theme.colors.primary }]}>
-                                  Done
-                                </Text>
-                              </TouchableOpacity>
-                            </View>
-                          ) : (
-                            <DateTimePicker
-                              value={dueDate}
-                              mode="datetime"
-                              display="default"
-                              onChange={handleDateChange}
-                              textColor={theme.colors.text}
-                              themeVariant={theme.dark ? 'dark' : 'light'}
-                            />
-                          )
-                        )}
-                      </View>
-
-                      <View style={styles.inputContainer}>
-                        <Text style={[styles.label, { color: theme.colors.text }]}>
-                          Estimated Duration
-                        </Text>
-                        <View style={[
-                          styles.durationInput,
-                          { 
-                            backgroundColor: theme.colors.cardBackground,
-                            borderColor: theme.colors.border
-                          }
-                        ]}>
-                          <Ionicons 
-                            name="time-outline" 
-                            size={20} 
-                            color={theme.colors.text} 
-                          />
-                          <TextInput
-                            style={[
-                              styles.input,
-                              { 
-                                color: theme.colors.text,
-                                borderWidth: 0,
-                                backgroundColor: 'transparent'
-                              }
-                            ]}
-                            placeholder="Enter duration in minutes"
-                            placeholderTextColor={theme.colors.subtext}
-                            value={estimatedMinutes}
-                            onChangeText={setEstimatedMinutes}
-                            keyboardType="numeric"
-                          />
-                        </View>
-                      </View>
-
-                      <View style={styles.inputContainer}>
-                        <Text style={[styles.label, { color: theme.colors.text }]}>
-                          Priority
-                        </Text>
-                        <View style={styles.priorityContainer}>
-                          {(['low', 'medium', 'high'] as const).map(opt => (
-                            <TouchableOpacity
-                              key={opt}
-                              style={[
-                                styles.priorityOption,
-                                { 
-                                  backgroundColor: priority === opt 
-                                    ? getPriorityColor(opt) + '15'
-                                    : theme.colors.cardBackground,
-                                  borderColor: priority === opt 
-                                    ? getPriorityColor(opt)
-                                    : theme.colors.border
-                                }
-                              ]}
-                              onPress={() => setPriority(opt)}
-                              activeOpacity={0.8}
-                            >
-                              <Ionicons 
-                                name={
-                                  opt === 'high' ? 'arrow-up-circle-outline' :
-                                  opt === 'medium' ? 'remove-circle-outline' :
-                                  'arrow-down-circle-outline'
-                                }
-                                size={20}
-                                color={getPriorityColor(opt)}
-                              />
-                              <Text style={[
-                                styles.priorityText,
-                                { color: getPriorityColor(opt) }
-                              ]}>
-                                {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </View>
-
-                      <View style={styles.inputContainer}>
-                        <Text style={[styles.label, { color: theme.colors.text }]}>
-                          Status
-                        </Text>
-                        <View style={styles.statusContainer}>
-                          {(['pending', 'in_progress', 'completed'] as const).map(opt => (
-                            <TouchableOpacity
-                              key={opt}
-                              style={[
-                                styles.statusOption,
-                                { 
-                                  backgroundColor: status === opt 
-                                    ? theme.colors.primary + '15'
-                                    : theme.colors.cardBackground,
-                                  borderColor: status === opt 
-                                    ? theme.colors.primary
-                                    : theme.colors.border
-                                }
-                              ]}
-                              onPress={() => setStatus(opt)}
-                              activeOpacity={0.8}
-                            >
-                              <Ionicons 
-                                name={
-                                  opt === 'pending' ? 'time-outline' :
-                                  opt === 'in_progress' ? 'sync-outline' :
-                                  'checkmark-circle-outline'
-                                }
-                                size={20}
-                                color={status === opt ? theme.colors.primary : theme.colors.text}
-                              />
-                              <Text style={[
-                                styles.statusText,
-                                { 
-                                  color: status === opt ? theme.colors.primary : theme.colors.text,
-                                  opacity: status === opt ? 1 : 0.7
-                                }
-                              ]}>
-                                {opt.split('_').map(word => 
-                                  word.charAt(0).toUpperCase() + word.slice(1)
-                                ).join(' ')}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </View>
-
-                      {error ? (
-                        <View style={styles.errorContainer}>
-                          <Ionicons name="alert-circle-outline" size={20} color={theme.colors.error} />
-                          <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                            {error}
-                          </Text>
-                        </View>
-                      ) : null}
-
-                      <View style={styles.buttonContainer}>
-                        <TouchableOpacity 
-                          style={[
-                            styles.button,
-                            styles.cancelButton,
-                            { 
-                              backgroundColor: 'transparent',
-                              borderWidth: 1.5,
-                              borderColor: theme.colors.primary
-                            }
-                          ]} 
-                          onPress={handleClose}
-                        >
-                          <Text style={[styles.buttonText, { color: theme.colors.primary }]}>
-                            Cancel
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={[
-                            styles.button,
-                            styles.createButton,
-                            { 
-                              backgroundColor: theme.colors.primary,
-                              borderWidth: 0
-                            }
-                          ]} 
-                          onPress={handleCreate}
-                        >
-                          <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>
-                            Create Task
-                          </Text>
-                          <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                </ScrollView>
-              </Animated.View>
-            </TouchableOpacity>
+            <View style={styles.datePickerContainer}>
+              <View style={styles.datePickerModal}>
+                <View style={styles.datePickerHeader}>
+                  <TouchableOpacity onPress={hideDatePicker}>
+                    <Text style={styles.datePickerCancel}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.datePickerTitle}>Select Date</Text>
+                  <TouchableOpacity onPress={hideDatePicker}>
+                    <Text style={styles.datePickerDone}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={handleDateChange}
+                  minimumDate={new Date()}
+                  textColor={colors.textPrimary}
+                />
+              </View>
+            </View>
           </TouchableOpacity>
-        </Animated.View>
-      </KeyboardAvoidingView>
+        </Modal>
+      )}
+
+      {/* Time Picker */}
+      {showTimePicker && (
+        <Modal
+          visible={showTimePicker}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={hideTimePicker}
+        >
+          <TouchableOpacity 
+            style={styles.datePickerOverlay}
+            activeOpacity={1}
+            onPress={hideTimePicker}
+          >
+            <View style={styles.datePickerContainer}>
+              <View style={styles.datePickerModal}>
+                <View style={styles.datePickerHeader}>
+                  <TouchableOpacity onPress={hideTimePicker}>
+                    <Text style={styles.datePickerCancel}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.datePickerTitle}>Select Time</Text>
+                  <TouchableOpacity onPress={hideTimePicker}>
+                    <Text style={styles.datePickerDone}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={selectedTime}
+                  mode="time"
+                  display="spinner"
+                  onChange={handleTimeChange}
+                  textColor={colors.textPrimary}
+                />
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Subject Picker Modal */}
+      <Modal
+        visible={showSubjectPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowSubjectPicker(false)}
+      >
+        <View style={styles.pickerModalContainer}>
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={() => setShowSubjectPicker(false)}>
+              <Text style={styles.cancelButton}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Select Subject</Text>
+            <View style={styles.placeholder} />
+          </View>
+          
+          <ScrollView style={styles.pickerContent}>
+            {localSubjects.map((subjectItem) => (
+              <TouchableOpacity
+                key={subjectItem.id}
+                style={[
+                  styles.subjectOption,
+                  subject === subjectItem.name && styles.selectedSubjectOption
+                ]}
+                onPress={() => handleSubjectSelect(subjectItem.name)}
+              >
+                <View style={styles.subjectOptionContent}>
+                  <View 
+                    style={[styles.subjectColorDot, { backgroundColor: subjectItem.color }]} 
+                  />
+                  <Text style={[
+                    styles.subjectOptionText,
+                    subject === subjectItem.name && styles.selectedSubjectOptionText
+                  ]}>
+                    {subjectItem.name}
+                  </Text>
+                </View>
+                {subject === subjectItem.name && (
+                  <Text style={styles.checkmark}>✓</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
     </Modal>
   );
-}; 
+}
+
+const styles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.backgroundDark,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: colors.backgroundDark,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  cancelButton: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  modalSaveButton: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primaryBlue,
+  },
+  modalSaveButtonDisabled: {
+    color: colors.textSecondary,
+    opacity: 0.5,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: colors.backgroundDark,
+  },
+  scrollContentContainer: {
+    paddingBottom: 50,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  inputHalf: {
+    width: '48%',
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
+  modalInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: colors.textPrimary,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  inputWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  iconInput: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingLeft: 12,
+    color: colors.textPrimary,
+    fontSize: 16,
+    justifyContent: 'center',
+  },
+  prioritySelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  priorityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '30%',
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  selectedPriorityButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  priorityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  priorityText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  selectedPriorityText: {
+    color: colors.textPrimary,
+    fontWeight: '500',
+  },
+  bottomPadding: {
+    height: 20,
+  },
+  subjectPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  subjectPickerContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  selectedSubject: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  subjectPlaceholder: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginLeft: 8,
+  },
+  selectedSubjectText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  subjectColorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  pickerModalContainer: {
+    flex: 1,
+    backgroundColor: colors.backgroundDark,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  placeholder: {
+    width: 60, // Fixed width instead of flex to center the title
+  },
+  pickerContent: {
+    padding: 20,
+  },
+  subjectOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  selectedSubjectOption: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: colors.primaryBlue,
+  },
+  subjectOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  subjectOptionText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  selectedSubjectOptionText: {
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
+  checkmark: {
+    fontSize: 18,
+    color: colors.primaryBlue,
+    fontWeight: '600',
+  },
+  selectedDateText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  datePickerContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  datePickerModal: {
+    backgroundColor: colors.backgroundDark,
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: 400,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  datePickerCancel: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  datePickerDone: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primaryBlue,
+  },
+});

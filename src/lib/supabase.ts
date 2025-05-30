@@ -1,3 +1,4 @@
+import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient, Session, User } from '@supabase/supabase-js';
@@ -16,100 +17,218 @@ console.log('Environment variables:', {
 const supabaseUrl = EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
+console.log('Supabase configuration:', {
+  supabaseUrl,
+  hasAnonKey: !!supabaseAnonKey,
+  anonKeyLength: supabaseAnonKey?.length,
+});
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase credentials:', { supabaseUrl, supabaseAnonKey });
   throw new Error('Missing Supabase URL or Anon Key. Please check your environment variables.');
 }
 
-// Create a single instance of the Supabase client
-let supabaseInstance: SupabaseClient | null = null;
-
-export const getSupabaseClient = (): SupabaseClient => {
-  if (!supabaseInstance) {
-    try {
-      console.log('Attempting to create Supabase client with URL:', supabaseUrl);
-      supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-        // @ts-expect-error: 'auth' is valid in v1 but not in v2 types
-        auth: {
-          storage: AsyncStorage,
-          autoRefreshToken: true,
-          persistSession: true,
-          detectSessionInUrl: false,
-        },
-      });
-      
-      // Test the connection
-      void (async () => {
-        try {
-          await supabaseInstance?.from('_test_connection').select('*').limit(1);
-          console.log('Successfully connected to Supabase');
-        } catch (error: unknown) {
-          console.error('Supabase connection test failed:', {
-            error,
-            errorMessage: error instanceof Error ? error.message : 'Unknown error',
-            errorDetails: (error as any)?.details,
-            errorHint: (error as any)?.hint,
-            statusCode: (error as any)?.code
-          });
-        }
-      })();
-    } catch (error: unknown) {
-      console.error('Error creating Supabase client:', {
-        error,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        supabaseUrl,
-        hasAnonKey: !!supabaseAnonKey
-      });
-      throw error;
+// Check if we're using the wrong key type
+try {
+  if (supabaseAnonKey) {
+    const payload = JSON.parse(atob(supabaseAnonKey.split('.')[1]));
+    console.log('Key payload:', payload);
+    if (payload.role === 'service_role') {
+      console.error('🚨 CRITICAL: You are using a service_role key! This will NOT work in React Native.');
+      console.error('Please update your .env file to use the anon key instead.');
+      console.error('Check SUPABASE_SETUP.md for instructions.');
+    } else if (payload.role === 'anon') {
+      console.log('✅ Correct: Using anon key for client-side authentication.');
     }
   }
-  return supabaseInstance;
-};
+} catch (error) {
+  console.warn('Could not parse JWT token:', error);
+}
 
-export const supabase = getSupabaseClient();
+// Create a single instance of the Supabase client
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+    flowType: 'pkce',
+  },
+  // Completely disable realtime for React Native compatibility
+  realtime: {
+    params: {
+      eventsPerSecond: 0,
+    },
+    // Use a mock implementation that doesn't try to create WebSocket connections
+    encoder: () => '',
+    decoder: () => ({}),
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-js-react-native',
+      'X-Supabase-Client': 'react-native',
+    },
+  },
+  // Disable automatic connection attempts
+  db: {
+    schema: 'public',
+  },
+});
+
+// Override realtime to prevent any connection attempts
+if (supabase.realtime) {
+  // Stub out realtime methods to prevent errors
+  supabase.realtime.connect = () => Promise.resolve();
+  supabase.realtime.disconnect = () => Promise.resolve();
+  supabase.realtime.channel = () => ({
+    subscribe: () => ({ unsubscribe: () => {} }),
+    unsubscribe: () => Promise.resolve(),
+    on: () => {},
+    off: () => {},
+  });
+}
+
+// Test the client initialization
+console.log('Supabase client initialized:', {
+  clientExists: !!supabase,
+  authExists: !!supabase.auth,
+  methodsExist: {
+    getSession: typeof supabase.auth.getSession,
+    signInWithPassword: typeof supabase.auth.signInWithPassword,
+    signUp: typeof supabase.auth.signUp,
+  }
+});
 
 // Auth helper functions
-export const signUp = async (email: string, password: string): Promise<{ user: User | null; session: Session | null; error: any }> => {
-  const { user, session, error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
-  return { user, session, error };
+export const signUp = async (email: string, password: string, fullName?: string) => {
+  try {
+    console.log('Attempting sign up for:', email);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
+    });
+    console.log('Sign up result:', { user: data.user?.email, error: error?.message });
+    return { data, error };
+  } catch (error) {
+    console.error('Sign up error:', error);
+    return { data: null, error };
+  }
 };
 
-export const signIn = async (email: string, password: string): Promise<{ user: User | null; session: Session | null; error: any }> => {
-  const { user, session, error } = await supabase.auth.signIn({
-    email,
-    password,
-  });
-  return { user, session, error };
+export const signIn = async (email: string, password: string) => {
+  try {
+    console.log('Attempting sign in for:', email);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    console.log('Sign in result:', { user: data.user?.email, error: error?.message });
+    return { data, error };
+  } catch (error) {
+    console.error('Sign in error:', error);
+    return { data: null, error };
+  }
 };
 
-export const signOut = async (): Promise<{ error: any }> => {
-  const { error } = await supabase.auth.signOut();
-  return { error };
+export const signInWithMagicLink = async (email: string) => {
+  try {
+    console.log('Attempting magic link for:', email);
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+      },
+    });
+    console.log('Magic link result:', { error: error?.message });
+    return { data, error };
+  } catch (error) {
+    console.error('Magic link error:', error);
+    return { data: null, error };
+  }
 };
 
-export const resetPassword = async (email: string): Promise<{ data: any; error: any }> => {
-  // Use a deep link URL that will open your app
-  const redirectTo = 'rhythm://reset-password';
-  const { data, error } = await supabase.auth.api.resetPasswordForEmail(email, { redirectTo });
-  return { data, error };
+export const signOut = async () => {
+  try {
+    console.log('Attempting sign out');
+    const { error } = await supabase.auth.signOut();
+    console.log('Sign out result:', { error: error?.message });
+    return { error };
+  } catch (error) {
+    console.error('Sign out error:', error);
+    return { error };
+  }
 };
 
-export const updatePassword = async (newPassword: string): Promise<{ user: User | null; error: any }> => {
-  const { user, error } = await supabase.auth.update({
-    password: newPassword,
-  });
-  return { user, error };
+export const resetPassword = async (email: string) => {
+  try {
+    console.log('Attempting password reset for:', email);
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'pulseplan://reset-password',
+    });
+    console.log('Password reset result:', { error: error?.message });
+    return { data, error };
+  } catch (error) {
+    console.error('Password reset error:', error);
+    return { data: null, error };
+  }
 };
 
-export const getCurrentUser = (): { user: User | null; error: null } => {
-  const user = supabase.auth.user();
-  return { user, error: null };
+export const updatePassword = async (newPassword: string) => {
+  try {
+    console.log('Attempting password update');
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    console.log('Password update result:', { error: error?.message });
+    return { data, error };
+  } catch (error) {
+    console.error('Password update error:', error);
+    return { data: null, error };
+  }
 };
 
-export const getSession = (): { session: Session | null; error: null } => {
-  const session = supabase.auth.session();
-  return { session, error: null };
+export const getCurrentUser = async () => {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    console.log('Get current user result:', { user: user?.email, error: error?.message });
+    return { user, error };
+  } catch (error) {
+    console.error('Get current user error:', error);
+    return { user: null, error };
+  }
+};
+
+export const getSession = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    console.log('Get session result:', { 
+      hasSession: !!session, 
+      user: session?.user?.email, 
+      error: error?.message 
+    });
+    return { session, error };
+  } catch (error) {
+    console.error('Get session error:', error);
+    return { session: null, error };
+  }
+};
+
+// Auth state listener
+export const onAuthStateChange = (callback: (event: string, session: Session | null) => void) => {
+  try {
+    console.log('Setting up auth state listener');
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state change:', event, session?.user?.email);
+      callback(event, session);
+    });
+    return data;
+  } catch (error) {
+    console.error('Auth state change listener error:', error);
+    return { data: { subscription: { unsubscribe: () => {} } } };
+  }
 }; 

@@ -208,3 +208,162 @@ Update the `app.json` file with your Stripe publishable key:
 - Chrome extension scrapes assignments from Canvas dashboard
 - Sends structured JSON to `POST /upload_canvas_data`
 - CU Boulder and other Canvas domains supported via `host_permissions`
+
+---
+
+## 🚀 Current Status
+
+✅ **Successfully migrated from React Navigation to Expo Router**  
+✅ **Integrated Supabase v2 authentication**  
+✅ **Fixed React Native compatibility issues**  
+✅ **Added comprehensive polyfills for Node.js modules**
+
+## 🔧 Recent Fixes Applied
+
+### 1. Expo Router Migration
+
+- ✅ Updated from React Navigation to Expo Router
+- ✅ Restructured app with proper file-based routing
+- ✅ Removed unnecessary `src/pages/` and `src/navigation/` directories
+- ✅ Updated all navigation to use Expo Router conventions
+
+### 2. Supabase Authentication Integration
+
+- ✅ Updated to Supabase v2 (latest version)
+- ✅ Created comprehensive auth context with error handling
+- ✅ Implemented sign in, sign up, magic link, and password reset
+- ✅ Added proper session management and auth state persistence
+
+### 3. React Native Compatibility
+
+- ✅ Added Node.js polyfills for React Native environment
+- ✅ Configured Metro bundler to resolve Node.js modules
+- ✅ Installed all required polyfill packages (`events`, `stream`, `buffer`, etc.)
+- ✅ Created polyfills setup to handle Supabase dependencies
+
+### 4. Enhanced Error Detection
+
+- ✅ Added JWT token validation to detect wrong Supabase key types
+- ✅ Clear console warnings when using service_role instead of anon key
+- ✅ Comprehensive logging throughout authentication flow
+
+## ⚠️ CRITICAL: Action Required
+
+**You are currently using a `service_role` key instead of an `anon` key!**
+
+### To Fix:
+
+1. Go to your Supabase Dashboard: https://supabase.com/dashboard
+2. Navigate to your project: `jwvohxsgokfcysfqhtzo`
+3. Go to **Settings** → **API**
+4. Copy the **anon/public** key (NOT the service_role key)
+5. Update your `.env` file:
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://jwvohxsgokfcysfqhtzo.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+```
+
+The anon key should have `"role":"anon"` when decoded at https://jwt.io
+
+## 🛠 Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- Expo CLI
+- iOS Simulator or physical device
+- Supabase account
+
+### Installation
+
+1. **Install dependencies:**
+
+```bash
+npm install
+```
+
+2. **Update environment variables:**
+
+```bash
+# Copy and update with your anon key
+cp .env.example .env
+```
+
+3. **Start the development server:**
+
+```bash
+npm start
+# or clear cache if needed
+npx expo start --clear
+```
+
+## 📱 App Structure
+
+```
+src/
+├── app/                    # Expo Router pages
+│   ├── _layout.tsx        # Root layout with auth provider
+│   ├── index.tsx          # Entry point with auth check
+│   ├── auth.tsx           # Authentication page
+│   ├── onboarding.tsx     # User onboarding
+│   └── (tabs)/            # Tab navigation
+│       ├── _layout.tsx    # Tab layout
+│       ├── home.tsx       # Today view
+│       ├── week.tsx       # Week view
+│       ├── progress.tsx   # Progress tracking
+│       └── settings.tsx   # Settings & profile
+├── components/            # Reusable UI components
+├── contexts/             # React contexts (auth, etc.)
+├── lib/                  # Utilities and configurations
+│   └── supabase.ts       # Supabase client & auth functions
+└── constants/            # App constants and theme
+```
+
+## 🔐 Authentication Features
+
+- ✅ Email/password authentication
+- ✅ Magic link sign in
+- ✅ Password reset functionality
+- ✅ Persistent sessions with AsyncStorage
+- ✅ Auto token refresh
+- ✅ Proper error handling and loading states
+
+## 🎨 UI Components
+
+- Modern, clean design with React Native
+- Ionicons for consistent iconography
+- Custom theme with dark mode support
+- Responsive layouts for different screen sizes
+
+## 📋 Next Steps
+
+1. **CRITICAL**: Update `.env` with correct anon key
+2. Test authentication flow
+3. Complete onboarding screens
+4. Implement task management features
+5. Add data persistence with Supabase
+
+## 🐛 Troubleshooting
+
+### "supabase.auth.getSession is not a function"
+
+- You're using the wrong key type. Update to anon key.
+
+### Node.js module errors
+
+- Already fixed with polyfills. Clear cache: `npx expo start --clear`
+
+### Authentication not working
+
+- Verify your Supabase key is the anon key, not service_role
+
+## 📚 Documentation
+
+- [Expo Router Docs](https://docs.expo.dev/router/introduction/)
+- [Supabase Auth Docs](https://supabase.com/docs/guides/auth)
+- [React Native Docs](https://reactnative.dev/docs/getting-started)
+
+---
+
+**Need help?** Check `SUPABASE_SETUP.md` for detailed Supabase configuration instructions.

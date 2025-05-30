@@ -4,6 +4,7 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
+      "@/*": ["src/*"],
       "@config/*": ["src/config/*"]
     }
   }

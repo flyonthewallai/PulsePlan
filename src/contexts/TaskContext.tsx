@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
-import { API_URL } from '../config/api';
+import { API_URL, testConnection } from '../config/api';
 import NetInfo from '@react-native-community/netinfo';
 
 // Define task type
@@ -132,6 +132,14 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      // Test API connection first
+      console.log(`🔍 Testing connection to API: ${API_URL}`);
+      const connectionOk = await testConnection();
+      if (!connectionOk) {
+        throw new Error(`Cannot reach server at ${API_URL}. Please check if the server is running.`);
+      }
+
+      console.log(`✅ Connected to API successfully`);
       const res = await fetch(`${API_URL}/tasks`, {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -139,15 +147,17 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to fetch tasks: ${res.status}`);
+        throw new Error(`Failed to fetch tasks: ${res.status} ${res.statusText}`);
       }
 
       const data = await res.json();
+      console.log(`📋 Fetched ${data.length} tasks from server`);
       setTasks(data);
       await updateCache(data);
     } catch (err) {
       console.error('Error fetching tasks:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch tasks';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -157,6 +167,13 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!session?.access_token) throw new Error('Not authenticated');
 
     try {
+      // Test API connection first
+      console.log(`🔍 Testing connection for task creation: ${API_URL}`);
+      const connectionOk = await testConnection();
+      if (!connectionOk) {
+        throw new Error(`Cannot reach server at ${API_URL}. Please check if the server is running.`);
+      }
+
       const res = await fetch(`${API_URL}/tasks`, {
         method: 'POST',
         headers: {
@@ -167,10 +184,12 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to create task: ${res.status}`);
+        const errorText = await res.text();
+        throw new Error(`Failed to create task: ${res.status} ${res.statusText} - ${errorText}`);
       }
 
       const newTask = await res.json();
+      console.log(`✅ Created task: ${newTask.title}`);
       const updatedTasks = [...tasks, newTask];
       setTasks(updatedTasks);
       await updateCache(updatedTasks);

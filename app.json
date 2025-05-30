@@ -48,7 +48,10 @@
               "pathPrefix": "/--/auth/callback"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -70,15 +73,17 @@
           "merchantIdentifier": "merchant.com.rhythm.app",
           "enableGooglePay": true
         }
-      ]
+      ],
+      "expo-router"
     ],
     "scheme": "rhythm",
     "sdkVersion": "53.0.0",
     "extra": {
-      "apiUrl": "http://localhost:3000",
+      "apiUrl": "http://localhost:5001",
+      "apiPort": "5001",
       "stripePublishableKey": "pk_test_51RPGvL4cCEE1fltDtwqgVQIxe7rCsReNaQhzka3UGxvZcjkEveCiYTUjfA2KgzTPPAB7vq3WvaC0b2AmK59c87ak00q8wxgUAz",
-      "supabaseUrl": "your-supabase-project-url",
-      "supabaseAnonKey": "your-supabase-anon-key"
+      "supabaseUrl": "https://jwvohxsgokfcysfqhtzo.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3dm9oeHNnb2tmY3lzZnFodHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNjQwNjYsImV4cCI6MjA2Mjk0MDA2Nn0.76EqvgoCCoOwxc5KTrSqX5PLeHtB6YD2GbEjSpeOvaU"
     }
   }
-} 
+}
