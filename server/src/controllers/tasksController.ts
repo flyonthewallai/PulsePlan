@@ -43,11 +43,22 @@ export const updateTask = async (req: AuthenticatedRequest, res: Response) => {
   }
   const userId = req.user?.id;
   const { id } = (req as any).params;
-  const { title, due_date, estimated_minutes, subject } = (req as any).body;
+  const { title, description, subject, due_date, estimated_minutes, status, priority } = (req as any).body;
+  
+  // Build update object with only provided fields
+  const updateData: any = {};
+  if (title !== undefined) updateData.title = title;
+  if (description !== undefined) updateData.description = description;
+  if (subject !== undefined) updateData.subject = subject;
+  if (due_date !== undefined) updateData.due_date = due_date;
+  if (estimated_minutes !== undefined) updateData.estimated_minutes = estimated_minutes;
+  if (status !== undefined) updateData.status = status;
+  if (priority !== undefined) updateData.priority = priority;
+  
   // Only update if the task belongs to the user
   const { data, error } = await supabase
     .from('tasks')
-    .update({ title, due_date, estimated_minutes, subject })
+    .update(updateData)
     .eq('id', id)
     .eq('user_id', userId)
     .select()
