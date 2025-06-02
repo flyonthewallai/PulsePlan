@@ -43,7 +43,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const refreshAuth = async () => {
     try {
-      console.log('🔄 Refreshing auth state...');
       const { session, error: sessionError } = await getSession();
       
       if (sessionError) {
@@ -51,69 +50,59 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setError('Failed to refresh authentication session');
         setSession(null);
         setUser(null);
-        console.log('🔄 Auth state set to unauthenticated due to error');
-      } else {
-        console.log('🔄 Auth refresh result:', { 
-          hasSession: !!session, 
-          userEmail: session?.user?.email || 'none',
-          sessionKeys: session ? Object.keys(session) : []
-        });
-        setSession(session);
-        setUser(session?.user ?? null);
+      } else if (!session) {
+        setSession(null);
+        setUser(null);
         setError(null);
-        console.log('🔄 Auth state updated:', {
-          hasUser: !!(session?.user),
-          userEmail: session?.user?.email || 'none'
-        });
+      } else if (!session.user) {
+        setSession(null);
+        setUser(null);
+        setError(null);
+      } else {
+        // Session is valid - we have a session with user data
+        setSession(session);
+        setUser(session.user);
+        setError(null);
       }
     } catch (error) {
       console.error('Error refreshing auth:', error);
       setError('Authentication refresh failed');
       setSession(null);
       setUser(null);
-      console.log('🔄 Auth state set to unauthenticated due to exception');
     }
   };
 
   // Navigation logic in auth context
   useEffect(() => {
     if (loading) {
-      console.log('⏳ Auth still loading, skipping navigation...');
       return;
     }
 
     const isInAuthGroup = segments[0] === '(tabs)';
     const isOnAuthPage = segments[0] === 'auth';
     const isOnIndexPage = segments.length === 0;
-    
-    console.log('🔀 Auth Context Navigation Check:', { 
-      hasUser: !!user, 
-      isAuthenticated: !!user,
-      segments,
-      isInAuthGroup,
-      isOnAuthPage,
-      isOnIndexPage,
-      userEmail: user?.email || 'none'
-    });
 
     if (!user) {
       // User not authenticated
       if (isInAuthGroup) {
-        console.log('🔒 User not authenticated, redirecting from tabs to auth...');
         router.replace('/auth');
-      } else if (!isOnAuthPage && !isOnIndexPage) {
-        console.log('🔒 User not authenticated, redirecting to auth...');
+      } else if (isOnIndexPage) {
+        // If user is on index page and not authenticated, redirect to auth
+        setTimeout(() => {
+          router.replace('/auth');
+        }, 500); // Small delay to ensure auth state is settled
+      } else if (!isOnAuthPage) {
         router.replace('/auth');
-      } else {
-        console.log('👤 User not authenticated but already on auth/index page');
       }
     } else {
       // User is authenticated
-      if (!isInAuthGroup) {
-        console.log('✅ User authenticated, redirecting to home...');
+      if (!isInAuthGroup && !isOnIndexPage) {
         router.replace('/(tabs)/home');
-      } else {
-        console.log('🏠 User authenticated and already in tabs');
+      } else if (isOnIndexPage) {
+        // Special case: if user is on index page and authenticated, immediately redirect
+        setTimeout(() => {
+          router.replace('/(tabs)/home');
+        }, 100); // Small delay to ensure routing is ready
       }
     }
   }, [user, loading, segments, router]);
@@ -129,11 +118,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // Get initial session
     const getInitialSession = async () => {
+      setLoading(true);
+      
       try {
-        console.log('Getting initial session...');
         await refreshAuth();
       } catch (error) {
-        console.error('Error getting initial session:', error);
+        console.error('❌ Error getting initial session:', error);
         setError('Authentication initialization failed');
       } finally {
         setLoading(false);
@@ -142,9 +132,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     getInitialSession();
 
-    // For now, we'll skip the auth state listener since it's not implemented in our RN client
-    // This can be added later with a polling mechanism if needed
-    console.log('Auth context initialized with React Native client');
+    // Set up periodic session refresh to catch any stale sessions
+    const refreshInterval = setInterval(() => {
+      if (!loading && user) {
+        refreshAuth().catch(error => {
+          console.error('Periodic refresh failed:', error);
+        });
+      }
+    }, 5 * 60 * 1000); // Refresh every 5 minutes
+
+    return () => {
+      clearInterval(refreshInterval);
+    };
   }, []);
 
   const value = {

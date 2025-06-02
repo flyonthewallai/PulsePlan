@@ -4,6 +4,7 @@ export const colors = {
   accentPurple: '#8E6FFF',
   textPrimary: '#FFFFFF',
   textSecondary: '#C6C6D9',
+  premiumThemeName: 'rgba(255, 255, 255, 0.5)',
   taskColors: {
     high: '#FF5757',
     medium: '#FFC043',

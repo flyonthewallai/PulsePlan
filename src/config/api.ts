@@ -22,7 +22,7 @@ const constructBaseApiUrl = () => {
 
   // Otherwise use platform-specific defaults for development
   if (__DEV__) {
-    const basePort = apiPort || '5000';
+    const basePort = apiPort || '3000';
     if (Platform.OS === 'ios') {
       return `http://localhost:${basePort}`;
     }

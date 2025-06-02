@@ -4,7 +4,7 @@ import { colors } from '../constants/theme';
 
 interface GlowingOrbProps {
   size?: 'sm' | 'ms' | 'md' | 'lg';
-  color?: 'lavender' | 'coral' | 'blue';
+  color?: 'lavender' | 'coral' | 'blue' | string;
   glowIntensity?: number; // 0.1 to 1.0, controls radius/size
   glowOpacity?: number; // 0.1 to 2.0, controls opacity/visual intensity
   style?: any;
@@ -110,13 +110,22 @@ export const GlowingOrb = ({ size = 'md', color = 'blue', glowIntensity = 1.0, g
           shadowColor: '#FF6B6B',
         };
       case 'blue':
-      default:
         return {
           outerGlow: colors.primaryBlue + '15', // 8% opacity
           middleGlow: colors.primaryBlue + '25', // 15% opacity
           innerGlow: colors.primaryBlue + '40', // 25% opacity
           core: colors.primaryBlue,
           shadowColor: colors.primaryBlue,
+        };
+      default:
+        // Handle custom color strings
+        const customColor = typeof color === 'string' ? color : colors.primaryBlue;
+        return {
+          outerGlow: customColor + '15', // 8% opacity
+          middleGlow: customColor + '25', // 15% opacity
+          innerGlow: customColor + '40', // 25% opacity
+          core: customColor,
+          shadowColor: customColor,
         };
     }
   };

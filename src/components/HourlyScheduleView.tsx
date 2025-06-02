@@ -12,9 +12,10 @@ import {
   RefreshControl,
 } from 'react-native';
 import { GestureHandlerRootView, LongPressGestureHandler, PanGestureHandler, State } from 'react-native-gesture-handler';
-import { colors } from '../constants/theme';
 import { Task, useTasks } from '../contexts/TaskContext';
+import { useTheme } from '../contexts/ThemeContext';
 import TaskCreateModal from './TaskCreateModal';
+import TaskDetailsModal from './TaskDetailsModal';
 
 interface HourlyScheduleViewProps {
   tasks: Task[];
@@ -47,9 +48,13 @@ export default function HourlyScheduleView({
   date 
 }: HourlyScheduleViewProps) {
   const { updateTask, refreshTasks, loading } = useTasks();
+  const { currentTheme } = useTheme();
   const [draggedTask, setDraggedTask] = useState<DraggedTask | null>(null);
   const [temporaryTask, setTemporaryTask] = useState<TemporaryTask | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [newTaskHour, setNewTaskHour] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
@@ -62,15 +67,11 @@ export default function HourlyScheduleView({
   const validStartHour = studyStartHour || 9;
   const validEndHour = studyEndHour || 17;
   
-  console.log('HourlyScheduleView props:', { studyStartHour, studyEndHour, validStartHour, validEndHour });
-  
   // Create array of hours between study start and end
   const studyHours = [];
   for (let hour = validStartHour; hour <= validEndHour; hour++) {
     studyHours.push(hour);
   }
-  
-  console.log('Study hours array:', studyHours);
 
   const formatHour = (hour: number) => {
     const time = new Date();
@@ -124,29 +125,39 @@ export default function HourlyScheduleView({
     const startY = hourIndex * (HOUR_HEIGHT + 1) + 5; // Simplified calculation matching current time indicator
     
     // Create temporary task block and immediately set it to dragging state
-    setTemporaryTask({
+    const tempTask = {
       id: 'temp-' + Date.now(),
       startY,
       currentY: startY,
-      isDragging: true, // Set to true immediately so it can be dragged during the same gesture
+      isDragging: false, // Start as false, will be set to true when pan gesture begins
       hour,
-    });
+    };
+    
+    setTemporaryTask(tempTask);
     
     // Reset drag state
     setHasDragged(false);
     tempPanRef.setValue({ x: 0, y: 0 });
     
-    // Set a timeout to create the task if no dragging occurs
-    taskCreationTimeoutRef.current = setTimeout(() => {
-      if (!hasDragged) {
-        console.log('No dragging detected, creating task at original position');
-        setNewTaskHour(hour);
-        setShowTaskModal(true);
-      }
-    }, 1000); // 1 second timeout
+    console.log('Temporary task created:', tempTask);
+  };
+
+  const handleTempPanStart = () => {
+    if (!temporaryTask) return;
+    
+    console.log('Temporary task pan started');
+    setTemporaryTask(prev => prev ? { ...prev, isDragging: true } : null);
+    setHasDragged(true);
+    
+    // Clear any pending timeout since user started dragging
+    if (taskCreationTimeoutRef.current) {
+      clearTimeout(taskCreationTimeoutRef.current);
+      taskCreationTimeoutRef.current = null;
+    }
   };
 
   const startDrag = (task: Task, startY: number) => {
+    console.log('Starting drag for existing task:', task.title);
     setDraggedTask({
       ...task,
       isDragging: true,
@@ -186,6 +197,15 @@ export default function HourlyScheduleView({
     }
 
     const { translationY } = event.nativeEvent;
+    
+    // If user didn't drag much, create task at original position
+    if (Math.abs(translationY) < 20 && !hasDragged) {
+      console.log('Minimal movement detected, creating task at original position');
+      setNewTaskHour(temporaryTask.hour);
+      setShowTaskModal(true);
+      return;
+    }
+    
     const finalY = temporaryTask.startY + translationY;
     
     // Calculate which hour slot this corresponds to
@@ -380,26 +400,29 @@ export default function HourlyScheduleView({
         style={[
           styles.temporaryTaskBlock,
           {
-            backgroundColor: colors.primaryBlue,
+            backgroundColor: currentTheme.colors.primary,
             transform: tempPanRef.getTranslateTransform(),
             top: temporaryTask.startY,
-            left: 72,
-            right: 8,
-            height: HOUR_HEIGHT, // Full hour height to align with hour lines
-            position: 'absolute',
-            zIndex: 1001,
-          }
+          },
         ]}
       >
-        <Text style={styles.temporaryTaskText}>New Task</Text>
-        <Text style={styles.temporaryTaskTime}>
-          {formatHour(temporaryTask.hour)} - {formatHour(temporaryTask.hour + 1)}
-        </Text>
+        <Text style={[styles.temporaryTaskText, { color: '#fff' }]}>New Task</Text>
       </Animated.View>
     );
   };
 
+  const handleTaskPress = (task: Task) => {
+    setSelectedTask(task);
+    setShowDetailsModal(true);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setShowTaskModal(true);
+  };
+
   const handleModalClose = () => {
+    console.log('Modal closing, cleaning up temporary task');
     setShowTaskModal(false);
     setTemporaryTask(null); // Clean up temporary task when modal closes
     setHasDragged(false); // Reset drag state
@@ -409,7 +432,30 @@ export default function HourlyScheduleView({
       clearTimeout(taskCreationTimeoutRef.current);
       taskCreationTimeoutRef.current = null;
     }
+    setNewTaskHour(studyStartHour);
+    setEditingTask(null);
   };
+
+  const handleDetailsModalClose = () => {
+    setShowDetailsModal(false);
+    setSelectedTask(null);
+  };
+
+  // Add effect to handle long press completion without dragging
+  useEffect(() => {
+    if (temporaryTask && !temporaryTask.isDragging && !hasDragged) {
+      // If we have a temporary task that isn't being dragged, create task after delay
+      const timeout = setTimeout(() => {
+        if (temporaryTask && !temporaryTask.isDragging && !hasDragged) {
+          console.log('Long press completed without dragging, creating task');
+          setNewTaskHour(temporaryTask.hour);
+          setShowTaskModal(true);
+        }
+      }, 1500); // Much longer delay to allow plenty of time for dragging to start
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [temporaryTask, hasDragged]);
 
   useEffect(() => {
     return () => {
@@ -431,7 +477,7 @@ export default function HourlyScheduleView({
   }, []);
 
   return (
-    <GestureHandlerRootView style={styles.container}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
       <View style={styles.container}>
         <ScrollView 
           showsVerticalScrollIndicator={false}
@@ -441,20 +487,29 @@ export default function HourlyScheduleView({
             <RefreshControl
               refreshing={loading}
               onRefresh={refreshTasks}
-              tintColor={colors.primaryBlue}
-              colors={[colors.primaryBlue]}
+              tintColor={currentTheme.colors.primary}
+              colors={[currentTheme.colors.primary]}
               progressBackgroundColor="transparent"
             />
           }
-          onScrollBeginDrag={() => setIsScrolling(true)}
+          onScrollBeginDrag={() => {
+            console.log('Scroll began');
+            setIsScrolling(true);
+          }}
           onScrollEndDrag={() => {
+            console.log('Scroll ended');
             // Add a small delay to prevent accidental task creation right after scrolling
-            setTimeout(() => setIsScrolling(false), 100);
+            setTimeout(() => setIsScrolling(false), 200); // Increased delay
           }}
-          onMomentumScrollBegin={() => setIsScrolling(true)}
+          onMomentumScrollBegin={() => {
+            console.log('Momentum scroll began');
+            setIsScrolling(true);
+          }}
           onMomentumScrollEnd={() => {
-            setTimeout(() => setIsScrolling(false), 100);
+            console.log('Momentum scroll ended');
+            setTimeout(() => setIsScrolling(false), 200); // Increased delay
           }}
+          decelerationRate="normal" // Better scroll deceleration
         >
           <View style={styles.scheduleContainer}>
             {studyHours.map((hour, index) => {
@@ -463,7 +518,7 @@ export default function HourlyScheduleView({
               return (
                 <View key={hour} style={styles.hourSlot}>
                   <View style={styles.timeColumn}>
-                    <Text style={styles.timeText}>{formatHour(hour)}</Text>
+                    <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatHour(hour)}</Text>
                   </View>
                   
                   <View style={styles.taskColumn}>
@@ -474,24 +529,33 @@ export default function HourlyScheduleView({
                     <LongPressGestureHandler
                       onHandlerStateChange={({ nativeEvent }) => {
                         if (nativeEvent.state === State.ACTIVE) {
+                          console.log('Long press activated for hour:', hour);
                           handleLongPress(hour);
                         }
                       }}
-                      minDurationMs={800}
-                      maxDist={20}
+                      minDurationMs={600} // Increased from 500ms for more intentional gesture
+                      maxDist={30} // Increased tolerance for movement
+                      shouldCancelWhenOutside={false}
                     >
                       <PanGestureHandler
                         id={`hour-pan-${hour}`}
                         onGestureEvent={({ nativeEvent }) => {
+                          if (temporaryTask && !temporaryTask.isDragging) {
+                            // Don't handle pan gestures until dragging starts
+                            return;
+                          }
                           if (temporaryTask && temporaryTask.isDragging) {
                             handleTempPanGesture({ nativeEvent });
                           }
                         }}
                         onHandlerStateChange={({ nativeEvent }) => {
-                          if (nativeEvent.state === State.END && temporaryTask && temporaryTask.isDragging) {
+                          if (nativeEvent.state === State.BEGAN && temporaryTask) {
+                            handleTempPanStart();
+                          } else if (nativeEvent.state === State.END && temporaryTask && temporaryTask.isDragging) {
                             handleTempPanEnd({ nativeEvent });
                           }
                         }}
+                        activeOffsetY={[-10, 10]} // Allow horizontal movement without triggering pan
                       >
                         <Animated.View style={styles.hourClickableArea}>
                           {/* Tasks within this hour */}
@@ -508,6 +572,7 @@ export default function HourlyScheduleView({
                                     handlePanEnd({ nativeEvent });
                                   }
                                 }}
+                                minDist={5} // Allow easier dragging of existing tasks
                               >
                                 <Animated.View style={styles.taskWrapper}>
                                   <TouchableOpacity
@@ -516,6 +581,7 @@ export default function HourlyScheduleView({
                                       { backgroundColor: getSubjectColor(task.subject) }
                                     ]}
                                     activeOpacity={0.8}
+                                    onPress={() => handleTaskPress(task)}
                                   >
                                     <Text style={styles.taskTitle} numberOfLines={1}>
                                       {task.title}
@@ -566,6 +632,14 @@ export default function HourlyScheduleView({
           return time;
         })()}
         initialTimeEstimate="60"
+        editingTask={editingTask}
+      />
+
+      <TaskDetailsModal
+        visible={showDetailsModal}
+        task={selectedTask}
+        onClose={handleDetailsModalClose}
+        onEdit={handleEditTask}
       />
     </GestureHandlerRootView>
   );
@@ -574,7 +648,6 @@ export default function HourlyScheduleView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.backgroundDark,
   },
   scrollView: {
     flex: 1,
@@ -598,7 +671,6 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 12,
-    color: colors.textSecondary,
     fontWeight: '500',
     position: 'absolute',
     top: -2,
@@ -618,7 +690,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   taskBlock: {
-    backgroundColor: colors.primaryBlue,
     borderRadius: 8,
     padding: 8,
     height: HOUR_HEIGHT - 10,
@@ -700,7 +771,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(79, 140, 255, 0.3)',
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: colors.primaryBlue,
     borderStyle: 'dashed',
     zIndex: 999,
   },
@@ -715,11 +785,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     opacity: 0.9,
+    position: 'absolute',
+    left: 72,
+    right: 8,
+    zIndex: 1001,
   },
   temporaryTaskText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
     marginBottom: 2,
   },
   temporaryTaskTime: {
