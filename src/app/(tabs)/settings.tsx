@@ -36,13 +36,7 @@ import ThemeSelector from '../../components/ThemeSelector';
 import { signOut } from '../../lib/supabase-rn';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
-
-const themes = [
-  { id: 'midnight', name: 'Midnight', primary: '#4F8CFF', accent: '#8E6FFF' },
-  { id: 'ocean', name: 'Ocean', primary: '#00C2FF', accent: '#0066FF' },
-  { id: 'forest', name: 'Forest', primary: '#4CD964', accent: '#0A84FF' },
-  { id: 'sunset', name: 'Sunset', primary: '#FF9500', accent: '#FF2D55' },
-];
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface SubjectColor {
   id: string;
@@ -54,7 +48,22 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user, refreshAuth } = useAuth();
   const { workingHours, updateWorkingHours } = useSettings();
-  const [selectedTheme, setSelectedTheme] = useState('midnight');
+  const { currentTheme, allThemes, setTheme, isThemeUnlocked } = useTheme();
+
+  // Get dynamic colors from current theme
+  const themeColors = {
+    background: currentTheme.colors.background,
+    surface: currentTheme.colors.surface,
+    primary: currentTheme.colors.primary,
+    textPrimary: currentTheme.colors.textPrimary,
+    textSecondary: currentTheme.colors.textSecondary,
+    border: currentTheme.colors.border,
+    card: currentTheme.colors.card,
+    success: currentTheme.colors.success,
+    warning: currentTheme.colors.warning,
+    error: currentTheme.colors.error,
+  };
+
   const [integrations, setIntegrations] = useState({
     canvas: true,
     googleCalendar: true,
@@ -106,11 +115,8 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('🔓 Starting logout process...');
               await signOut();
-              console.log('🔓 Sign out completed, refreshing auth...');
               await refreshAuth();
-              console.log('🔓 Auth refreshed - navigation will be handled by AuthContext');
             } catch (error) {
               console.error('Error logging out:', error);
               Alert.alert('Logout Error', 'An error occurred while logging out.');
@@ -119,6 +125,36 @@ export default function SettingsScreen() {
         }
       ]
     );
+  };
+
+  const handleThemeChange = async (themeId: string) => {
+    try {
+      const theme = allThemes.find(t => t.id === themeId);
+      if (!theme) return;
+
+      if (theme.premium && !isThemeUnlocked(themeId)) {
+        Alert.alert(
+          'Premium Theme',
+          'This theme requires PulsePlan Premium. Would you like to upgrade?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Upgrade', 
+              onPress: () => {
+                // TODO: Navigate to premium upgrade screen
+                Alert.alert('Coming Soon', 'Premium upgrade will be available soon!');
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      await setTheme(themeId);
+    } catch (error) {
+      console.error('Error changing theme:', error);
+      Alert.alert('Error', 'Failed to change theme. Please try again.');
+    }
   };
 
   const handleSaveProfile = () => {
@@ -187,10 +223,10 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]} edges={['top']}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
+        <Text style={[styles.title, { color: themeColors.textPrimary }]}>Settings</Text>
       </View>
 
       <ScrollView 
@@ -198,133 +234,135 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.content}
       >
         {/* Profile Section */}
-        <View style={styles.profileCard}>
-          <View style={styles.profileCircle}>
-            <Text style={styles.profileInitial}>
+        <View style={[styles.profileCard, { backgroundColor: themeColors.surface }]}>
+          <View style={[styles.profileCircle, { backgroundColor: themeColors.primary }]}>
+            <Text style={[styles.profileInitial, { color: themeColors.textPrimary }]}>
               {user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
             </Text>
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>
+            <Text style={[styles.profileName, { color: themeColors.textPrimary }]}>
               {user?.user_metadata?.full_name || 'User'}
             </Text>
-            <Text style={styles.profileEmail}>
+            <Text style={[styles.profileEmail, { color: themeColors.textSecondary }]}>
               {user?.email || 'user@example.com'}
             </Text>
           </View>
-          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-            <Text style={styles.editButtonText}>Edit</Text>
+          <TouchableOpacity style={[styles.editButton, { backgroundColor: themeColors.card }]} onPress={handleEditProfile}>
+            <Text style={[styles.editButtonText, { color: themeColors.textPrimary }]}>Edit</Text>
           </TouchableOpacity>
         </View>
 
         {/* Theme Section */}
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Edit size={20} color={colors.textSecondary} />
-            <Text style={styles.sectionTitle}>Theme</Text>
+            <Edit size={20} color={themeColors.textSecondary} />
+            <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>Theme</Text>
           </View>
           
           <ThemeSelector 
-            themes={themes} 
-            selectedTheme={selectedTheme}
-            onSelectTheme={setSelectedTheme}
+            themes={allThemes} 
+            selectedTheme={currentTheme.id}
+            onSelectTheme={handleThemeChange}
+            isPremium={true}
           />
         </View>
 
         {/* Study Time Preferences */}
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Clock size={20} color={colors.textPrimary} />
-            <Text style={styles.sectionTitle}>Study Time Preferences</Text>
+            <Clock size={20} color={themeColors.textPrimary} />
+            <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>Study Time Preferences</Text>
           </View>
 
-          <View style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Study Start Time</Text>
+          <View style={[styles.settingItem, { borderBottomColor: themeColors.border }]}>
+            <Text style={[styles.settingLabel, { color: themeColors.textSecondary }]}>Study Start Time</Text>
             <TouchableOpacity
-              style={styles.timeInput}
+              style={[styles.timeInput, { backgroundColor: themeColors.card }]}
               onPress={() => setShowStartTimePicker(true)}
             >
-              <Text style={styles.timeInputText}>{formatTimeDisplay(workingHours.startHour)}</Text>
+              <Text style={[styles.timeInputText, { color: themeColors.textPrimary }]}>{formatTimeDisplay(workingHours.startHour)}</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Study End Time</Text>
+          <View style={[styles.settingItem, { borderBottomColor: themeColors.border }]}>
+            <Text style={[styles.settingLabel, { color: themeColors.textSecondary }]}>Study End Time</Text>
             <TouchableOpacity
-              style={styles.timeInput}
+              style={[styles.timeInput, { backgroundColor: themeColors.card }]}
               onPress={() => setShowEndTimePicker(true)}
             >
-              <Text style={styles.timeInputText}>{formatTimeDisplay(workingHours.endHour)}</Text>
+              <Text style={[styles.timeInputText, { color: themeColors.textPrimary }]}>{formatTimeDisplay(workingHours.endHour)}</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Break Duration (minutes)</Text>
+          <View style={[styles.settingItem, { borderBottomColor: themeColors.border }]}>
+            <Text style={[styles.settingLabel, { color: themeColors.textSecondary }]}>Break Duration (minutes)</Text>
             <TextInput
-              style={[styles.timeInput, styles.textInput]}
+              style={[styles.timeInput, styles.textInput, { backgroundColor: themeColors.card, color: themeColors.textPrimary }]}
               value={breakDuration}
               onChangeText={setBreakDuration}
               keyboardType="numeric"
               placeholder="30"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={themeColors.textSecondary}
             />
           </View>
 
-          <View style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Enable Notifications</Text>
+          <View style={[styles.settingItem, { borderBottomColor: themeColors.border }]}>
+            <Text style={[styles.settingLabel, { color: themeColors.textSecondary }]}>Enable Notifications</Text>
             <Switch
               value={enableNotifications}
               onValueChange={setEnableNotifications}
-              trackColor={{ false: '#767577', true: colors.primaryBlue }}
+              trackColor={{ false: '#767577', true: themeColors.primary }}
               thumbColor={enableNotifications ? '#fff' : '#f4f3f4'}
             />
           </View>
         </View>
 
         {/* Subject Colors */}
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Palette size={20} color={colors.textPrimary} />
-            <Text style={styles.sectionTitle}>Subject Colors</Text>
+            <Palette size={20} color={themeColors.textPrimary} />
+            <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>Subject Colors</Text>
           </View>
 
           {subjectColors.map((subject) => (
             <TouchableOpacity
               key={subject.id}
-              style={styles.subjectItem}
+              style={[styles.subjectItem, { borderBottomColor: themeColors.border }]}
               onPress={() => {
                 // TODO: Implement subject color edit
                 Alert.alert('Coming Soon', 'Subject color editing will be available in the next update!');
               }}
             >
-              <View style={styles.subjectColorInfo}>
+              <View style={[styles.subjectColorInfo, { borderBottomColor: themeColors.border }]}>
                 <View style={[styles.colorDot, { backgroundColor: subject.color }]} />
-                <Text style={styles.subjectName}>{subject.name}</Text>
+                <Text style={[styles.subjectName, { color: themeColors.textPrimary }]}>{subject.name}</Text>
               </View>
-              <ChevronRight size={20} color={colors.textSecondary} />
+              <ChevronRight size={20} color={themeColors.textSecondary} />
             </TouchableOpacity>
           ))}
 
           <TouchableOpacity
-            style={styles.addSubjectButton}
+            style={[styles.addSubjectButton]}
             onPress={handleAddSubject}
+            activeOpacity={0.7}
           >
-            <Plus size={20} color={colors.primaryBlue} />
-            <Text style={styles.addSubjectText}>Add Subject</Text>
+            <Plus size={20} color={themeColors.primary} />
+            <Text style={[styles.addSubjectText, { color: themeColors.primary }]}>Add Subject</Text>
           </TouchableOpacity>
         </View>
 
         {/* Integrations Section */}
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Calendar size={20} color={colors.textSecondary} />
-            <Text style={styles.sectionTitle}>Integrations</Text>
+            <Calendar size={20} color={themeColors.textSecondary} />
+            <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>Integrations</Text>
           </View>
           
-          <View style={styles.toggleItem}>
-            <Text style={styles.toggleLabel}>Canvas</Text>
+          <View style={[styles.toggleItem, { borderBottomColor: themeColors.border }]}>
+            <Text style={[styles.toggleLabel, { color: themeColors.textSecondary }]}>Canvas</Text>
             <Switch
-              trackColor={{ false: '#767577', true: colors.primaryBlue }}
+              trackColor={{ false: '#767577', true: themeColors.primary }}
               thumbColor={integrations.canvas ? '#fff' : '#f4f3f4'}
               ios_backgroundColor="#3e3e3e"
               onValueChange={() => toggleIntegration('canvas')}
@@ -332,10 +370,10 @@ export default function SettingsScreen() {
             />
           </View>
           
-          <View style={styles.toggleItem}>
-            <Text style={styles.toggleLabel}>Google Calendar</Text>
+          <View style={[styles.toggleItem, { borderBottomColor: themeColors.border }]}>
+            <Text style={[styles.toggleLabel, { color: themeColors.textSecondary }]}>Google Calendar</Text>
             <Switch
-              trackColor={{ false: '#767577', true: colors.primaryBlue }}
+              trackColor={{ false: '#767577', true: themeColors.primary }}
               thumbColor={integrations.googleCalendar ? '#fff' : '#f4f3f4'}
               ios_backgroundColor="#3e3e3e"
               onValueChange={() => toggleIntegration('googleCalendar')}
@@ -345,26 +383,26 @@ export default function SettingsScreen() {
         </View>
 
         {/* Notifications Section */}
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Bell size={20} color={colors.textSecondary} />
-            <Text style={styles.sectionTitle}>Notifications</Text>
+            <Bell size={20} color={themeColors.textSecondary} />
+            <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>Notifications</Text>
           </View>
           
-          <View style={styles.toggleItem}>
-            <Text style={styles.toggleLabel}>Task Reminders</Text>
+          <View style={[styles.toggleItem, { borderBottomColor: themeColors.border }]}>
+            <Text style={[styles.toggleLabel, { color: themeColors.textSecondary }]}>Task Reminders</Text>
             <Switch
-              trackColor={{ false: '#767577', true: colors.primaryBlue }}
+              trackColor={{ false: '#767577', true: themeColors.primary }}
               thumbColor={true ? '#fff' : '#f4f3f4'}
               ios_backgroundColor="#3e3e3e"
               value={true}
             />
           </View>
           
-          <View style={styles.toggleItem}>
-            <Text style={styles.toggleLabel}>AI Suggestions</Text>
+          <View style={[styles.toggleItem, { borderBottomColor: themeColors.border }]}>
+            <Text style={[styles.toggleLabel, { color: themeColors.textSecondary }]}>AI Suggestions</Text>
             <Switch
-              trackColor={{ false: '#767577', true: colors.primaryBlue }}
+              trackColor={{ false: '#767577', true: themeColors.primary }}
               thumbColor={true ? '#fff' : '#f4f3f4'}
               ios_backgroundColor="#3e3e3e"
               value={true}
@@ -373,24 +411,49 @@ export default function SettingsScreen() {
         </View>
 
         {/* Subscription Section */}
-        <LinearGradient
-          colors={[colors.primaryBlue, colors.accentPurple]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.subscriptionCard}
-        >
-          <CreditCard size={24} color="#fff" />
-          <Text style={styles.subscriptionTitle}>PulsePlan Premium</Text>
-          <Text style={styles.subscriptionStatus}>Active • $3.99/month</Text>
-          <TouchableOpacity style={styles.subscriptionButton}>
-            <Text style={styles.subscriptionButtonText}>Manage Subscription</Text>
-          </TouchableOpacity>
-        </LinearGradient>
+        <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
+          <LinearGradient
+            colors={['rgba(79, 140, 255, 0.15)', 'rgba(148, 77, 255, 0.15)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.subscriptionCard, { backgroundColor: themeColors.card }]}
+          >
+            <View style={styles.subscriptionHeader}>
+              <View style={styles.subscriptionIconContainer}>
+                <CreditCard size={16} color={themeColors.primary} />
+              </View>
+              <View style={styles.subscriptionBadge}>
+                <Text style={[styles.subscriptionBadgeText, { color: themeColors.textPrimary }]}>PREMIUM</Text>
+              </View>
+            </View>
+            
+            <View style={styles.subscriptionContent}>
+              <Text style={[styles.subscriptionTitle, { color: themeColors.textPrimary }]}>PulsePlan Premium</Text>
+              <Text style={[styles.subscriptionDescription, { color: themeColors.textSecondary }]}>
+                Premium themes, advanced AI features, and unlimited task organization
+              </Text>
+              
+              <View style={styles.subscriptionPricing}>
+                <Text style={[styles.subscriptionPrice, { color: themeColors.textPrimary }]}>$3.99</Text>
+                <Text style={[styles.subscriptionPeriod, { color: themeColors.textSecondary }]}>/month</Text>
+              </View>
+              
+              <View style={styles.subscriptionStatusContainer}>
+                <View style={[styles.subscriptionStatusDot, { backgroundColor: themeColors.primary }]} />
+                <Text style={[styles.subscriptionStatus, { color: themeColors.textPrimary }]}>Active Subscription</Text>
+              </View>
+            </View>
+            
+            <TouchableOpacity style={[styles.subscriptionButton, { backgroundColor: themeColors.card }]}>
+              <Text style={[styles.subscriptionButtonText, { color: themeColors.textPrimary }]}>Manage Subscription</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <LogOut size={20} color={colors.textSecondary} />
-          <Text style={styles.logoutText}>Log Out</Text>
+          <LogOut size={20} color={themeColors.textSecondary} />
+          <Text style={[styles.logoutText, { color: themeColors.textSecondary }]}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -400,43 +463,43 @@ export default function SettingsScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <View style={[styles.modalContainer, { backgroundColor: themeColors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
             <TouchableOpacity onPress={() => setShowEditModal(false)}>
-              <Text style={styles.cancelButton}>Cancel</Text>
+              <Text style={[styles.cancelButton, { color: themeColors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>Edit Profile</Text>
             <TouchableOpacity onPress={handleSaveProfile}>
-              <Text style={styles.modalSaveButton}>Save</Text>
+              <Text style={[styles.modalSaveButton, { color: themeColors.primary }]}>Save</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Full Name</Text>
+              <Text style={[styles.inputLabel, { color: themeColors.textPrimary }]}>Full Name</Text>
               <TextInput
-                style={styles.modalInput}
+                style={[styles.modalInput, { backgroundColor: themeColors.card, color: themeColors.textPrimary, borderColor: themeColors.border }]}
                 value={editedName}
                 onChangeText={setEditedName}
                 placeholder="Enter your full name"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={themeColors.textSecondary}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email</Text>
+              <Text style={[styles.inputLabel, { color: themeColors.textPrimary }]}>Email</Text>
               <TextInput
-                style={styles.modalInput}
+                style={[styles.modalInput, { backgroundColor: themeColors.card, color: themeColors.textPrimary, borderColor: themeColors.border }]}
                 value={editedEmail}
                 onChangeText={setEditedEmail}
                 placeholder="Enter your email"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={themeColors.textSecondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
             </View>
 
-            <Text style={styles.modalNote}>
+            <Text style={[styles.modalNote, { color: themeColors.textSecondary }]}>
               Note: Email changes may require verification and will take effect after confirmation.
             </Text>
           </View>
@@ -452,19 +515,19 @@ export default function SettingsScreen() {
           onRequestClose={() => setShowStartTimePicker(false)}
         >
           <TouchableOpacity 
-            style={styles.datePickerOverlay}
+            style={[styles.datePickerOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}
             activeOpacity={1}
             onPress={() => setShowStartTimePicker(false)}
           >
-            <View style={styles.datePickerContainer}>
-              <View style={styles.datePickerModal}>
-                <View style={styles.datePickerHeader}>
+            <View style={[styles.datePickerContainer, { justifyContent: 'flex-end' }]}>
+              <View style={[styles.datePickerModal, { backgroundColor: themeColors.background }]}>
+                <View style={[styles.datePickerHeader, { borderBottomColor: themeColors.border }]}>
                   <TouchableOpacity onPress={() => setShowStartTimePicker(false)}>
-                    <Text style={styles.datePickerCancel}>Cancel</Text>
+                    <Text style={[styles.datePickerCancel, { color: themeColors.textSecondary }]}>Cancel</Text>
                   </TouchableOpacity>
-                  <Text style={styles.datePickerTitle}>Study Start Time</Text>
+                  <Text style={[styles.datePickerTitle, { color: themeColors.textPrimary }]}>Study Start Time</Text>
                   <TouchableOpacity onPress={saveStartTime}>
-                    <Text style={styles.datePickerDone}>Done</Text>
+                    <Text style={[styles.datePickerDone, { color: themeColors.primary }]}>Done</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
@@ -472,7 +535,7 @@ export default function SettingsScreen() {
                   mode="time"
                   display="spinner"
                   onChange={handleStartTimeChange}
-                  textColor={colors.textPrimary}
+                  textColor={themeColors.textPrimary}
                 />
               </View>
             </View>
@@ -488,19 +551,19 @@ export default function SettingsScreen() {
           onRequestClose={() => setShowEndTimePicker(false)}
         >
           <TouchableOpacity 
-            style={styles.datePickerOverlay}
+            style={[styles.datePickerOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}
             activeOpacity={1}
             onPress={() => setShowEndTimePicker(false)}
           >
-            <View style={styles.datePickerContainer}>
-              <View style={styles.datePickerModal}>
-                <View style={styles.datePickerHeader}>
+            <View style={[styles.datePickerContainer, { justifyContent: 'flex-end' }]}>
+              <View style={[styles.datePickerModal, { backgroundColor: themeColors.background }]}>
+                <View style={[styles.datePickerHeader, { borderBottomColor: themeColors.border }]}>
                   <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
-                    <Text style={styles.datePickerCancel}>Cancel</Text>
+                    <Text style={[styles.datePickerCancel, { color: themeColors.textSecondary }]}>Cancel</Text>
                   </TouchableOpacity>
-                  <Text style={styles.datePickerTitle}>Study End Time</Text>
+                  <Text style={[styles.datePickerTitle, { color: themeColors.textPrimary }]}>Study End Time</Text>
                   <TouchableOpacity onPress={saveEndTime}>
-                    <Text style={styles.datePickerDone}>Done</Text>
+                    <Text style={[styles.datePickerDone, { color: themeColors.primary }]}>Done</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
@@ -508,7 +571,7 @@ export default function SettingsScreen() {
                   mode="time"
                   display="spinner"
                   onChange={handleEndTimeChange}
-                  textColor={colors.textPrimary}
+                  textColor={themeColors.textPrimary}
                 />
               </View>
             </View>
@@ -522,7 +585,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.backgroundDark,
   },
   header: {
     paddingHorizontal: 24,
@@ -532,7 +594,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: colors.textPrimary,
   },
   content: {
     paddingHorizontal: 24,
@@ -541,7 +602,6 @@ const styles = StyleSheet.create({
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 16,
     padding: 16,
     marginVertical: 16,
@@ -550,14 +610,12 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: colors.primaryBlue,
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileInitial: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.textPrimary,
   },
   profileInfo: {
     marginLeft: 16,
@@ -566,25 +624,20 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.textPrimary,
   },
   profileEmail: {
     fontSize: 14,
-    color: colors.textSecondary,
   },
   editButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   editButtonText: {
     fontSize: 14,
-    color: colors.textPrimary,
   },
   section: {
     marginBottom: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 16,
     padding: 16,
   },
@@ -596,7 +649,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.textPrimary,
     marginLeft: 8,
   },
   settingItem: {
@@ -605,14 +657,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   settingLabel: {
     fontSize: 14,
-    color: colors.textSecondary,
   },
   timeInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -622,7 +671,6 @@ const styles = StyleSheet.create({
   },
   timeInputText: {
     fontSize: 14,
-    color: colors.textPrimary,
   },
   toggleItem: {
     flexDirection: 'row',
@@ -630,41 +678,104 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   toggleLabel: {
     fontSize: 14,
-    color: colors.textSecondary,
   },
   subscriptionCard: {
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
-    marginBottom: 24,
+    overflow: 'hidden',
   },
-  subscriptionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginTop: 8,
-  },
-  subscriptionStatus: {
-    fontSize: 14,
-    color: colors.textPrimary,
-    opacity: 0.8,
-    marginTop: 4,
+  subscriptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
     marginBottom: 16,
   },
+  subscriptionIconContainer: {
+    backgroundColor: 'rgba(79, 140, 255, 0.2)',
+    borderRadius: 8,
+    padding: 6,
+  },
+  subscriptionBadge: {
+    backgroundColor: 'rgba(79, 140, 255, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 140, 255, 0.3)',
+  },
+  subscriptionBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.primaryBlue,
+    letterSpacing: 0.5,
+  },
+  subscriptionContent: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  subscriptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  subscriptionDescription: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  subscriptionPricing: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 8,
+  },
+  subscriptionPrice: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  subscriptionPeriod: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginLeft: 2,
+  },
+  subscriptionStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  subscriptionStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#34D399',
+    marginRight: 6,
+  },
+  subscriptionStatus: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   subscriptionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(79, 140, 255, 0.2)',
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 140, 255, 0.3)',
   },
   subscriptionButtonText: {
-    color: colors.textPrimary,
+    color: colors.primaryBlue,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   logoutButton: {
     flexDirection: 'row',
@@ -675,7 +786,6 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: 16,
-    color: colors.textSecondary,
     marginLeft: 8,
   },
   subjectItem: {
@@ -684,7 +794,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   subjectColorInfo: {
     flexDirection: 'row',
@@ -698,7 +807,6 @@ const styles = StyleSheet.create({
   },
   subjectName: {
     fontSize: 16,
-    color: colors.textPrimary,
   },
   addSubjectButton: {
     flexDirection: 'row',
@@ -709,12 +817,10 @@ const styles = StyleSheet.create({
   },
   addSubjectText: {
     fontSize: 16,
-    color: colors.primaryBlue,
     marginLeft: 8,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.backgroundDark,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -728,16 +834,13 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.textPrimary,
   },
   cancelButton: {
     fontSize: 16,
-    color: colors.textSecondary,
   },
   modalSaveButton: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.primaryBlue,
   },
   modalContent: {
     padding: 20,
@@ -748,36 +851,28 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.textPrimary,
     marginBottom: 8,
   },
   modalInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: colors.textPrimary,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   modalNote: {
     fontSize: 14,
-    color: colors.textSecondary,
     fontStyle: 'italic',
     marginTop: 16,
     lineHeight: 20,
   },
   datePickerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   datePickerContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
   },
   datePickerModal: {
-    backgroundColor: colors.backgroundDark,
     padding: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -789,7 +884,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   datePickerCancel: {
     fontSize: 16,

@@ -140,22 +140,61 @@ class SupabaseAuthClient {
 
   async getSession() {
     try {
+      console.log('🔍 Attempting to retrieve session from AsyncStorage...');
       const storedSession = await AsyncStorage.getItem('supabase.auth.token');
+      
       if (!storedSession) {
-        console.log('No stored session found');
+        console.log('📭 No stored session found in AsyncStorage');
         return { session: null, error: null };
       }
 
-      const session = JSON.parse(storedSession);
-      console.log('Get session result:', { 
+      console.log('📦 Found stored session, parsing...');
+      let session;
+      
+      try {
+        session = JSON.parse(storedSession);
+      } catch (parseError) {
+        console.log('❌ Failed to parse session, clearing storage');
+        await AsyncStorage.removeItem('supabase.auth.token');
+        return { session: null, error: null };
+      }
+      
+      // Basic validation - only check for essential properties
+      if (!session || !session.user) {
+        console.log('❌ Session missing user, clearing storage');
+        await AsyncStorage.removeItem('supabase.auth.token');
+        return { session: null, error: null };
+      }
+
+      // Check if session is expired (only if expires_at exists)
+      if (session.expires_at) {
+        const expiryDate = new Date(session.expires_at * 1000);
+        const now = new Date();
+        if (expiryDate < now) {
+          console.log('⏰ Session has expired, clearing storage');
+          await AsyncStorage.removeItem('supabase.auth.token');
+          return { session: null, error: null };
+        }
+      }
+
+      console.log('✅ Valid session retrieved:', { 
         hasSession: !!session, 
         user: session?.user?.email,
         hasAccessToken: !!session?.access_token,
-        sessionKeys: Object.keys(session || {})
+        sessionKeys: Object.keys(session || {}),
+        expiresAt: session?.expires_at
       });
+
       return { session, error: null };
     } catch (error: any) {
-      console.error('Get session error:', error);
+      console.error('💥 Error retrieving session:', error);
+      // Clear potentially corrupted session data
+      try {
+        await AsyncStorage.removeItem('supabase.auth.token');
+        console.log('🧹 Cleared corrupted session data');
+      } catch (clearError) {
+        console.error('Failed to clear corrupted session:', clearError);
+      }
       return { session: null, error: { message: error.message } };
     }
   }

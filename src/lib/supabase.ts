@@ -219,16 +219,13 @@ export const getSession = async () => {
 };
 
 // Auth state listener
-export const onAuthStateChange = (callback: (event: string, session: Session | null) => void) => {
-  try {
-    console.log('Setting up auth state listener');
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state change:', event, session?.user?.email);
-      callback(event, session);
-    });
-    return data;
-  } catch (error) {
-    console.error('Auth state change listener error:', error);
-    return { data: { subscription: { unsubscribe: () => {} } } };
+const setupAuthListener = () => {
+  if (!supabase) {
+    console.error('Supabase client not initialized');
+    return;
   }
+  
+  supabase.auth.onAuthStateChange((event, session) => {
+    // Handle auth state changes if needed in web context
+  });
 }; 

@@ -7,18 +7,20 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Animated,
-  Easing,
   KeyboardAvoidingView,
   Platform,
-  Keyboard,
+  Alert,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { X, Send } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { X, Send, Calendar, Clock, Zap, BarChart3 } from 'lucide-react-native';
 
-import { colors } from '../constants/theme';
 import { GlowingOrb } from './GlowingOrb';
+import { useTheme } from '../contexts/ThemeContext';
+import { useTasks } from '../contexts/TaskContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { chatAPIService, ChatMessage } from '../services/chatService';
+import { schedulingAPIService } from '../services/schedulingService';
+import { formatAIResponse } from '../utils/markdownParser';
 
 type AIAssistantModalProps = {
   visible: boolean;
@@ -31,48 +33,215 @@ type Message = {
   isUser: boolean;
 };
 
+type QuickAction = {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  prompt: string;
+};
+
 export default function AIAssistantModal({ visible, onClose }: AIAssistantModalProps) {
+  const { currentTheme } = useTheme();
+  const { tasks } = useTasks();
+  const { workingHours } = useSettings();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', text: "Hi, I'm your AI study assistant! How can I help you today?", isUser: false },
+    { id: '1', text: "Hi, I'm Pulse, your AI study assistant! I can help you manage your tasks, analyze your schedule, and provide productivity insights. How can I help you today?", isUser: false },
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
+  const [showQuickActions, setShowQuickActions] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
   
-  const sendMessage = () => {
-    if (input.trim() === '') return;
+  const quickActions: QuickAction[] = [
+    {
+      id: 'schedule',
+      title: 'Smart Schedule',
+      icon: <Calendar size={18} color={currentTheme.colors.primary} />,
+      prompt: 'Please create an optimized schedule for my pending tasks today. Consider my working hours and break times.'
+    },
+    {
+      id: 'today',
+      title: "Today's Tasks",
+      icon: <Clock size={18} color={currentTheme.colors.primary} />,
+      prompt: 'Show me all my tasks for today and their status. What should I prioritize?'
+    },
+    {
+      id: 'productivity',
+      title: 'Productivity Tips',
+      icon: <Zap size={18} color={currentTheme.colors.primary} />,
+      prompt: 'Based on my current tasks and subjects, give me personalized productivity tips and study strategies.'
+    },
+    {
+      id: 'analysis',
+      title: 'Task Analysis',
+      icon: <BarChart3 size={18} color={currentTheme.colors.primary} />,
+      prompt: 'Analyze my task patterns, completion rates, and suggest improvements to my workflow.'
+    },
+  ];
+  
+  const sendMessage = async (messageText?: string) => {
+    const textToSend = messageText || input.trim();
+    if (textToSend === '' || isTyping) return;
     
     const newUserMessage = {
       id: Date.now().toString(),
-      text: input.trim(),
+      text: textToSend,
       isUser: true,
     };
     
     setMessages(prev => [...prev, newUserMessage]);
-    setInput('');
+    if (!messageText) setInput('');
     setIsTyping(true);
+    setShowQuickActions(false);
     
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponses = [
-        "I've analyzed your schedule. Try focusing on your Math assignment first as it's due tomorrow.",
-        "Looking at your progress, you're doing great in Science but might need to spend more time on History.",
-        "Based on your study patterns, your most productive hours are in the morning. Want me to reschedule some tasks to that time?",
-        "I notice you have 3 assignments due this Friday. Would you like me to create a study plan to complete them all on time?",
+    try {
+      // Special handling for scheduling requests
+      if (textToSend.toLowerCase().includes('schedule') && textToSend.toLowerCase().includes('optimized')) {
+        await handleIntelligentScheduling(textToSend);
+        return;
+      }
+      
+      // Build conversation history for API
+      const messagesToSend: ChatMessage[] = [
+        ...conversationHistory,
+        { role: 'user', content: textToSend }
       ];
       
-      const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
+      // Send to GPT API
+      const response = await chatAPIService.sendMessage(messagesToSend);
       
+      // Format the AI response to clean markdown
+      const formattedResponse = formatAIResponse(response.content);
+      
+      // Add AI response
       const newAIMessage = {
         id: (Date.now() + 1).toString(),
-        text: randomResponse,
+        text: formattedResponse,
         isUser: false,
       };
       
       setMessages(prev => [...prev, newAIMessage]);
+      
+      // Update conversation history
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'user', content: textToSend },
+        { role: 'assistant', content: response.content }
+      ]);
+      
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        text: error instanceof Error ? error.message : 'Sorry, I encountered an error. Please try again.',
+        isUser: false,
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
+      // Show alert for critical errors
+      if (error instanceof Error && error.message.includes('Authentication')) {
+        Alert.alert(
+          'Authentication Error',
+          'Please log in again to continue using the AI assistant.',
+          [{ text: 'OK', onPress: onClose }]
+        );
+      }
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
+
+  const handleIntelligentScheduling = async (userPrompt: string) => {
+    try {
+      // Filter pending tasks
+      const pendingTasks = tasks.filter(task => task.status === 'pending');
+      
+      if (pendingTasks.length === 0) {
+        const noTasksMessage = {
+          id: (Date.now() + 1).toString(),
+          text: "You don't have any pending tasks to schedule. Create some tasks first, and I'll help you organize them optimally!",
+          isUser: false,
+        };
+        setMessages(prev => [...prev, noTasksMessage]);
+        return;
+      }
+
+      // Convert tasks to scheduling format
+      const schedulingTasks = schedulingAPIService.convertTasksToSchedulingFormat(pendingTasks);
+      
+      // Generate time slots for today
+      const today = new Date();
+      const timeSlots = schedulingAPIService.generateDefaultTimeSlots(
+        today,
+        workingHours?.startHour || 9,
+        workingHours?.endHour || 17
+      );
+      
+      // Get user preferences
+      const userPreferences = schedulingAPIService.getUserPreferences(workingHours);
+      
+      // Generate schedule
+      const schedulingResult = await schedulingAPIService.generateSchedule(
+        schedulingTasks,
+        timeSlots,
+        userPreferences
+      );
+      
+      // Format the response with markdown cleaning
+      const scheduleText = schedulingResult.schedule.map(block => {
+        const startTime = new Date(block.startTime).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        const endTime = new Date(block.endTime).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        return `${startTime} - ${endTime}: ${block.title}`;
+      }).join('\n');
+      
+      const fullResponse = `📅 Here's your optimized schedule for today:\n\n${scheduleText}\n\n${formatAIResponse(schedulingResult.explanation)}`;
+      
+      const scheduleMessage = {
+        id: (Date.now() + 1).toString(),
+        text: fullResponse,
+        isUser: false,
+      };
+      
+      setMessages(prev => [...prev, scheduleMessage]);
+      
+    } catch (error) {
+      console.error('Error generating schedule:', error);
+      
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        text: error instanceof Error ? error.message : 'Sorry, I had trouble creating your schedule. Please try again.',
+        isUser: false,
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    }
+  };
+
+  const handleQuickAction = (action: QuickAction) => {
+    sendMessage(action.prompt);
+  };
+  
+  // Reset conversation when modal opens
+  useEffect(() => {
+    if (visible) {
+      setConversationHistory([]);
+      setMessages([
+        { id: '1', text: "Hi, I'm Pulse, your AI study assistant! I can help you manage your tasks, analyze your schedule, and provide productivity insights. How can I help you today?", isUser: false },
+      ]);
+      setShowQuickActions(true);
+    }
+  }, [visible]);
   
   useEffect(() => {
     if (scrollViewRef.current) {
@@ -82,6 +251,12 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
     }
   }, [messages]);
 
+  const handleKeyPress = () => {
+    if (Platform.OS === 'web') {
+      sendMessage();
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -90,15 +265,15 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
       onRequestClose={onClose}
     >
       <BlurView intensity={20} style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.header}>
+        <View style={[styles.modalContainer, { backgroundColor: currentTheme.colors.background }]}>
+          <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <X color={colors.textSecondary} size={24} />
+              <X color={currentTheme.colors.textSecondary} size={24} />
             </TouchableOpacity>
             
             <View style={styles.aiInfo}>
-              <GlowingOrb size="sm" glowIntensity={0.3} glowOpacity={1.0} />
-              <Text style={styles.aiName}>Pulse</Text>
+              <GlowingOrb size="sm" color={currentTheme.colors.primary} glowIntensity={0.3} glowOpacity={1.0} />
+              <Text style={[styles.aiName, { color: currentTheme.colors.textPrimary }]}>Pulse</Text>
             </View>
           </View>
           
@@ -113,19 +288,53 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
                 key={message.id} 
                 style={[
                   styles.messageBubble,
-                  message.isUser ? styles.userBubble : styles.aiBubble,
+                  message.isUser 
+                    ? [styles.userBubble, { backgroundColor: currentTheme.colors.primary }]
+                    : [styles.aiBubble, { backgroundColor: currentTheme.colors.surface }],
                 ]}
               >
-                <Text style={styles.messageText}>{message.text}</Text>
+                <Text style={[
+                  styles.messageText, 
+                  { 
+                    color: message.isUser ? '#FFFFFF' : currentTheme.colors.textPrimary 
+                  }
+                ]}>
+                  {message.text}
+                </Text>
               </View>
             ))}
             
+            {showQuickActions && messages.length === 1 && (
+              <View style={styles.quickActionsContainer}>
+                <Text style={[styles.quickActionsTitle, { color: currentTheme.colors.textSecondary }]}>
+                  Quick Actions
+                </Text>
+                <View style={styles.quickActionsGrid}>
+                  {quickActions.map(action => (
+                    <TouchableOpacity
+                      key={action.id}
+                      style={[styles.quickActionButton, { 
+                        backgroundColor: currentTheme.colors.surface,
+                        borderColor: currentTheme.colors.border
+                      }]}
+                      onPress={() => handleQuickAction(action)}
+                    >
+                      {action.icon}
+                      <Text style={[styles.quickActionText, { color: currentTheme.colors.textPrimary }]}>
+                        {action.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+            
             {isTyping && (
-              <View style={[styles.messageBubble, styles.aiBubble]}>
+              <View style={[styles.messageBubble, styles.aiBubble, { backgroundColor: currentTheme.colors.surface }]}>
                 <View style={styles.typingIndicator}>
-                  <View style={styles.typingDot} />
-                  <View style={[styles.typingDot, styles.typingDotMiddle]} />
-                  <View style={styles.typingDot} />
+                  <View style={[styles.typingDot, { backgroundColor: currentTheme.colors.textSecondary }]} />
+                  <View style={[styles.typingDot, styles.typingDotMiddle, { backgroundColor: currentTheme.colors.textSecondary }]} />
+                  <View style={[styles.typingDot, { backgroundColor: currentTheme.colors.textSecondary }]} />
                 </View>
               </View>
             )}
@@ -135,21 +344,27 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={80}
           >
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, { backgroundColor: currentTheme.colors.surface }]}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { 
+                  color: currentTheme.colors.textPrimary,
+                  borderColor: currentTheme.colors.border
+                }]}
                 placeholder="Ask your AI assistant..."
-                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                placeholderTextColor={currentTheme.colors.textSecondary}
                 value={input}
                 onChangeText={setInput}
                 multiline
+                maxLength={500}
+                onSubmitEditing={handleKeyPress}
+                editable={!isTyping}
               />
               <TouchableOpacity 
-                style={styles.sendButton}
-                onPress={sendMessage}
-                disabled={input.trim() === ''}
+                style={[styles.sendButton, { opacity: input.trim() === '' || isTyping ? 0.5 : 1 }]}
+                onPress={() => sendMessage()}
+                disabled={input.trim() === '' || isTyping}
               >
-                <View style={styles.sendButtonGradient}>
+                <View style={[styles.sendButtonGradient, { backgroundColor: currentTheme.colors.primary }]}>
                   <Send color="#fff" size={20} />
                 </View>
               </TouchableOpacity>
@@ -168,7 +383,6 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.backgroundDark,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     marginTop: 60,
@@ -180,7 +394,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   closeButton: {
     position: 'absolute',
@@ -195,83 +408,102 @@ const styles = StyleSheet.create({
   aiName: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.textPrimary,
   },
   messageContainer: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
   },
   messageContent: {
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingVertical: 16,
   },
   messageBubble: {
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 12,
     maxWidth: '80%',
+    padding: 12,
+    borderRadius: 16,
+    marginVertical: 4,
   },
   userBubble: {
-    backgroundColor: colors.primaryBlue,
     alignSelf: 'flex-end',
     borderBottomRightRadius: 4,
   },
   aiBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignSelf: 'flex-start',
     borderBottomLeftRadius: 4,
   },
   messageText: {
-    color: colors.textPrimary,
     fontSize: 16,
   },
   typingIndicator: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    height: 24,
-    width: 50,
   },
   typingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.textSecondary,
     marginHorizontal: 2,
     opacity: 0.6,
   },
   typingDotMiddle: {
-    opacity: 0.8,
+    animationDelay: '0.1s',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
   },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    color: colors.textPrimary,
     fontSize: 16,
     maxHeight: 100,
     marginRight: 12,
   },
   sendButton: {
-    marginBottom: 4,
+    marginBottom: 2,
   },
   sendButtonGradient: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.primaryBlue,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  quickActionsContainer: {
+    marginVertical: 16,
+  },
+  quickActionsTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  quickActionButton: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
   },
 });

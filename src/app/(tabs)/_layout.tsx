@@ -2,22 +2,26 @@ import { Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, Home, BarChart3, Settings } from 'lucide-react-native';
-import { colors } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { currentTheme } = useTheme();
   
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          ...styles.tabBar,
+          backgroundColor: currentTheme.colors.background,
+          borderTopColor: currentTheme.colors.border,
+          borderTopWidth: 1,
+          elevation: 0,
           height: 60 + insets.bottom,
           paddingBottom: insets.bottom,
         },
-        tabBarActiveTintColor: colors.primaryBlue,
-        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarActiveTintColor: currentTheme.colors.primary,
+        tabBarInactiveTintColor: currentTheme.colors.textSecondary,
         tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
@@ -54,12 +58,6 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: colors.backgroundDark,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
-    borderTopWidth: 1,
-    elevation: 0,
-  },
   tabBarLabel: {
     fontSize: 12,
     fontWeight: '500',

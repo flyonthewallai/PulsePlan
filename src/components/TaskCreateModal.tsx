@@ -11,10 +11,10 @@ import {
   Alert,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Book, Calendar, Clock, Flag } from 'lucide-react-native';
+import { Book, Calendar, Clock, Flag, X, Check } from 'lucide-react-native';
 
-import { colors } from '../constants/theme';
-import { useTasks, CreateTaskData } from '../contexts/TaskContext';
+import { useTasks, CreateTaskData, Task } from '../contexts/TaskContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 type TaskCreateModalProps = {
   visible: boolean;
@@ -22,10 +22,12 @@ type TaskCreateModalProps = {
   initialDate?: Date;
   initialTime?: Date;
   initialTimeEstimate?: string;
+  editingTask?: Task | null;
 };
 
-export default function TaskCreateModal({ visible, onClose, initialDate, initialTime, initialTimeEstimate }: TaskCreateModalProps) {
-  const { createTask, loading } = useTasks();
+export default function TaskCreateModal({ visible, onClose, initialDate, initialTime, initialTimeEstimate, editingTask }: TaskCreateModalProps) {
+  const { createTask, updateTask, loading } = useTasks();
+  const { currentTheme } = useTheme();
   const [isCreating, setIsCreating] = useState(false);
   
   const [title, setTitle] = useState('');
@@ -162,26 +164,40 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
       dueDateTime.setHours(selectedTime.getHours());
       dueDateTime.setMinutes(selectedTime.getMinutes());
       
-      const taskData: CreateTaskData = {
-        title: title.trim(),
-        description: '', // We can add a description field later
-        subject,
-        due_date: dueDateTime.toISOString(),
-        estimated_minutes: timeEstimate ? parseInt(timeEstimate) : undefined,
-        status: 'pending',
-        priority,
-      };
+      if (editingTask) {
+        // Update existing task
+        const updateData = {
+          title: title.trim(),
+          subject,
+          due_date: dueDateTime.toISOString(),
+          estimated_minutes: timeEstimate ? parseInt(timeEstimate) : undefined,
+          priority,
+        };
 
-      await createTask(taskData);
+        await updateTask(editingTask.id, updateData);
+        Alert.alert('Success', 'Task updated successfully!');
+      } else {
+        // Create new task
+        const taskData: CreateTaskData = {
+          title: title.trim(),
+          description: '', // We can add a description field later
+          subject,
+          due_date: dueDateTime.toISOString(),
+          estimated_minutes: timeEstimate ? parseInt(timeEstimate) : undefined,
+          status: 'pending',
+          priority,
+        };
+
+        await createTask(taskData);
+        Alert.alert('Success', 'Task created successfully!');
+      }
       
       // Reset form and close modal
       resetForm();
       onClose();
-      
-      Alert.alert('Success', 'Task created successfully!');
     } catch (error) {
-      console.error('Error creating task:', error);
-      Alert.alert('Error', 'Failed to create task. Please try again.');
+      console.error('Error saving task:', error);
+      Alert.alert('Error', `Failed to ${editingTask ? 'update' : 'create'} task. Please try again.`);
     } finally {
       setIsCreating(false);
     }
@@ -197,23 +213,34 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
     setCurrentFocusedInput(null);
   };
   
-  // Reset form when modal opens or initial values change
+  // Populate form when editing
   useEffect(() => {
-    if (visible) {
+    if (editingTask && visible) {
+      setTitle(editingTask.title);
+      setSubject(editingTask.subject);
+      setPriority(editingTask.priority);
+      
+      const dueDate = new Date(editingTask.due_date);
+      setSelectedDate(dueDate);
+      setSelectedTime(dueDate);
+      
+      setTimeEstimate(editingTask.estimated_minutes?.toString() || '60');
+    } else if (!editingTask && visible) {
+      // Reset form for new task
       resetForm();
     }
-  }, [visible, initialDate, initialTime, initialTimeEstimate]);
+  }, [editingTask, visible, initialDate, initialTime, initialTimeEstimate]);
   
   const getPriorityColor = (value: string) => {
     switch (value) {
       case 'high':
-        return colors.taskColors.high;
+        return currentTheme.colors.error;
       case 'medium':
-        return colors.taskColors.medium;
+        return currentTheme.colors.warning;
       case 'low':
-        return colors.taskColors.low;
+        return currentTheme.colors.success;
       default:
-        return colors.taskColors.default;
+        return currentTheme.colors.textSecondary;
     }
   };
 
@@ -224,19 +251,22 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <View ref={modalRef} style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={styles.cancelButton}>Cancel</Text>
+      <View ref={modalRef} style={[styles.modalContainer, { backgroundColor: currentTheme.colors.background }]}>
+        <View style={[styles.modalHeader, { borderBottomColor: currentTheme.colors.border }]}>
+          <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
+            <X color={currentTheme.colors.textSecondary} size={24} />
           </TouchableOpacity>
-          <Text style={styles.modalTitle}>New Task</Text>
-          <TouchableOpacity onPress={handleSave} disabled={isCreating}>
-            <Text style={[
-              styles.modalSaveButton,
-              isCreating && styles.modalSaveButtonDisabled
-            ]}>
-              {isCreating ? 'Creating...' : 'Create'}
-            </Text>
+          <Text style={[styles.modalTitle, { color: currentTheme.colors.textPrimary }]}>
+            {editingTask ? 'Edit Task' : 'New Task'}
+          </Text>
+          <TouchableOpacity onPress={handleSave} disabled={isCreating} style={[
+            styles.saveButton,
+            { backgroundColor: isCreating ? 'transparent' : 'rgba(79, 140, 255, 0.15)' }
+          ]}>
+            <Check 
+              color={isCreating ? currentTheme.colors.textSecondary : currentTheme.colors.primary} 
+              size={24} 
+            />
           </TouchableOpacity>
         </View>
 
@@ -248,12 +278,12 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Task Title</Text>
+            <Text style={[styles.inputLabel, { color: currentTheme.colors.textPrimary }]}>Task Title</Text>
             <TextInput
               ref={titleInputRef}
-              style={styles.modalInput}
+              style={[styles.modalInput, { backgroundColor: currentTheme.colors.surface, color: currentTheme.colors.textPrimary, borderColor: currentTheme.colors.border }]}
               placeholder="What do you need to do?"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={currentTheme.colors.textSecondary}
               value={title}
               onChangeText={setTitle}
               onFocus={() => handleInputFocus('title')}
@@ -262,41 +292,41 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
           </View>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Subject</Text>
+            <Text style={[styles.inputLabel, { color: currentTheme.colors.textPrimary }]}>Subject</Text>
             <TouchableOpacity 
-              style={styles.subjectPicker}
+              style={[styles.subjectPicker, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}
               onPress={() => setShowSubjectPicker(true)}
             >
-              <Book size={20} color={colors.textSecondary} />
+              <Book size={20} color={currentTheme.colors.textSecondary} />
               <View style={styles.subjectPickerContent}>
                 {subject ? (
                   <View style={styles.selectedSubject}>
                     <View 
                       style={[
                         styles.subjectColorDot, 
-                        { backgroundColor: getSelectedSubject()?.color || colors.textSecondary }
+                        { backgroundColor: getSelectedSubject()?.color || currentTheme.colors.textSecondary }
                       ]} 
                     />
-                    <Text style={styles.selectedSubjectText}>{subject}</Text>
+                    <Text style={[styles.selectedSubjectText, { color: currentTheme.colors.textPrimary }]}>{subject}</Text>
                   </View>
                 ) : (
-                  <Text style={styles.subjectPlaceholder}>Select subject</Text>
+                  <Text style={[styles.subjectPlaceholder, { color: currentTheme.colors.textSecondary }]}>Select subject</Text>
                 )}
               </View>
-              <Text style={styles.dropdownArrow}>▼</Text>
+              <Text style={[styles.dropdownArrow, { color: currentTheme.colors.textSecondary }]}>▼</Text>
             </TouchableOpacity>
           </View>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Priority</Text>
+            <Text style={[styles.inputLabel, { color: currentTheme.colors.textPrimary }]}>Priority</Text>
             <View style={styles.prioritySelector}>
               {(['high', 'medium', 'low'] as const).map((value) => (
                 <TouchableOpacity
                   key={value}
                   style={[
                     styles.priorityButton,
-                    priority === value && styles.selectedPriorityButton,
                     { borderColor: getPriorityColor(value) },
+                    priority === value && [styles.selectedPriorityButton, { backgroundColor: currentTheme.colors.surface }],
                   ]}
                   onPress={() => setPriority(value)}
                 >
@@ -309,7 +339,8 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
                   <Text 
                     style={[
                       styles.priorityText,
-                      priority === value && styles.selectedPriorityText,
+                      { color: currentTheme.colors.textSecondary },
+                      priority === value && [styles.selectedPriorityText, { color: currentTheme.colors.textPrimary }],
                     ]}
                   >
                     {value.charAt(0).toUpperCase() + value.slice(1)}
@@ -321,41 +352,41 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
           
           <View style={styles.inputRow}>
             <View style={[styles.inputGroup, styles.inputHalf]}>
-              <Text style={styles.inputLabel}>Due Date</Text>
-              <View style={styles.inputWithIcon}>
-                <Calendar size={20} color={colors.textSecondary} />
+              <Text style={[styles.inputLabel, { color: currentTheme.colors.textPrimary }]}>Due Date</Text>
+              <View style={[styles.inputWithIcon, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+                <Calendar size={20} color={currentTheme.colors.textSecondary} />
                 <TouchableOpacity
                   style={styles.iconInput}
                   onPress={showDatePickerModal}
                 >
-                  <Text style={styles.selectedDateText}>{formatDate(selectedDate)}</Text>
+                  <Text style={[styles.selectedDateText, { color: currentTheme.colors.textPrimary }]}>{formatDate(selectedDate)}</Text>
                 </TouchableOpacity>
               </View>
             </View>
             
             <View style={[styles.inputGroup, styles.inputHalf]}>
-              <Text style={styles.inputLabel}>Due Time</Text>
-              <View style={styles.inputWithIcon}>
-                <Clock size={20} color={colors.textSecondary} />
+              <Text style={[styles.inputLabel, { color: currentTheme.colors.textPrimary }]}>Due Time</Text>
+              <View style={[styles.inputWithIcon, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+                <Clock size={20} color={currentTheme.colors.textSecondary} />
                 <TouchableOpacity
                   style={styles.iconInput}
                   onPress={showTimePickerModal}
                 >
-                  <Text style={styles.selectedDateText}>{formatTime(selectedTime)}</Text>
+                  <Text style={[styles.selectedDateText, { color: currentTheme.colors.textPrimary }]}>{formatTime(selectedTime)}</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Time Estimate</Text>
-            <View style={styles.inputWithIcon}>
-              <Flag size={20} color={colors.textSecondary} />
+            <Text style={[styles.inputLabel, { color: currentTheme.colors.textPrimary }]}>Time Estimate</Text>
+            <View style={[styles.inputWithIcon, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+              <Flag size={20} color={currentTheme.colors.textSecondary} />
               <TextInput
                 ref={timeEstimateInputRef}
-                style={styles.iconInput}
+                style={[styles.iconInput, { color: currentTheme.colors.textPrimary }]}
                 placeholder="How long will it take? (min)"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={currentTheme.colors.textSecondary}
                 keyboardType="number-pad"
                 value={timeEstimate}
                 onChangeText={setTimeEstimate}
@@ -383,14 +414,14 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
             onPress={hideDatePicker}
           >
             <View style={styles.datePickerContainer}>
-              <View style={styles.datePickerModal}>
-                <View style={styles.datePickerHeader}>
+              <View style={[styles.datePickerModal, { backgroundColor: currentTheme.colors.background }]}>
+                <View style={[styles.datePickerHeader, { borderBottomColor: currentTheme.colors.border }]}>
                   <TouchableOpacity onPress={hideDatePicker}>
-                    <Text style={styles.datePickerCancel}>Cancel</Text>
+                    <Text style={[styles.datePickerCancel, { color: currentTheme.colors.textSecondary }]}>Cancel</Text>
                   </TouchableOpacity>
-                  <Text style={styles.datePickerTitle}>Select Date</Text>
+                  <Text style={[styles.datePickerTitle, { color: currentTheme.colors.textPrimary }]}>Select Date</Text>
                   <TouchableOpacity onPress={hideDatePicker}>
-                    <Text style={styles.datePickerDone}>Done</Text>
+                    <Text style={[styles.datePickerDone, { color: currentTheme.colors.primary }]}>Done</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
@@ -399,7 +430,7 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
                   display="spinner"
                   onChange={handleDateChange}
                   minimumDate={new Date()}
-                  textColor={colors.textPrimary}
+                  textColor={currentTheme.colors.textPrimary}
                 />
               </View>
             </View>
@@ -421,14 +452,14 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
             onPress={hideTimePicker}
           >
             <View style={styles.datePickerContainer}>
-              <View style={styles.datePickerModal}>
-                <View style={styles.datePickerHeader}>
+              <View style={[styles.datePickerModal, { backgroundColor: currentTheme.colors.background }]}>
+                <View style={[styles.datePickerHeader, { borderBottomColor: currentTheme.colors.border }]}>
                   <TouchableOpacity onPress={hideTimePicker}>
-                    <Text style={styles.datePickerCancel}>Cancel</Text>
+                    <Text style={[styles.datePickerCancel, { color: currentTheme.colors.textSecondary }]}>Cancel</Text>
                   </TouchableOpacity>
-                  <Text style={styles.datePickerTitle}>Select Time</Text>
+                  <Text style={[styles.datePickerTitle, { color: currentTheme.colors.textPrimary }]}>Select Time</Text>
                   <TouchableOpacity onPress={hideTimePicker}>
-                    <Text style={styles.datePickerDone}>Done</Text>
+                    <Text style={[styles.datePickerDone, { color: currentTheme.colors.primary }]}>Done</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
@@ -436,7 +467,7 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
                   mode="time"
                   display="spinner"
                   onChange={handleTimeChange}
-                  textColor={colors.textPrimary}
+                  textColor={currentTheme.colors.textPrimary}
                 />
               </View>
             </View>
@@ -451,12 +482,12 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
         presentationStyle="pageSheet"
         onRequestClose={() => setShowSubjectPicker(false)}
       >
-        <View style={styles.pickerModalContainer}>
-          <View style={styles.pickerHeader}>
+        <View style={[styles.pickerModalContainer, { backgroundColor: currentTheme.colors.background }]}>
+          <View style={[styles.pickerHeader, { borderBottomColor: currentTheme.colors.border }]}>
             <TouchableOpacity onPress={() => setShowSubjectPicker(false)}>
-              <Text style={styles.cancelButton}>Cancel</Text>
+              <Text style={[styles.cancelButton, { color: currentTheme.colors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Select Subject</Text>
+            <Text style={[styles.modalTitle, { color: currentTheme.colors.textPrimary }]}>Select Subject</Text>
             <View style={styles.placeholder} />
           </View>
           
@@ -466,7 +497,10 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
                 key={subjectItem.id}
                 style={[
                   styles.subjectOption,
-                  subject === subjectItem.name && styles.selectedSubjectOption
+                  { 
+                    borderColor: currentTheme.colors.border,
+                    backgroundColor: subject === subjectItem.name ? currentTheme.colors.surface : 'transparent'
+                  }
                 ]}
                 onPress={() => handleSubjectSelect(subjectItem.name)}
               >
@@ -476,13 +510,14 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
                   />
                   <Text style={[
                     styles.subjectOptionText,
-                    subject === subjectItem.name && styles.selectedSubjectOptionText
+                    { color: currentTheme.colors.textPrimary },
+                    subject === subjectItem.name && { color: currentTheme.colors.primary }
                   ]}>
                     {subjectItem.name}
                   </Text>
                 </View>
                 {subject === subjectItem.name && (
-                  <Text style={styles.checkmark}>✓</Text>
+                  <Text style={[styles.checkmark, { color: currentTheme.colors.primary }]}>✓</Text>
                 )}
               </TouchableOpacity>
             ))}
@@ -496,7 +531,6 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.backgroundDark,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -505,34 +539,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: colors.backgroundDark,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.textPrimary,
   },
   cancelButton: {
-    fontSize: 16,
-    color: colors.textSecondary,
+    padding: 4,
   },
-  modalSaveButton: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.primaryBlue,
-  },
-  modalSaveButtonDisabled: {
-    color: colors.textSecondary,
-    opacity: 0.5,
+  saveButton: {
+    padding: 8,
+    borderRadius: 12,
   },
   modalContent: {
     flex: 1,
-    padding: 20,
-    backgroundColor: colors.backgroundDark,
   },
   scrollContentContainer: {
-    paddingBottom: 50,
+    padding: 20,
   },
   inputGroup: {
     marginBottom: 20,
@@ -547,33 +570,26 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.textPrimary,
     marginBottom: 8,
   },
   modalInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: colors.textPrimary,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   inputWithIcon: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   iconInput: {
     flex: 1,
     paddingVertical: 12,
     paddingLeft: 12,
-    color: colors.textPrimary,
     fontSize: 16,
     justifyContent: 'center',
   },
@@ -589,7 +605,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   selectedPriorityButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -602,10 +617,8 @@ const styles = StyleSheet.create({
   },
   priorityText: {
     fontSize: 14,
-    color: colors.textSecondary,
   },
   selectedPriorityText: {
-    color: colors.textPrimary,
     fontWeight: '500',
   },
   bottomPadding: {
@@ -614,12 +627,10 @@ const styles = StyleSheet.create({
   subjectPicker: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   subjectPickerContent: {
     flex: 1,
@@ -631,16 +642,13 @@ const styles = StyleSheet.create({
   },
   subjectPlaceholder: {
     fontSize: 16,
-    color: colors.textSecondary,
   },
   dropdownArrow: {
     fontSize: 12,
-    color: colors.textSecondary,
     marginLeft: 8,
   },
   selectedSubjectText: {
     fontSize: 16,
-    color: colors.textPrimary,
   },
   subjectColorDot: {
     width: 12,
@@ -650,7 +658,6 @@ const styles = StyleSheet.create({
   },
   pickerModalContainer: {
     flex: 1,
-    backgroundColor: colors.backgroundDark,
   },
   pickerHeader: {
     flexDirection: 'row',
@@ -659,10 +666,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   placeholder: {
-    width: 60, // Fixed width instead of flex to center the title
+    width: 60,
   },
   pickerContent: {
     padding: 20,
@@ -674,14 +680,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     marginBottom: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  selectedSubjectOption: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderColor: colors.primaryBlue,
   },
   subjectOptionContent: {
     flexDirection: 'row',
@@ -689,20 +689,13 @@ const styles = StyleSheet.create({
   },
   subjectOptionText: {
     fontSize: 16,
-    color: colors.textPrimary,
-  },
-  selectedSubjectOptionText: {
-    color: colors.textPrimary,
-    fontWeight: '600',
   },
   checkmark: {
     fontSize: 18,
-    color: colors.primaryBlue,
     fontWeight: '600',
   },
   selectedDateText: {
     fontSize: 16,
-    color: colors.textPrimary,
   },
   datePickerOverlay: {
     flex: 1,
@@ -713,7 +706,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   datePickerModal: {
-    backgroundColor: colors.backgroundDark,
     padding: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -725,20 +717,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   datePickerCancel: {
     fontSize: 16,
-    color: colors.textSecondary,
   },
   datePickerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.textPrimary,
   },
   datePickerDone: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.primaryBlue,
   },
 });
