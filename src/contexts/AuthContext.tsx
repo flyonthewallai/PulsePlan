@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { useRouter, useSegments } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabaseAuth, onAuthStateChange, getSession } from '@/lib/supabase-rn';
 
 interface AuthContextType {
@@ -10,6 +11,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   error: string | null;
   refreshAuth: () => Promise<void>;
+  needsOnboarding: boolean;
+  markOnboardingComplete: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,6 +22,8 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   error: null,
   refreshAuth: async () => {},
+  needsOnboarding: false,
+  markOnboardingComplete: async () => {},
 });
 
 export const useAuth = () => {
@@ -33,6 +38,8 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const ONBOARDING_KEY = 'onboarding_completed';
+
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const router = useRouter();
   const segments = useSegments();
@@ -40,6 +47,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+
+  const checkOnboardingStatus = async (userId: string) => {
+    try {
+      const onboardingData = await AsyncStorage.getItem(`${ONBOARDING_KEY}_${userId}`);
+      return onboardingData === 'true';
+    } catch (error) {
+      console.error('Error checking onboarding status:', error);
+      return false;
+    }
+  };
+
+  const markOnboardingComplete = async () => {
+    if (!user?.id) return;
+    
+    try {
+      await AsyncStorage.setItem(`${ONBOARDING_KEY}_${user.id}`, 'true');
+      setNeedsOnboarding(false);
+      console.log('✅ Onboarding marked as complete');
+    } catch (error) {
+      console.error('Error marking onboarding complete:', error);
+    }
+  };
 
   const refreshAuth = async () => {
     try {
@@ -50,25 +80,39 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setError('Failed to refresh authentication session');
         setSession(null);
         setUser(null);
+        setNeedsOnboarding(false);
       } else if (!session) {
         setSession(null);
         setUser(null);
         setError(null);
+        setNeedsOnboarding(false);
       } else if (!session.user) {
         setSession(null);
         setUser(null);
         setError(null);
+        setNeedsOnboarding(false);
       } else {
         // Session is valid - we have a session with user data
         setSession(session);
         setUser(session.user);
         setError(null);
+        
+        // Check if user needs onboarding
+        const hasCompletedOnboarding = await checkOnboardingStatus(session.user.id);
+        setNeedsOnboarding(!hasCompletedOnboarding);
+        
+        console.log('🔍 Auth refresh complete:', {
+          userId: session.user.id,
+          email: session.user.email,
+          needsOnboarding: !hasCompletedOnboarding
+        });
       }
     } catch (error) {
       console.error('Error refreshing auth:', error);
       setError('Authentication refresh failed');
       setSession(null);
       setUser(null);
+      setNeedsOnboarding(false);
     }
   };
 
@@ -80,11 +124,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     const isInAuthGroup = segments[0] === '(tabs)';
     const isOnAuthPage = segments[0] === 'auth';
+    const isOnOnboardingPage = segments[0] === 'onboarding';
     const isOnIndexPage = segments.length === 0;
+
+    console.log('🧭 Navigation check:', {
+      segments,
+      user: !!user,
+      needsOnboarding,
+      isInAuthGroup,
+      isOnAuthPage,
+      isOnOnboardingPage,
+      isOnIndexPage
+    });
 
     if (!user) {
       // User not authenticated
-      if (isInAuthGroup) {
+      if (isInAuthGroup || isOnOnboardingPage) {
         router.replace('/auth');
       } else if (isOnIndexPage) {
         // If user is on index page and not authenticated, redirect to auth
@@ -96,16 +151,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     } else {
       // User is authenticated
-      if (!isInAuthGroup && !isOnIndexPage) {
-        router.replace('/(tabs)/home');
-      } else if (isOnIndexPage) {
-        // Special case: if user is on index page and authenticated, immediately redirect
-        setTimeout(() => {
+      if (needsOnboarding) {
+        // User needs onboarding
+        if (!isOnOnboardingPage) {
+          console.log('🎯 Redirecting to onboarding...');
+          router.replace('/onboarding');
+        }
+      } else {
+        // User has completed onboarding
+        if (!isInAuthGroup && !isOnIndexPage) {
+          console.log('🏠 Redirecting to main app...');
           router.replace('/(tabs)/home');
-        }, 100); // Small delay to ensure routing is ready
+        } else if (isOnIndexPage || isOnOnboardingPage) {
+          // Special case: if user is on index page or onboarding and authenticated with completed onboarding
+          setTimeout(() => {
+            router.replace('/(tabs)/home');
+          }, 100); // Small delay to ensure routing is ready
+        }
       }
     }
-  }, [user, loading, segments, router]);
+  }, [user, needsOnboarding, loading, segments, router]);
 
   useEffect(() => {
     // Validate Supabase client
@@ -153,6 +218,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     isAuthenticated: !!user,
     error,
     refreshAuth,
+    needsOnboarding,
+    markOnboardingComplete,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

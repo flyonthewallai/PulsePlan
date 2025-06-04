@@ -1,228 +1,40 @@
 import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { createClient } from '@supabase/supabase-js';
 import { EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY } from '@env';
 
-// Import only auth-related types and functions to avoid realtime issues
-import type { Session, User, AuthError, AuthResponse } from '@supabase/supabase-js';
+// Get Supabase configuration - try environment variables first, then fall back to app.json
+const getSupabaseConfig = () => {
+  // Try environment variables first
+  let supabaseUrl = EXPO_PUBLIC_SUPABASE_URL;
+  let supabaseAnonKey = EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-// Custom minimal Supabase client for React Native
-class SupabaseAuthClient {
-  private url: string;
-  private key: string;
-  private headers: Record<string, string>;
-
-  constructor(url: string, key: string) {
-    this.url = url;
-    this.key = key;
-    this.headers = {
-      'apikey': key,
-      'Authorization': `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      'X-Client-Info': 'supabase-js-react-native',
-    };
+  // If environment variables are undefined, fall back to app.json
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.log('Environment variables not found, falling back to app.json');
+    supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
+    supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
   }
 
-  private async request(endpoint: string, options: RequestInit = {}) {
-    const url = `${this.url}/auth/v1${endpoint}`;
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...this.headers,
-        ...options.headers,
-      },
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || `HTTP ${response.status}`);
-    }
-
-    return data;
-  }
-
-  async signUp(email: string, password: string, metadata?: any) {
-    try {
-      console.log('Attempting sign up for:', email);
-      const data = await this.request('/signup', {
-        method: 'POST',
-        body: JSON.stringify({
-          email,
-          password,
-          data: metadata,
-        }),
-      });
-      console.log('Sign up result:', { user: data.user?.email, error: data.error });
-      return { data, error: null };
-    } catch (error: any) {
-      console.error('Sign up error:', error);
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  async signInWithPassword(email: string, password: string) {
-    try {
-      console.log('Attempting sign in for:', email);
-      const data = await this.request('/token?grant_type=password', {
-        method: 'POST',
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
-      
-      // Structure the response to match Supabase format
-      const sessionData = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_in: data.expires_in,
-        expires_at: data.expires_at,
-        token_type: data.token_type,
-        user: data.user,
-      };
-      
-      // Store session in AsyncStorage
-      if (data.access_token && data.user) {
-        await AsyncStorage.setItem('supabase.auth.token', JSON.stringify(sessionData));
-      }
-      
-      console.log('Sign in result:', { user: data.user?.email, hasToken: !!data.access_token });
-      return { 
-        data: { 
-          user: data.user, 
-          session: sessionData 
-        }, 
-        error: null 
-      };
-    } catch (error: any) {
-      console.error('Sign in error:', error);
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  async signOut() {
-    try {
-      console.log('Attempting sign out');
-      
-      // Try to call the logout endpoint, but don't fail if it errors
-      try {
-        await this.request('/logout', {
-          method: 'POST',
-        });
-        console.log('Server logout successful');
-      } catch (serverError) {
-        console.warn('Server logout failed (this is okay):', serverError);
-        // Continue with local logout even if server logout fails
-      }
-      
-      // Always clear the local session regardless of server response
-      await AsyncStorage.removeItem('supabase.auth.token');
-      console.log('Local session cleared');
-      
-      console.log('Sign out completed successfully');
-      return { error: null };
-    } catch (error: any) {
-      console.error('Sign out error:', error);
-      
-      // Even if there's an error, try to clear local session
-      try {
-        await AsyncStorage.removeItem('supabase.auth.token');
-        console.log('Local session cleared despite error');
-      } catch (clearError) {
-        console.error('Failed to clear local session:', clearError);
-      }
-      
-      // Return success anyway since we cleared local session
-      return { error: null };
-    }
-  }
-
-  async getSession() {
-    try {
-      console.log('🔍 Attempting to retrieve session from AsyncStorage...');
-      const storedSession = await AsyncStorage.getItem('supabase.auth.token');
-      
-      if (!storedSession) {
-        console.log('📭 No stored session found in AsyncStorage');
-        return { session: null, error: null };
-      }
-
-      console.log('📦 Found stored session, parsing...');
-      let session;
-      
-      try {
-        session = JSON.parse(storedSession);
-      } catch (parseError) {
-        console.log('❌ Failed to parse session, clearing storage');
-        await AsyncStorage.removeItem('supabase.auth.token');
-        return { session: null, error: null };
-      }
-      
-      // Basic validation - only check for essential properties
-      if (!session || !session.user) {
-        console.log('❌ Session missing user, clearing storage');
-        await AsyncStorage.removeItem('supabase.auth.token');
-        return { session: null, error: null };
-      }
-
-      // Check if session is expired (only if expires_at exists)
-      if (session.expires_at) {
-        const expiryDate = new Date(session.expires_at * 1000);
-        const now = new Date();
-        if (expiryDate < now) {
-          console.log('⏰ Session has expired, clearing storage');
-          await AsyncStorage.removeItem('supabase.auth.token');
-          return { session: null, error: null };
-        }
-      }
-
-      console.log('✅ Valid session retrieved:', { 
-        hasSession: !!session, 
-        user: session?.user?.email,
-        hasAccessToken: !!session?.access_token,
-        sessionKeys: Object.keys(session || {}),
-        expiresAt: session?.expires_at
-      });
-
-      return { session, error: null };
-    } catch (error: any) {
-      console.error('💥 Error retrieving session:', error);
-      // Clear potentially corrupted session data
-      try {
-        await AsyncStorage.removeItem('supabase.auth.token');
-        console.log('🧹 Cleared corrupted session data');
-      } catch (clearError) {
-        console.error('Failed to clear corrupted session:', clearError);
-      }
-      return { session: null, error: { message: error.message } };
-    }
-  }
-
-  async getUser() {
-    try {
-      const { session } = await this.getSession();
-      const user = session?.user || null;
-      console.log('Get user result:', { user: user?.email });
-      return { user, error: null };
-    } catch (error: any) {
-      console.error('Get user error:', error);
-      return { user: null, error: { message: error.message } };
-    }
-  }
-}
+  return { supabaseUrl, supabaseAnonKey };
+};
 
 // Debug: Log environment variables
 console.log('Environment variables:', {
   fromEnv: {
     supabaseUrl: EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: EXPO_PUBLIC_SUPABASE_ANON_KEY,
+  },
+  fromAppJson: {
+    supabaseUrl: Constants.expoConfig?.extra?.supabaseUrl,
+    supabaseAnonKey: Constants.expoConfig?.extra?.supabaseAnonKey,
   }
 });
 
 // Initialize Supabase client
-const supabaseUrl = EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
 
 console.log('Supabase configuration:', {
   supabaseUrl,
@@ -232,7 +44,7 @@ console.log('Supabase configuration:', {
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase credentials:', { supabaseUrl, supabaseAnonKey });
-  throw new Error('Missing Supabase URL or Anon Key. Please check your environment variables.');
+  throw new Error('Missing Supabase URL or Anon Key. Please check your environment variables or app.json configuration.');
 }
 
 // Check if we're using the wrong key type
@@ -252,39 +64,214 @@ try {
   console.warn('Could not parse JWT token:', error);
 }
 
-// Create the custom Supabase client
-export const supabaseAuth = new SupabaseAuthClient(supabaseUrl, supabaseAnonKey);
+// Create the official Supabase client
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+    flowType: 'pkce',
+  },
+  // Disable realtime for React Native compatibility
+  realtime: {
+    params: {
+      eventsPerSecond: 0,
+    },
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-js-react-native',
+      'X-Supabase-Client': 'react-native',
+    },
+  },
+});
 
-// Export individual auth functions for compatibility
-export const signUp = (email: string, password: string, fullName?: string) => 
-  supabaseAuth.signUp(email, password, fullName ? { full_name: fullName } : undefined);
+// Clear all auth data function
+export const clearAllAuthData = async () => {
+  try {
+    console.log('🧹 Clearing all auth data...');
+    
+    // Clear Supabase session
+    await supabase.auth.signOut();
+    
+    // Clear all possible auth-related keys from AsyncStorage
+    const authKeys = [
+      'supabase.auth.token',
+      'sb-auth-token',
+      '@supabase/auth-token',
+      'supabaseAuthToken',
+      'user_session',
+      'auth_session',
+    ];
+    
+    await Promise.all(authKeys.map(key => AsyncStorage.removeItem(key)));
+    
+    // Clear any cached task data since it's user-specific
+    await AsyncStorage.removeItem('cached_tasks');
+    await AsyncStorage.removeItem('last_sync_timestamp');
+    
+    console.log('✅ All auth data cleared successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Error clearing auth data:', error);
+    return { success: false, error };
+  }
+};
 
-export const signIn = (email: string, password: string) => 
-  supabaseAuth.signInWithPassword(email, password);
+// Debug function - expose globally for browser console access
+if (typeof window !== 'undefined') {
+  (window as any).clearAuthData = clearAllAuthData;
+  (window as any).debugAuth = async () => {
+    console.log('🔍 Current auth state:');
+    const session = await getSession();
+    console.log('Session:', session);
+    
+    // Check AsyncStorage for auth data
+    const authKeys = [
+      'supabase.auth.token',
+      'sb-auth-token', 
+      '@supabase/auth-token',
+      'supabaseAuthToken',
+      'user_session',
+      'auth_session',
+    ];
+    
+    for (const key of authKeys) {
+      const value = await AsyncStorage.getItem(key);
+      if (value) {
+        console.log(`Found cached data for ${key}:`, value.substring(0, 50) + '...');
+      }
+    }
+  };
+  console.log('🛠️ Debug functions available:');
+  console.log('- window.clearAuthData() - Clear all auth data');
+  console.log('- window.debugAuth() - Show current auth state');
+}
 
-export const signOut = () => supabaseAuth.signOut();
+// Auth helper functions
+export const signUp = async (email: string, password: string, fullName?: string) => {
+  try {
+    console.log('Attempting sign up for:', email);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
+    });
+    console.log('Sign up result:', { user: data.user?.email, error: error?.message });
+    return { data, error };
+  } catch (error: any) {
+    console.error('Sign up error:', error);
+    return { data: null, error };
+  }
+};
 
-export const getSession = () => supabaseAuth.getSession();
+export const signIn = async (email: string, password: string) => {
+  try {
+    console.log('Attempting sign in for:', email);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    console.log('Sign in result:', { user: data.user?.email, error: error?.message });
+    return { data, error };
+  } catch (error: any) {
+    console.error('Sign in error:', error);
+    return { data: null, error };
+  }
+};
 
-export const getCurrentUser = () => supabaseAuth.getUser();
-
-// Mock functions for features not needed
 export const signInWithMagicLink = async (email: string) => {
-  console.log('Magic link not implemented in RN client');
-  return { data: null, error: { message: 'Magic link not supported in this client' } };
+  try {
+    console.log('Attempting magic link sign in for:', email);
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+      },
+    });
+    console.log('Magic link result:', { success: !!data, error: error?.message });
+    return { data, error };
+  } catch (error: any) {
+    console.error('Magic link error:', error);
+    return { data: null, error };
+  }
 };
 
 export const resetPassword = async (email: string) => {
-  console.log('Password reset not implemented in RN client');
-  return { data: null, error: { message: 'Password reset not supported in this client' } };
+  try {
+    console.log('Attempting password reset for:', email);
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email);
+    console.log('Password reset result:', { success: !!data, error: error?.message });
+    return { data, error };
+  } catch (error: any) {
+    console.error('Password reset error:', error);
+    return { data: null, error };
+  }
 };
 
-export const updatePassword = async (newPassword: string) => {
-  console.log('Password update not implemented in RN client');
-  return { data: null, error: { message: 'Password update not supported in this client' } };
+export const signOut = async () => {
+  try {
+    console.log('🚪 Attempting sign out...');
+    
+    // First, try to sign out from Supabase
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
+      console.warn('Supabase sign out error (continuing with cleanup):', error.message);
+    } else {
+      console.log('✅ Supabase sign out successful');
+    }
+    
+    // Always clear all local auth data regardless of Supabase response
+    await clearAllAuthData();
+    
+    console.log('✅ Sign out completed successfully');
+    return { error: null };
+  } catch (error: any) {
+    console.error('❌ Sign out error:', error);
+    
+    // Even if there's an error, try to clear local data
+    await clearAllAuthData();
+    
+    // Return success since we cleared local data
+    return { error: null };
+  }
 };
 
-export const onAuthStateChange = (callback: (event: string, session: Session | null) => void) => {
-  console.log('Auth state listener not implemented in RN client');
-  return { data: { subscription: { unsubscribe: () => {} } } };
-}; 
+export const getCurrentUser = async () => {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    console.log('Get current user result:', { user: user?.email, error: error?.message });
+    return { user, error };
+  } catch (error: any) {
+    console.error('Get current user error:', error);
+    return { user: null, error };
+  }
+};
+
+export const getSession = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    console.log('Get session result:', { 
+      hasSession: !!session, 
+      user: session?.user?.email, 
+      error: error?.message 
+    });
+    return { session, error };
+  } catch (error: any) {
+    console.error('Get session error:', error);
+    return { session: null, error };
+  }
+};
+
+export const onAuthStateChange = (callback: (event: string, session: any) => void) => {
+  return supabase.auth.onAuthStateChange(callback);
+};
+
+// Export the client for direct usage if needed
+export { supabase as supabaseAuth }; 
