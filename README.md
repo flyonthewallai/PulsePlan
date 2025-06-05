@@ -2,252 +2,219 @@
   <img src="https://github.com/user-attachments/assets/0833a286-ba32-42a2-a5ca-4ae8bda63168" alt="PulsePlan" width="355"/>
 </p>
 
-# PulsePlan - AI-Powered Task & Schedule Management
+# PulsePlan – AI-Powered Planner
 
-PulsePlan is a comprehensive productivity application that combines AI-powered task management with seamless calendar integration. Built with React Native and Expo, it offers a modern, intuitive interface for managing your schedule, tasks, and calendar events across multiple platforms.
+PulsePlan is a mobile-first academic planning assistant that integrates with Canvas, Google Calendar, Apple Calendar, and Outlook to create adaptive schedules using AI. Designed for students, it streamlines planning with intelligent time-blocking, real-time task updates, and personalized assistance.
 
-## 🌟 Key Features
+> 📱 Let your schedule find its rhythm.
 
-### 📅 **Advanced Calendar Integration**
+---
 
-- **Google Calendar & Microsoft Outlook** seamless synchronization
-- **Bidirectional sync** - create, edit, and delete events from either platform
-- **Intelligent conflict resolution** with automatic duplicate detection
-- **Multiple calendar support** with selective synchronization
-- **Real-time sync status** monitoring and error handling
+## ✨ Features
 
-### 🤖 **AI-Powered Task Management**
+* **Canvas Sync** – Browser extension imports assignments
+* **AI Scheduling** – Vector model with GPT-4o insights for smart planning
+* **Real-Time Adjustments** – Reacts to task status changes
+* **Calendar Integration** – Connects with Google, Outlook, and Apple
+* **Task Management** – Tap to complete, skip, or reschedule
+* **Authentication** – Google sign-in via Supabase Auth
+* **Freemium Model** – Free weekly plans; premium unlocks advanced scheduling
 
-- Smart task prioritization and scheduling
-- AI-generated suggestions for optimal time blocking
-- Natural language processing for task creation
-- Intelligent deadline and reminder management
+---
 
-### ⚡ **Modern UI/UX**
+## 📺️ ML Model: Design & Strategy
 
-- Beautiful, responsive design with multiple theme options
-- Smooth animations and haptic feedback
-- Dark mode and customizable color schemes
-- Accessibility-first design principles
+### 🧠 Purpose
 
-### 🔒 **Secure & Private**
+* Power adaptive scheduling and prioritization logic
+* Enable offline and fallback suggestions when GPT is unavailable
+* Learn user behavior patterns to enhance suggestions
 
-- Row-level security with Supabase
-- OAuth 2.0 authentication for calendar providers
-- End-to-end encryption for sensitive data
-- GDPR-compliant data handling
+### 📆 Architecture
 
-## 🚀 Quick Start
+* **Framework**: Lightweight PyTorch model
+* **Embedding Memory**: Vectorized task embeddings using transformer encodings or sentence embeddings
+* **Inputs**:
 
-### Prerequisites
+  * Task metadata (type, due date, estimated time, course)
+  * User behavior (on-time, skipped, completed, streaks)
+  * Time-of-day performance trends
+* **Outputs**:
 
-- Node.js (v16 or higher)
-- Expo CLI: `npm install -g @expo/cli`
-- Supabase account
-- Google Cloud Console account (for Google Calendar)
-- Microsoft Azure account (for Outlook Calendar)
+  * Suggested task time blocks
+  * Personalized priorities
+  * Recurring task timing insights
 
-### Installation
+### ⚙️ Integration with GPT-4o
+
+* GPT-4o handles:
+
+  * Natural language reasoning and user prompts
+  * Generating user-facing plans
+* Internal ML model handles:
+
+  * Rapid, lightweight predictions
+  * Cold start suggestions
+  * Real-time re-ranking of schedule blocks
+
+### 🌟 Future Enhancements
+
+* Grade-aware prioritization using Canvas data
+* Context tagging with emojis or journaling
+* Reinforcement learning with user feedback
+* Evaluation metrics: completion rates, consistency, satisfaction
+
+---
+
+## 🗺️ Project Structure
+
+```
+flyonthewalldev-pulseplan/
+├── README.md
+├── app.json
+├── babel.config.js
+├── index.ts
+├── metro.config.js
+├── package.json
+├── polyfills.js
+├── tsconfig.json
+├── assets/
+├── extension/
+│   ├── content.js
+│   ├── manifest.json
+│   ├── popup.html
+│   ├── popup.js
+│   └── upload.js
+├── server/
+│   ├── package.json
+│   └── src/
+│       ├── config/
+│       ├── controllers/
+│       ├── middleware/
+│       ├── routes/
+│       ├── services/
+│       ├── types/
+│       └── utils/
+└── src/
+    ├── app/
+    ├── assets/
+    ├── components/
+    ├── config/
+    ├── constants/
+    ├── contexts/
+    ├── hooks/
+    ├── lib/
+    ├── services/
+    ├── types/
+    └── utils/
+```
+
+---
+
+## 🔠 Tech Stack
+
+| Layer         | Technology                        |
+| ------------- | --------------------------------- |
+| Frontend      | React Native (Expo)               |
+| Backend       | FastAPI or Node.js API            |
+| Auth          | Supabase Auth                     |
+| Database      | Supabase (PostgreSQL)             |
+| AI Assistant  | OpenAI GPT-4o                     |
+| ML Model      | PyTorch vector-memory model       |
+| Payments      | Apple                             |
+| Browser Sync  | Chrome Extension for Canvas       |
+| Calendar APIs | Google, Microsoft Graph, EventKit |
+
+---
+
+## 🚀 Setup Instructions
+
+### 1. Clone the Repository
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/PulsePlan.git
+git clone https://github.com/flyonthewall-dev/pulseplan.git
 cd PulsePlan
+```
 
-# Install dependencies
-npm run install:all
+### 2. Configure Environment Variables
 
-# Set up environment variables (see SETUP_GUIDE.md)
-cp .env.example .env
-# Edit .env with your API keys and credentials
+Create `.env` files in `/web/`, `/server/`, and `/extension/`:
 
-# Run database schema
-# Execute database-schema.sql in your Supabase SQL editor
+```
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+OPENAI_API_KEY=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PREMIUM_PRICE_ID=
+```
 
-# Start the development servers
+### 3. Supabase Setup
+
+```bash
+npm install -g supabase
+supabase start
+supabase db push
+psql -h localhost -U postgres -d pulseplan < supabase/seed.sql
+```
+
+### 4. Frontend (React Native Expo)
+
+```bash
+cd src
+npm install
+npx expo start
+```
+
+### 5. Backend (FastAPI or Node.js)
+
+```bash
+cd server
+npm install
 npm run dev
 ```
 
-### Calendar Integration Setup
+### 6. Chrome Extension
 
-For complete calendar integration setup instructions, see:
+1. Go to `chrome://extensions`
+2. Enable Developer Mode
+3. Load `/extension/` folder as unpacked extension
 
-- 📖 **[Setup Guide](SETUP_GUIDE.md)** - Step-by-step setup instructions
-- 📚 **[Calendar Integration Documentation](CALENDAR_INTEGRATION.md)** - Comprehensive API documentation
-- 🔧 **[Database Schema](database-schema.sql)** - Complete database structure
+---
 
-### Verification
+## 🔐 Authentication
 
-Test your calendar integration setup:
+* Apple Sign-in via Supabase
+* JWTs for session management
+* Auto-refresh and secure token storage
 
-```bash
-# Verify calendar integration is working
-npm run verify-calendar
+---
 
-# Test server health
-npm run test:connection
+## 💳 Stripe Payments via Website
 
-# Verify Supabase configuration
-npm run verify-supabase
-```
+* Freemium model: basic free, premium unlocks long-term scheduling
+* Webhook events: `checkout.session.completed`, `customer.subscription.deleted`
+* `requirePremium.ts` middleware restricts premium-only routes
 
-## 🏗️ Architecture
+---
 
-### Frontend (React Native + Expo)
+## 🧠 AI + Scheduling
 
-- **Framework**: React Native with Expo SDK 53
-- **Navigation**: Expo Router with file-based routing
-- **State Management**: React Context API with custom hooks
-- **UI Components**: Custom component library with Lucide icons
-- **Styling**: StyleSheet with dynamic theming support
+* GPT-4o powered endpoint: `POST /generate_schedule`
+* Uses task metadata, availability, and completion history
+* Scheduling logic combined with in-house lightweight ML model
 
-### Backend (Node.js + TypeScript)
+---
 
-- **Framework**: Express.js with TypeScript
-- **Database**: Supabase PostgreSQL with Row Level Security
-- **Authentication**: Supabase Auth + OAuth 2.0 for calendar providers
-- **Calendar APIs**: Google Calendar API + Microsoft Graph API
-- **Background Tasks**: Automatic calendar synchronization
+## 🗓 Calendar Integration
 
-### Calendar Integration Architecture
+* Syncs with Google, Outlook, and Apple
+* Handles bidirectional sync and event conflict resolution
+* Background tasks manage token refresh and error handling
+* Focused on user-friendly connection setup and real-time performance
 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   PulsePlan     │    │   Backend API    │    │   External      │
-│   Client App    │◄──►│   Server         │◄──►│   Calendar      │
-│                 │    │                  │    │   Services      │
-│ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
-│ │ Calendar    │ │    │ │ Auth         │ │    │ │ Google      │ │
-│ │ Integration │ │    │ │ Controllers  │ │    │ │ Calendar    │ │
-│ │ Modal       │ │    │ └──────────────┘ │    │ │ API         │ │
-│ └─────────────┘ │    │ ┌──────────────┐ │    │ └─────────────┘ │
-│ ┌─────────────┐ │    │ │ Calendar     │ │    │ ┌─────────────┐ │
-│ │ Calendar    │ │    │ │ Controllers  │ │    │ │ Microsoft   │ │
-│ │ Service     │ │    │ └──────────────┘ │    │ │ Graph API   │ │
-│ └─────────────┘ │    │ ┌──────────────┐ │    │ └─────────────┘ │
-└─────────────────┘    │ │ Sync Service │ │    └─────────────────┘
-                       │ └──────────────┘ │
-                       └──────────────────┘
-                                ▲
-                                │
-                       ┌──────────────────┐
-                       │   Supabase       │
-                       │   Database       │
-                       │                  │
-                       │ • Calendar       │
-                       │   Connections    │
-                       │ • Events         │
-                       │ • Sync Status    │
-                       │ • Conflicts      │
-                       │ • Preferences    │
-                       └──────────────────┘
-```
+---
 
-## 📱 Application Structure
-
-```
-PulsePlan/
-├── src/                          # Client-side React Native code
-│   ├── app/                      # Expo Router pages
-│   │   ├── (tabs)/              # Tab-based navigation
-│   │   │   ├── index.tsx        # Dashboard/Home screen
-│   │   │   ├── calendar.tsx     # Calendar view
-│   │   │   ├── tasks.tsx        # Task management
-│   │   │   └── settings.tsx     # Settings with calendar integration
-│   │   └── auth/                # Authentication screens
-│   ├── components/              # Reusable UI components
-│   │   ├── CalendarIntegrationModal.tsx  # Calendar connection UI
-│   │   └── ...
-│   ├── services/                # API client services
-│   │   ├── calendarService.ts   # Calendar API client
-│   │   └── ...
-│   ├── contexts/                # React Context providers
-│   └── config/                  # Configuration files
-├── server/                       # Backend Node.js server
-│   ├── src/
-│   │   ├── controllers/         # API endpoint handlers
-│   │   │   ├── calendarController.ts        # Google Calendar API
-│   │   │   ├── microsoftCalendarController.ts # Microsoft Calendar API
-│   │   │   ├── googleAuthController.ts      # Google OAuth
-│   │   │   └── microsoftAuthController.ts   # Microsoft OAuth
-│   │   ├── routes/              # Express route definitions
-│   │   │   └── calendarRoutes.ts           # Calendar API routes
-│   │   ├── services/            # Business logic services
-│   │   │   └── calendarSyncService.ts      # Calendar synchronization
-│   │   ├── config/              # Server configuration
-│   │   │   ├── google.ts        # Google API configuration
-│   │   │   └── microsoft.ts     # Microsoft API configuration
-│   │   └── middleware/          # Express middleware
-│   └── package.json
-├── scripts/                      # Utility scripts
-│   └── verify-calendar-integration.js     # Integration verification
-├── database-schema.sql           # Complete database schema
-├── CALENDAR_INTEGRATION.md       # Comprehensive API documentation
-├── SETUP_GUIDE.md               # Step-by-step setup instructions
-└── README.md                    # This file
-```
-
-## 📋 Available Scripts
-
-```bash
-# Development
-npm start                 # Start Expo development server
-npm run dev              # Start both server and client concurrently
-npm run dev:server       # Start backend server only
-npm run dev:client       # Start Expo client only
-
-# Testing & Verification
-npm run verify-calendar  # Verify calendar integration setup
-npm run test:connection  # Test server connectivity
-npm run verify-supabase  # Verify Supabase configuration
-
-# Installation
-npm run install:all      # Install all dependencies (client + server)
-
-# Platform-specific
-npm run android          # Start Android development
-npm run ios             # Start iOS development
-npm run web             # Start web development
-```
-
-## 🔧 Environment Configuration
-
-Create a `.env` file in the project root with the following structure:
-
-```env
-# Server Configuration
-PORT=5000
-CLIENT_URL=http://localhost:8081
-
-# Supabase Database
-EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_KEY=your_supabase_service_key
-
-# Google Calendar Integration
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_REDIRECT_URL=http://localhost:5000/auth/google/callback
-
-# Microsoft Calendar Integration
-MICROSOFT_CLIENT_ID=your_microsoft_client_id
-MICROSOFT_CLIENT_SECRET=your_microsoft_client_secret
-MICROSOFT_REDIRECT_URL=http://localhost:5000/auth/microsoft/callback
-MICROSOFT_TENANT_ID=common
-```
-
-## 🎯 Calendar Integration Features
-
-### ✅ Complete Implementation
-
-- **OAuth 2.0 Authentication** for Google and Microsoft calendars
-- **Bidirectional Event Synchronization** with conflict resolution
-- **Full CRUD Operations** for calendar events
-- **Multiple Calendar Support** per provider
-- **Intelligent Conflict Detection** with confidence scoring
-- **Automatic Token Refresh** and connection management
-- **Real-time Sync Status** monitoring
-- **User-friendly Integration Interface**
-- **Comprehensive Error Handling** and recovery
-- **Database Security** with Row Level Security policies
+PulsePlan is built by **Fly on the Wall** — AI-powered products with personality. Visit us at [flyonthewalldev.com](https://flyonthewalldev.com) and [pulseplan.app](https://pulseplan.app).
