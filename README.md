@@ -237,8 +237,6 @@ MICROSOFT_REDIRECT_URL=http://localhost:5000/auth/microsoft/callback
 MICROSOFT_TENANT_ID=common
 ```
 
-For detailed setup instructions, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
-
 ## 🎯 Calendar Integration Features
 
 ### ✅ Complete Implementation
@@ -253,69 +251,3 @@ For detailed setup instructions, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
 - **User-friendly Integration Interface**
 - **Comprehensive Error Handling** and recovery
 - **Database Security** with Row Level Security policies
-
-### 🔧 API Endpoints
-
-**Authentication:**
-
-- `GET /auth/google?userId={userId}` - Initiate Google OAuth
-- `GET /auth/microsoft?userId={userId}` - Initiate Microsoft OAuth
-
-**Calendar Management:**
-
-- `GET /calendar/status/{userId}` - Get connection status
-- `GET /calendar/google/events/{userId}` - Get Google Calendar events
-- `GET /calendar/microsoft/events/{userId}` - Get Microsoft Calendar events
-
-**Event Operations:**
-
-- `POST /calendar/google/events/{userId}` - Create Google Calendar event
-- `PUT /calendar/google/events/{userId}/{eventId}` - Update event
-- `DELETE /calendar/google/events/{userId}/{eventId}` - Delete event
-
-**Synchronization:**
-
-- `POST /calendar/sync/{userId}` - Sync all calendars
-- `GET /calendar/sync/status/{userId}` - Get sync status
-
-For complete API documentation, see [CALENDAR_INTEGRATION.md](CALENDAR_INTEGRATION.md).
-
-## 📚 Documentation
-
-- **[Setup Guide](SETUP_GUIDE.md)** - Complete setup instructions for calendar integration
-- **[Calendar Integration Docs](CALENDAR_INTEGRATION.md)** - Comprehensive API and feature documentation
-- **[Database Schema](database-schema.sql)** - Complete database structure and security policies
-- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature-name`
-3. Commit your changes: `git commit -am 'Add some feature'`
-4. Push to the branch: `git push origin feature/your-feature-name`
-5. Create a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-If you encounter any issues with the calendar integration:
-
-1. Check the [Setup Guide](SETUP_GUIDE.md) for configuration instructions
-2. Run the verification script: `npm run verify-calendar`
-3. Check the [troubleshooting section](CALENDAR_INTEGRATION.md#troubleshooting) in the documentation
-4. Review server logs for specific error messages
-
-## 🎉 What's Next
-
-Your PulsePlan application now has complete, enterprise-grade calendar integration! The system supports:
-
-- **Seamless OAuth authentication** for Google and Microsoft calendars
-- **Bidirectional synchronization** with intelligent conflict resolution
-- **Full event management** with all calendar features supported
-- **Real-time sync monitoring** and error handling
-- **Production-ready security** and performance optimization
-
-Ready to sync your calendars and supercharge your productivity! 🚀
