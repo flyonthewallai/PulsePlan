@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 import { Alert, Linking } from 'react-native';
 import { supabase, getCurrentUser } from '../lib/supabase';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:3000';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:5000';
 const PUBLISHABLE_KEY = Constants.expoConfig?.extra?.stripePublishableKey;
 
 interface PremiumContextType {
@@ -146,7 +146,7 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <StripeProvider
       publishableKey={PUBLISHABLE_KEY}
-      merchantIdentifier="merchant.com.rhythm.app"
+      merchantIdentifier="merchant.com.pulseplan.app"
     >
       <PremiumContext.Provider 
         value={{ 

@@ -9,20 +9,24 @@ document.addEventListener("DOMContentLoaded", function () {
   const syncButton = document.getElementById("syncButton");
   const messageElement = document.getElementById("message");
   const loginSection = document.getElementById("loginSection");
+  const connectionSection = document.getElementById("connectionSection");
+  const scanQRButton = document.getElementById("scanQRButton");
 
   // Initialize UI
   initializeUI();
 
-  // Add event listener for the sync button
+  // Add event listeners
   syncButton.addEventListener("click", handleSync);
+  scanQRButton.addEventListener("click", handleQRScan);
 
   // Function to initialize the popup UI
   function initializeUI() {
     // Check if user is logged in
-    chrome.storage.local.get(["rhythm_jwt"], function (result) {
-      if (!result.rhythm_jwt) {
+    chrome.storage.local.get(["pulseplan_jwt"], function (result) {
+      if (!result.pulseplan_jwt) {
         syncButton.disabled = true;
         loginSection.style.display = "block";
+        connectionSection.style.display = "block";
       }
     });
 
@@ -90,6 +94,102 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
     );
+  }
+
+  // Function to handle QR code scanning
+  async function handleQRScan() {
+    try {
+      messageElement.textContent = "Opening QR scanner...";
+      messageElement.className = "message";
+
+      // For demo purposes, we'll use a simple prompt
+      // In a real implementation, you'd integrate a QR code library
+      const qrData = prompt("Paste the connection URL from PulsePlan app:");
+
+      if (qrData) {
+        await handleQRCodeDetected(qrData);
+      }
+    } catch (error) {
+      console.error("QR scanning error:", error);
+      messageElement.textContent = "QR scanning failed. Please try again.";
+      messageElement.className = "message error";
+    }
+  }
+
+  // Function to handle detected QR code
+  async function handleQRCodeDetected(qrData) {
+    try {
+      // Extract connection code from QR data
+      let connectionCode;
+
+      if (qrData.includes("code=")) {
+        const url = new URL(qrData);
+        connectionCode = url.searchParams.get("code");
+      } else {
+        // Assume the input is the connection code itself
+        connectionCode = qrData.trim();
+      }
+
+      if (!connectionCode) {
+        throw new Error("Invalid connection data");
+      }
+
+      await connectWithCode(connectionCode);
+    } catch (error) {
+      console.error("QR code processing error:", error);
+      messageElement.textContent = "Invalid connection data. Please try again.";
+      messageElement.className = "message error";
+    }
+  }
+
+  // Function to connect using connection code
+  async function connectWithCode(connectionCode) {
+    try {
+      messageElement.textContent = "Connecting to PulsePlan...";
+      messageElement.className = "message";
+
+      // Send connection request to PulsePlan API
+      const response = await fetch(
+        "https://api.pulseplan.flyonthewalldev.com/canvas/connect-extension",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ connectionCode }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Connection failed");
+      }
+
+      const result = await response.json();
+
+      // Store connection info (we'll get JWT from login)
+      chrome.storage.local.set({
+        canvas_connected: true,
+        connected_at: new Date().toISOString(),
+        connection_message: result.message,
+      });
+
+      messageElement.textContent =
+        result.message || "Successfully connected to PulsePlan!";
+      messageElement.className = "message success";
+
+      // Hide connection section
+      connectionSection.style.display = "none";
+
+      // User still needs to log in to get JWT for syncing
+      if (!syncButton.disabled) {
+        loginSection.style.display = "none";
+      }
+    } catch (error) {
+      console.error("Connection error:", error);
+      messageElement.textContent = `Connection failed: ${error.message}`;
+      messageElement.className = "message error";
+    }
   }
 
   // Helper function to format date

@@ -37,6 +37,8 @@ import { signOut } from '../../lib/supabase-rn';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import CalendarIntegrationModal from '../../components/CalendarIntegrationModal';
+import CanvasModal from '../../components/CanvasModal';
 
 interface SubjectColor {
   id: string;
@@ -77,6 +79,8 @@ export default function SettingsScreen() {
     { id: '4', name: 'Literature', color: '#95E1D3' },
   ]);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showCanvasModal, setShowCanvasModal] = useState(false);
   const [editedName, setEditedName] = useState(user?.user_metadata?.full_name || '');
   const [editedEmail, setEditedEmail] = useState(user?.email || '');
   
@@ -359,27 +363,43 @@ export default function SettingsScreen() {
             <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>Integrations</Text>
           </View>
           
-          <View style={[styles.toggleItem, { borderBottomColor: themeColors.border }]}>
-            <Text style={[styles.toggleLabel, { color: themeColors.textSecondary }]}>Canvas</Text>
-            <Switch
-              trackColor={{ false: '#767577', true: themeColors.primary }}
-              thumbColor={integrations.canvas ? '#fff' : '#f4f3f4'}
-              ios_backgroundColor="#3e3e3e"
-              onValueChange={() => toggleIntegration('canvas')}
-              value={integrations.canvas}
-            />
-          </View>
+          <TouchableOpacity
+            style={[styles.settingItem, { borderBottomColor: themeColors.border }]}
+            onPress={() => setShowCalendarModal(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingItemContent}>
+              <View style={styles.settingItemLeft}>
+                <Calendar size={20} color={themeColors.primary} />
+                <View style={styles.settingItemText}>
+                  <Text style={[styles.settingLabel, { color: themeColors.textPrimary }]}>Calendar Integration</Text>
+                  <Text style={[styles.settingDescription, { color: themeColors.textSecondary }]}>
+                    Connect Google Calendar & Outlook
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight size={20} color={themeColors.textSecondary} />
+            </View>
+          </TouchableOpacity>
           
-          <View style={[styles.toggleItem, { borderBottomColor: themeColors.border }]}>
-            <Text style={[styles.toggleLabel, { color: themeColors.textSecondary }]}>Google Calendar</Text>
-            <Switch
-              trackColor={{ false: '#767577', true: themeColors.primary }}
-              thumbColor={integrations.googleCalendar ? '#fff' : '#f4f3f4'}
-              ios_backgroundColor="#3e3e3e"
-              onValueChange={() => toggleIntegration('googleCalendar')}
-              value={integrations.googleCalendar}
-            />
-          </View>
+          <TouchableOpacity
+            style={[styles.settingItem, { borderBottomColor: themeColors.border }]}
+            onPress={() => setShowCanvasModal(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingItemContent}>
+              <View style={styles.settingItemLeft}>
+                <Calendar size={20} color={themeColors.primary} />
+                <View style={styles.settingItemText}>
+                  <Text style={[styles.settingLabel, { color: themeColors.textPrimary }]}>Canvas LMS</Text>
+                  <Text style={[styles.settingDescription, { color: themeColors.textSecondary }]}>
+                    Sync assignments and grades
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight size={20} color={themeColors.textSecondary} />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Notifications Section */}
@@ -578,6 +598,18 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </Modal>
       )}
+
+      {/* Calendar Integration Modal */}
+      <CalendarIntegrationModal
+        visible={showCalendarModal}
+        onClose={() => setShowCalendarModal(false)}
+      />
+
+      {/* Canvas Integration Modal */}
+      <CanvasModal
+        visible={showCanvasModal}
+        onClose={() => setShowCanvasModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -660,6 +692,25 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: 14,
+  },
+  settingItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
+  },
+  settingItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  settingItemText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  settingDescription: {
+    fontSize: 12,
+    marginTop: 2,
   },
   timeInput: {
     borderRadius: 8,

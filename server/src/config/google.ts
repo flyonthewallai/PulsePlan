@@ -12,9 +12,10 @@ if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URL) {
   console.warn('Google OAuth credentials not found in environment variables. Google Calendar features will be disabled.');
 }
 
-// Define Google Calendar API scopes
+// Define comprehensive Google Calendar API scopes for full integration
 export const SCOPES = [
-  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile'
 ];
@@ -30,9 +31,17 @@ export const oauth2Client = GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_R
 
 // Helper function to get a new OAuth2 client instance
 export function getOAuth2Client() {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URL) {
+    throw new Error('Google OAuth credentials not configured');
+  }
   return new google.auth.OAuth2(
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URL
   );
+}
+
+// Helper function to check if Google OAuth is configured
+export function isGoogleOAuthConfigured(): boolean {
+  return !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REDIRECT_URL);
 } 

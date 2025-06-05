@@ -5,7 +5,7 @@
 
 // API endpoint for Canvas data upload
 const API_ENDPOINT =
-  "https://api.rhythm.flyonthewalldev.com/upload_canvas_data";
+  "https://api.pulseplan.flyonthewalldev.com/canvas/upload-data";
 
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -24,6 +24,68 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// Auto-sync logic: Check for new assignments periodically
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "autoSync") {
+    console.log("🔄 Auto-sync triggered");
+    performAutoSync();
+  }
+});
+
+// Set up auto-sync alarm when extension starts
+chrome.runtime.onStartup.addListener(() => {
+  setupAutoSync();
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  setupAutoSync();
+});
+
+function setupAutoSync() {
+  // Create alarm for weekly auto-sync
+  chrome.alarms.create("autoSync", {
+    delayInMinutes: 60, // First sync after 1 hour
+    periodInMinutes: 10080, // Then every week (7 days * 24 hours * 60 minutes)
+  });
+  console.log("📅 Auto-sync scheduled for weekly intervals");
+}
+
+async function performAutoSync() {
+  try {
+    // Check if user is logged in
+    const { pulseplan_jwt } = await getFromStorage(["pulseplan_jwt"]);
+
+    if (!pulseplan_jwt) {
+      console.log("⚠️ Auto-sync skipped: User not logged in");
+      return;
+    }
+
+    // Check if there are unsynced assignments
+    const { canvas_assignments } = await getFromStorage(["canvas_assignments"]);
+    const unsyncedAssignments = (canvas_assignments || []).filter(
+      (a) => !a.synced
+    );
+
+    if (unsyncedAssignments.length === 0) {
+      console.log("✅ Auto-sync: No new assignments to sync");
+      return;
+    }
+
+    // Perform sync
+    const result = await syncAssignmentsToPulsePlan();
+    console.log(`🎉 Auto-sync completed: ${result.count} assignments synced`);
+
+    // Update badge to show sync status
+    chrome.action.setBadgeText({ text: "" });
+    chrome.action.setBadgeBackgroundColor({ color: "#4CAF50" });
+  } catch (error) {
+    console.error("❌ Auto-sync failed:", error);
+    // Show error badge
+    chrome.action.setBadgeText({ text: "!" });
+    chrome.action.setBadgeBackgroundColor({ color: "#F44336" });
+  }
+}
+
 /**
  * Main function to sync assignments to PulsePlan
  * Gets assignments from storage, authenticates, and sends to the API
@@ -31,13 +93,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function syncAssignmentsToPulsePlan() {
   try {
     // Get the auth token and assignments from storage
-    const { rhythm_jwt, canvas_assignments } = await getFromStorage([
-      "rhythm_jwt",
+    const { pulseplan_jwt, canvas_assignments } = await getFromStorage([
+      "pulseplan_jwt",
       "canvas_assignments",
     ]);
 
     // Check if user is logged in
-    if (!rhythm_jwt) {
+    if (!pulseplan_jwt) {
       throw new Error("Not logged in. Please log in to PulsePlan first.");
     }
 
@@ -67,7 +129,7 @@ async function syncAssignmentsToPulsePlan() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${rhythm_jwt}`,
+        Authorization: `Bearer ${pulseplan_jwt}`,
       },
       body: JSON.stringify(payload),
       // Add timeout to prevent hanging requests

@@ -286,20 +286,7 @@ export default function HourlyScheduleView({
       const hourSlotIndex = currentHour - validStartHour;
       const topPosition = hourSlotIndex * (HOUR_HEIGHT + 1) + minuteProgress * HOUR_HEIGHT + 5 - 2; // +5 for scheduleContainer paddingTop, -2 to align with timeText visual position
       
-      // Debug logging
-      console.log('Current Time Indicator Debug:', {
-        currentTime: now.toLocaleTimeString(),
-        currentHour,
-        currentMinutes,
-        currentSeconds,
-        validStartHour,
-        validEndHour,
-        hourSlotIndex,
-        minuteProgress: (minuteProgress * 100).toFixed(1) + '%',
-        topPosition,
-        calculation: `${hourSlotIndex} * (${HOUR_HEIGHT} + 1) + ${minuteProgress.toFixed(3)} * ${HOUR_HEIGHT} + 5 = ${topPosition}`,
-        previousCalculation: `OLD: ${hourSlotIndex * HOUR_HEIGHT + minuteProgress * HOUR_HEIGHT + hourSlotIndex * 1 + 5}`
-      });
+      
       
       const timeString = now.toLocaleTimeString('en-US', {
         hour: 'numeric',

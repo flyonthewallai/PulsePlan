@@ -1,5 +1,5 @@
 {
-  "name": "rhythm-server",
+  "name": "pulseplan-server",
   "version": "1.0.0",
   "description": "Backend server for PulsePlan app with Google Calendar integration",
   "main": "dist/index.js",
@@ -13,7 +13,7 @@
     "ports": "lsof -i :5000-5010"
   },
   "keywords": [
-    "rhythm",
+    "pulseplan",
     "google-calendar",
     "oauth",
     "calendar-integration"

@@ -260,6 +260,18 @@ export default function OnboardingScreen() {
     }
   };
 
+  const toggleStudyTime = (timeId: string) => {
+    setPreferences(prev => ({
+      ...prev,
+      studyPreferences: {
+        ...prev.studyPreferences,
+        preferredStudyTimes: prev.studyPreferences.preferredStudyTimes.includes(timeId)
+          ? prev.studyPreferences.preferredStudyTimes.filter(t => t !== timeId)
+          : [...prev.studyPreferences.preferredStudyTimes, timeId]
+      }
+    }));
+  };
+
   const renderStepContent = () => {
     const currentStep = steps[step];
     
@@ -283,37 +295,39 @@ export default function OnboardingScreen() {
       case 'profile':
         return (
           <View style={styles.stepContent}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Full Name</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your full name"
-                value={name}
-                onChangeText={setName}
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>School/Organization (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your school or organization"
-                value={school}
-                onChangeText={setSchool}
-                placeholderTextColor="#9CA3AF"
-              />
+            <View style={styles.formContainer}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your full name"
+                  value={name}
+                  onChangeText={setName}
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your email"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>School/Organization (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your school or organization"
+                  value={school}
+                  onChangeText={setSchool}
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
             </View>
           </View>
         );
@@ -338,7 +352,7 @@ export default function OnboardingScreen() {
                   <Ionicons 
                     name={option.icon as any} 
                     size={32} 
-                    color={preferences.userType === option.id ? '#00AEEF' : '#6B7280'} 
+                    color={preferences.userType === option.id ? '#4F8CFF' : '#6B7280'} 
                   />
                   <Text style={[
                     styles.optionTitle,
@@ -356,71 +370,64 @@ export default function OnboardingScreen() {
       case 'studyPreferences':
         return (
           <View style={styles.stepContent}>
-            <View style={styles.preferenceSection}>
-              <Text style={styles.sectionTitle}>Preferred Study Session Length</Text>
-              <View style={styles.sliderContainer}>
-                {[15, 25, 45, 60].map((duration) => (
-                  <TouchableOpacity
-                    key={duration}
-                    style={[
-                      styles.durationOption,
-                      preferences.studyPreferences.sessionDuration === duration && styles.durationOptionSelected
-                    ]}
-                    onPress={() => setPreferences(prev => ({
-                      ...prev,
-                      studyPreferences: { ...prev.studyPreferences, sessionDuration: duration }
-                    }))}
-                  >
-                    <Text style={[
-                      styles.durationText,
-                      preferences.studyPreferences.sessionDuration === duration && styles.durationTextSelected
-                    ]}>
-                      {duration}m
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            <View style={styles.preferencesContainer}>
+              <View style={styles.preferenceSection}>
+                <Text style={styles.sectionTitle}>When do you prefer to study?</Text>
+                <View style={styles.timeOptionsContainer}>
+                  {[
+                    { id: 'morning', label: 'Morning (6-12 PM)' },
+                    { id: 'afternoon', label: 'Afternoon (12-6 PM)' },
+                    { id: 'evening', label: 'Evening (6-10 PM)' },
+                    { id: 'night', label: 'Night (10 PM+)' }
+                  ].map((timeOption) => (
+                    <TouchableOpacity
+                      key={timeOption.id}
+                      style={[
+                        styles.timeOption,
+                        preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) && styles.timeOptionSelected
+                      ]}
+                      onPress={() => toggleStudyTime(timeOption.id)}
+                    >
+                      <Ionicons 
+                        name={preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) ? 'checkmark-circle' : 'ellipse-outline'} 
+                        size={20} 
+                        color={preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) ? '#4F8CFF' : '#6B7280'} 
+                      />
+                      <Text style={[
+                        styles.timeOptionText,
+                        preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) && styles.timeOptionTextSelected
+                      ]}>
+                        {timeOption.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
-            
-            <View style={styles.preferenceSection}>
-              <Text style={styles.sectionTitle}>Preferred Study Times</Text>
-              <View style={styles.timeOptionsContainer}>
-                {[
-                  { id: 'morning', label: 'Morning (6-12 PM)', icon: 'sunny-outline' },
-                  { id: 'afternoon', label: 'Afternoon (12-6 PM)', icon: 'partly-sunny-outline' },
-                  { id: 'evening', label: 'Evening (6-10 PM)', icon: 'moon-outline' },
-                  { id: 'night', label: 'Night (10 PM-2 AM)', icon: 'moon' }
-                ].map((timeOption) => (
-                  <TouchableOpacity
-                    key={timeOption.id}
-                    style={[
-                      styles.timeOption,
-                      preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) && styles.timeOptionSelected
-                    ]}
-                    onPress={() => {
-                      const currentTimes = preferences.studyPreferences.preferredStudyTimes;
-                      const newTimes = currentTimes.includes(timeOption.id)
-                        ? currentTimes.filter(t => t !== timeOption.id)
-                        : [...currentTimes, timeOption.id];
-                      setPreferences(prev => ({
+              
+              <View style={styles.preferenceSection}>
+                <Text style={styles.sectionTitle}>Study Session Duration</Text>
+                <View style={styles.sliderContainer}>
+                  {[25, 45, 60, 90].map((duration) => (
+                    <TouchableOpacity
+                      key={duration}
+                      style={[
+                        styles.durationOption,
+                        preferences.studyPreferences.sessionDuration === duration && styles.durationOptionSelected
+                      ]}
+                      onPress={() => setPreferences(prev => ({
                         ...prev,
-                        studyPreferences: { ...prev.studyPreferences, preferredStudyTimes: newTimes }
-                      }));
-                    }}
-                  >
-                    <Ionicons 
-                      name={timeOption.icon as any} 
-                      size={20} 
-                      color={preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) ? '#00AEEF' : '#6B7280'} 
-                    />
-                    <Text style={[
-                      styles.timeOptionText,
-                      preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) && styles.timeOptionTextSelected
-                    ]}>
-                      {timeOption.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                        studyPreferences: { ...prev.studyPreferences, sessionDuration: duration }
+                      }))}
+                    >
+                      <Text style={[
+                        styles.durationText,
+                        preferences.studyPreferences.sessionDuration === duration && styles.durationTextSelected
+                      ]}>
+                        {duration}m
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </View>
           </View>
@@ -429,108 +436,109 @@ export default function OnboardingScreen() {
       case 'integrations':
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.integrationNote}>
-              Connect your existing tools to automatically sync assignments and calendar events.
-            </Text>
-            
-            <View style={styles.integrationsList}>
-              {[
-                { 
-                  key: 'canvas', 
-                  title: 'Canvas LMS', 
-                  description: 'Sync assignments and due dates',
-                  icon: 'school-outline',
-                  available: true
-                },
-                { 
-                  key: 'googleCalendar', 
-                  title: 'Google Calendar', 
-                  description: 'Sync your calendar events',
-                  icon: 'calendar-outline',
-                  available: true
-                },
-                { 
-                  key: 'outlook', 
-                  title: 'Microsoft Outlook', 
-                  description: 'Sync calendar and tasks',
-                  icon: 'mail-outline',
-                  available: true
-                }
-              ].map((integration) => (
-                <View key={integration.key} style={styles.integrationItem}>
-                  <View style={styles.integrationInfo}>
-                    <Ionicons name={integration.icon as any} size={24} color="#00AEEF" />
-                    <View style={styles.integrationText}>
-                      <Text style={styles.integrationTitle}>{integration.title}</Text>
-                      <Text style={styles.integrationDescription}>{integration.description}</Text>
+            <View style={styles.integrationsContainer}>
+              <Text style={styles.integrationNote}>
+                Connect your existing tools to automatically sync assignments and calendar events.
+              </Text>
+              
+              <View style={styles.integrationsList}>
+                {[
+                  { 
+                    key: 'canvas', 
+                    title: 'Canvas LMS', 
+                    description: 'Sync assignments and due dates',
+                    icon: 'school-outline'
+                  },
+                  { 
+                    key: 'googleCalendar', 
+                    title: 'Google Calendar', 
+                    description: 'Sync your calendar events',
+                    icon: 'calendar-outline'
+                  },
+                  { 
+                    key: 'outlook', 
+                    title: 'Microsoft Outlook', 
+                    description: 'Sync calendar and tasks',
+                    icon: 'mail-outline'
+                  }
+                ].map((integration) => (
+                  <View key={integration.key} style={styles.integrationItem}>
+                    <View style={styles.integrationInfo}>
+                      <Ionicons name={integration.icon as any} size={24} color="#4F8CFF" />
+                      <View style={styles.integrationText}>
+                        <Text style={styles.integrationTitle}>{integration.title}</Text>
+                        <Text style={styles.integrationDescription}>{integration.description}</Text>
+                      </View>
                     </View>
+                    <Switch
+                      value={preferences.integrations[integration.key as keyof typeof preferences.integrations]}
+                      onValueChange={(value) => setPreferences(prev => ({
+                        ...prev,
+                        integrations: { ...prev.integrations, [integration.key]: value }
+                      }))}
+                      trackColor={{ false: '#E5E7EB', true: '#4F8CFF' }}
+                      thumbColor="#FFFFFF"
+                    />
                   </View>
-                  <Switch
-                    value={preferences.integrations[integration.key as keyof typeof preferences.integrations]}
-                    onValueChange={(value) => setPreferences(prev => ({
-                      ...prev,
-                      integrations: { ...prev.integrations, [integration.key]: value }
-                    }))}
-                    trackColor={{ false: '#E5E7EB', true: '#00AEEF' }}
-                    thumbColor="#FFFFFF"
-                  />
-                </View>
-              ))}
+                ))}
+              </View>
+              
+              <Text style={styles.integrationFooter}>
+                You can always connect these later in Settings.
+              </Text>
             </View>
-            
-            <Text style={styles.integrationFooter}>
-              You can always connect these later in Settings.
-            </Text>
           </View>
         );
         
       case 'notifications':
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.notificationNote}>
-              Choose how you'd like PulsePlan to keep you on track.
-            </Text>
-            
-            <View style={styles.notificationsList}>
-              {[
-                { 
-                  key: 'deadlineReminders', 
-                  title: 'Deadline Reminders', 
-                  description: 'Get notified about upcoming due dates',
-                  icon: 'alarm-outline'
-                },
-                { 
-                  key: 'studyReminders', 
-                  title: 'Study Session Reminders', 
-                  description: 'Reminders for your scheduled study time',
-                  icon: 'time-outline'
-                },
-                { 
-                  key: 'weeklyReports', 
-                  title: 'Weekly Progress Reports', 
-                  description: 'Summary of your weekly achievements',
-                  icon: 'stats-chart-outline'
-                }
-              ].map((notification) => (
-                <View key={notification.key} style={styles.notificationItem}>
-                  <View style={styles.notificationInfo}>
-                    <Ionicons name={notification.icon as any} size={24} color="#00AEEF" />
-                    <View style={styles.notificationText}>
-                      <Text style={styles.notificationTitle}>{notification.title}</Text>
-                      <Text style={styles.notificationDescription}>{notification.description}</Text>
+            <View style={styles.notificationsContainer}>
+              <Text style={styles.notificationNote}>
+                Choose how you'd like PulsePlan to keep you on track.
+              </Text>
+              
+              <View style={styles.notificationsList}>
+                {[
+                  { 
+                    key: 'deadlineReminders', 
+                    title: 'Deadline Reminders', 
+                    description: 'Get notified about upcoming due dates',
+                    icon: 'alarm-outline'
+                  },
+                  { 
+                    key: 'studyReminders', 
+                    title: 'Study Session Reminders', 
+                    description: 'Reminders for your scheduled study time',
+                    icon: 'time-outline'
+                  },
+                  { 
+                    key: 'weeklyReports', 
+                    title: 'Weekly Progress Reports', 
+                    description: 'Summary of your weekly achievements',
+                    icon: 'stats-chart-outline'
+                  }
+                ].map((notification) => (
+                  <View key={notification.key} style={styles.notificationItem}>
+                    <View style={styles.notificationInfo}>
+                      <Ionicons name={notification.icon as any} size={24} color="#4F8CFF" />
+                      <View style={styles.notificationText}>
+                        <Text style={styles.notificationTitle}>{notification.title}</Text>
+                        <Text style={styles.notificationDescription}>{notification.description}</Text>
+                      </View>
                     </View>
+                    <Switch
+                      value={preferences.notifications[notification.key as keyof typeof preferences.notifications]}
+                      onValueChange={(value) => setPreferences(prev => ({
+                        ...prev,
+                        notifications: { ...prev.notifications, [notification.key]: value }
+                      }))}
+                      trackColor={{ false: '#E5E7EB', true: '#4F8CFF' }}
+                      thumbColor="#FFFFFF"
+                    />
                   </View>
-                  <Switch
-                    value={preferences.notifications[notification.key as keyof typeof preferences.notifications]}
-                    onValueChange={(value) => setPreferences(prev => ({
-                      ...prev,
-                      notifications: { ...prev.notifications, [notification.key]: value }
-                    }))}
-                    trackColor={{ false: '#E5E7EB', true: '#00AEEF' }}
-                    thumbColor="#FFFFFF"
-                  />
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
           </View>
         );
@@ -640,39 +648,45 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 32,
   },
   content: {
     flex: 1,
     minHeight: '100%',
+    paddingTop: 20,
   },
   header: {
     marginBottom: 32,
     alignItems: 'center',
+    paddingHorizontal: 16,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+    lineHeight: 34,
   },
   description: {
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
+    paddingHorizontal: 8,
   },
   progressContainer: {
     marginBottom: 40,
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   progressBar: {
     width: '100%',
     height: 4,
     borderRadius: 2,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   progressFill: {
     height: '100%',
@@ -688,9 +702,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     minHeight: 400,
+    paddingHorizontal: 8,
   },
   logoContainer: {
-    marginBottom: 32,
+    marginBottom: 40,
     alignItems: 'center',
   },
   logoOuter: {
@@ -721,8 +736,12 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     paddingHorizontal: 20,
   },
+  formContainer: {
+    width: '100%',
+    paddingHorizontal: 8,
+  },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
     width: '100%',
   },
   inputLabel: {
@@ -733,7 +752,7 @@ const styles = StyleSheet.create({
   },
   input: {
     width: '100%',
-    height: 50,
+    height: 52,
     paddingHorizontal: 16,
     borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -745,18 +764,20 @@ const styles = StyleSheet.create({
   optionsContainer: {
     width: '100%',
     gap: 16,
+    paddingHorizontal: 8,
   },
   optionCard: {
-    padding: 20,
+    padding: 24,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
-    minHeight: 120,
+    minHeight: 140,
+    justifyContent: 'center',
   },
   optionCardSelected: {
-    backgroundColor: 'rgba(0, 174, 239, 0.2)',
+    backgroundColor: 'rgba(79, 140, 255, 0.2)',
     borderColor: colors.primaryBlue,
   },
   optionTitle: {
@@ -775,6 +796,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
+    paddingHorizontal: 12,
+  },
+  preferencesContainer: {
+    width: '100%',
+    paddingHorizontal: 8,
   },
   preferenceSection: {
     marginBottom: 32,
@@ -784,8 +810,33 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: 20,
     textAlign: 'center',
+  },
+  timeOptionsContainer: {
+    gap: 12,
+  },
+  timeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  timeOptionSelected: {
+    backgroundColor: 'rgba(79, 140, 255, 0.2)',
+    borderColor: colors.primaryBlue,
+  },
+  timeOptionText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  timeOptionTextSelected: {
+    color: colors.primaryBlue,
   },
   sliderContainer: {
     flexDirection: 'row',
@@ -794,9 +845,9 @@ const styles = StyleSheet.create({
   },
   durationOption: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 8,
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -814,30 +865,9 @@ const styles = StyleSheet.create({
   durationTextSelected: {
     color: colors.textPrimary,
   },
-  timeOptionsContainer: {
-    gap: 12,
-  },
-  timeOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  timeOptionSelected: {
-    backgroundColor: 'rgba(0, 174, 239, 0.2)',
-    borderColor: colors.primaryBlue,
-  },
-  timeOptionText: {
-    fontSize: 16,
-    color: colors.textPrimary,
-    marginLeft: 12,
-    fontWeight: '500',
-  },
-  timeOptionTextSelected: {
-    color: colors.primaryBlue,
+  integrationsContainer: {
+    width: '100%',
+    paddingHorizontal: 8,
   },
   integrationNote: {
     fontSize: 16,
@@ -845,6 +875,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 24,
+    paddingHorizontal: 8,
   },
   integrationsList: {
     marginBottom: 24,
@@ -854,7 +885,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
     borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
@@ -886,12 +917,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
   },
+  notificationsContainer: {
+    width: '100%',
+    paddingHorizontal: 8,
+  },
   notificationNote: {
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 24,
+    paddingHorizontal: 8,
   },
   notificationsList: {
     gap: 16,
@@ -900,7 +936,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
     borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
@@ -930,6 +966,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
+    paddingHorizontal: 20,
   },
   checkmarkContainer: {
     width: 120,
@@ -947,7 +984,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
     lineHeight: 26,
-    paddingHorizontal: 20,
+    paddingHorizontal: 8,
   },
   completionSubtext: {
     fontSize: 14,
@@ -961,12 +998,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 40,
     paddingTop: 20,
+    paddingHorizontal: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   backButtonText: {
     fontSize: 16,
@@ -976,8 +1018,8 @@ const styles = StyleSheet.create({
   },
   nextButton: {
     backgroundColor: colors.primaryBlue,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -991,9 +1033,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+    minWidth: 140,
   },
   nextButtonDisabled: {
-    backgroundColor: 'rgba(0, 174, 239, 0.5)',
+    backgroundColor: 'rgba(79, 140, 255, 0.5)',
     shadowOpacity: 0,
     elevation: 0,
   },
