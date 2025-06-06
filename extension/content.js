@@ -14,8 +14,23 @@ function isAssignmentPage() {
   );
   // Course assignment pages
   const assignmentItems = document.querySelectorAll(".ig-row");
+  // Assignment index pages
+  const assignmentListItems = document.querySelectorAll(
+    ".assignment-list .assignment, .assignment_list .assignment, " +
+      "[data-view='assignments'] .assignment, .assignments .assignment, " +
+      ".assignment-group-list .assignment, .assignment-group .assignment"
+  );
+  // Generic assignment selectors
+  const genericAssignments = document.querySelectorAll(
+    "[id*='assignment'], [class*='assignment'], [data-id*='assignment']"
+  );
 
-  return dashboardItems.length > 0 || assignmentItems.length > 0;
+  return (
+    dashboardItems.length > 0 ||
+    assignmentItems.length > 0 ||
+    assignmentListItems.length > 0 ||
+    genericAssignments.length > 0
+  );
 }
 
 // Parse assignments from dashboard cards and todo items
@@ -27,6 +42,7 @@ function scrapeAssignmentsFromDashboard() {
     const titleElement = item.querySelector(".todo-details__Title");
     const courseElement = item.querySelector(".todo-details__CourseTitle");
     const dateElement = item.querySelector(".todo-details__Info");
+    const gradeElement = item.querySelector(".todo-details__Grade, .points");
 
     if (titleElement) {
       const assignment = {
@@ -37,6 +53,8 @@ function scrapeAssignmentsFromDashboard() {
           : "Unknown Course",
         dueDate: dateElement ? extractDate(dateElement.textContent) : null,
         url: titleElement.closest("a") ? titleElement.closest("a").href : null,
+        grade: gradeElement ? extractGrade(gradeElement.textContent) : null,
+        status: determineAssignmentStatus(item),
         scraped: new Date().toISOString(),
       };
 
@@ -82,6 +100,8 @@ function scrapeAssignmentsFromCoursePage() {
   document.querySelectorAll(".ig-row").forEach((row) => {
     const titleElement = row.querySelector(".ig-title");
     const dateElement = row.querySelector(".date-due");
+    const gradeElement = row.querySelector(".grade, .points, .score");
+    const statusElement = row.querySelector(".submission-status, .status");
 
     if (titleElement) {
       const assignment = {
@@ -92,11 +112,109 @@ function scrapeAssignmentsFromCoursePage() {
         url: titleElement.closest("a")
           ? titleElement.closest("a").href
           : window.location.href,
+        grade: gradeElement ? extractGrade(gradeElement.textContent) : null,
+        status: statusElement
+          ? extractStatus(statusElement.textContent)
+          : "pending",
         scraped: new Date().toISOString(),
       };
 
       assignments.push(assignment);
     }
+  });
+
+  return assignments;
+}
+
+// Parse assignments from assignment index/list pages
+function scrapeAssignmentsFromIndexPage() {
+  const assignments = [];
+  const courseTitle =
+    document.querySelector(
+      "h1, .course-title, [class*='course'], .context-course-info h1"
+    ) || document.querySelector("title");
+  const courseName = courseTitle
+    ? courseTitle.textContent.trim()
+    : "Unknown Course";
+
+  // Try multiple selectors for assignment items
+  const selectors = [
+    ".assignment", // Generic assignment class
+    "[id*='assignment']", // Elements with assignment in ID
+    ".assignment-list li", // Assignment list items
+    ".assignment-group .assignment", // Assignment group items
+    ".content-box", // Canvas content boxes
+    ".assignment_list_item", // Alternative assignment list
+    ".context_module_item", // Module items
+    "tr", // Table rows that might contain assignments
+  ];
+
+  let foundAssignments = false;
+
+  selectors.forEach((selector) => {
+    if (foundAssignments) return; // Skip if we already found assignments
+
+    const elements = document.querySelectorAll(selector);
+    if (elements.length === 0) return;
+
+    elements.forEach((element) => {
+      // Look for title in various ways
+      const titleElement =
+        element.querySelector(
+          "a[title], .title, .assignment-title, .ig-title, h3, h4"
+        ) ||
+        element.querySelector("a") ||
+        element;
+
+      if (!titleElement) return;
+
+      const titleText =
+        titleElement.getAttribute("title") || titleElement.textContent.trim();
+
+      // Skip if it doesn't look like an assignment
+      if (!titleText || titleText.length < 3) return;
+      if (
+        titleText.toLowerCase().includes("calendar") ||
+        titleText.toLowerCase().includes("people") ||
+        titleText.toLowerCase().includes("files")
+      )
+        return;
+
+      // Look for due date information
+      const dateElement = element.querySelector(
+        ".date-due, .due-date, .due_date, .date_due, " +
+          "[class*='due'], [class*='date'], .datetime"
+      );
+
+      // Look for grade information
+      const gradeElement = element.querySelector(
+        ".grade, .points, .score, .percentage, " +
+          "[class*='grade'], [class*='points'], [class*='score']"
+      );
+
+      // Get the assignment URL
+      const linkElement =
+        titleElement.tagName === "A"
+          ? titleElement
+          : element.querySelector("a");
+      const assignmentUrl = linkElement
+        ? linkElement.href
+        : window.location.href;
+
+      const assignment = {
+        id: "canvas_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+        title: titleText,
+        course: courseName,
+        dueDate: dateElement ? extractDate(dateElement.textContent) : null,
+        url: assignmentUrl,
+        grade: gradeElement ? extractGrade(gradeElement.textContent) : null,
+        status: determineAssignmentStatus(element),
+        scraped: new Date().toISOString(),
+      };
+
+      assignments.push(assignment);
+      foundAssignments = true;
+    });
   });
 
   return assignments;
@@ -162,16 +280,109 @@ function extractDate(text) {
   return null;
 }
 
+// Helper function to extract grades from text
+function extractGrade(text) {
+  if (!text) return null;
+
+  text = text.trim();
+
+  // Look for patterns like "85/100", "A-", "95%", "8.5/10"
+  const gradePatterns = [
+    /(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/, // "85/100" or "8.5/10"
+    /(\d+(?:\.\d+)?)%/, // "95%"
+    /([A-F][+-]?)/, // "A-", "B+", etc.
+    /(\d+(?:\.\d+)?)\s*pts?/i, // "85 pts"
+  ];
+
+  for (const pattern of gradePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      if (pattern === gradePatterns[0]) {
+        // Points format: calculate percentage
+        const earned = parseFloat(match[1]);
+        const total = parseFloat(match[2]);
+        return {
+          points: earned,
+          maxPoints: total,
+          percentage: total > 0 ? Math.round((earned / total) * 100) : null,
+          display: text,
+        };
+      } else if (pattern === gradePatterns[1]) {
+        // Percentage format
+        return {
+          percentage: parseFloat(match[1]),
+          display: text,
+        };
+      } else if (pattern === gradePatterns[2]) {
+        // Letter grade
+        return {
+          letterGrade: match[1],
+          display: text,
+        };
+      } else if (pattern === gradePatterns[3]) {
+        // Points only
+        return {
+          points: parseFloat(match[1]),
+          display: text,
+        };
+      }
+    }
+  }
+
+  return { display: text };
+}
+
+// Helper function to determine assignment status
+function determineAssignmentStatus(element) {
+  const text = element.textContent.toLowerCase();
+
+  if (text.includes("submitted") || text.includes("complete")) {
+    return "completed";
+  } else if (text.includes("graded") || text.includes("scored")) {
+    return "graded";
+  } else if (text.includes("overdue") || text.includes("late")) {
+    return "overdue";
+  } else if (text.includes("missing")) {
+    return "missing";
+  }
+
+  return "pending";
+}
+
+// Helper function to extract status from text
+function extractStatus(text) {
+  if (!text) return "pending";
+
+  text = text.toLowerCase().trim();
+
+  if (text.includes("submitted") || text.includes("complete")) {
+    return "completed";
+  } else if (text.includes("graded") || text.includes("scored")) {
+    return "graded";
+  } else if (text.includes("overdue") || text.includes("late")) {
+    return "overdue";
+  } else if (text.includes("missing")) {
+    return "missing";
+  }
+
+  return "pending";
+}
+
 // Main function to collect assignments
 function collectAssignments() {
   if (!isAssignmentPage()) return [];
 
-  // Get assignments from both potential sources
+  // Get assignments from all potential sources
   const dashboardAssignments = scrapeAssignmentsFromDashboard();
   const courseAssignments = scrapeAssignmentsFromCoursePage();
+  const indexAssignments = scrapeAssignmentsFromIndexPage();
 
   // Combine results
-  const allAssignments = [...dashboardAssignments, ...courseAssignments];
+  const allAssignments = [
+    ...dashboardAssignments,
+    ...courseAssignments,
+    ...indexAssignments,
+  ];
 
   // Filter out duplicates (based on title and course)
   const uniqueAssignments = allAssignments.filter((assignment) => {
@@ -233,7 +444,30 @@ function storeAssignments(assignments) {
 
 // Run the collection process
 function runCollection() {
+  console.log("🔍 PulsePlan: Starting assignment collection...");
+  console.log("📍 Current URL:", window.location.href);
+
   const assignments = collectAssignments();
+  console.log(`📚 PulsePlan: Found ${assignments.length} assignments`);
+
+  if (assignments.length > 0) {
+    console.log("📋 Assignments found:", assignments);
+  } else {
+    console.log("🔍 Debug: Checking page elements...");
+    console.log(
+      "- Dashboard items:",
+      document.querySelectorAll(".ic-DashboardCard, .todo-list-item").length
+    );
+    console.log("- IG rows:", document.querySelectorAll(".ig-row").length);
+    console.log(
+      "- Generic assignments:",
+      document.querySelectorAll("[id*='assignment'], [class*='assignment']")
+        .length
+    );
+    console.log("- Table rows:", document.querySelectorAll("tr").length);
+    console.log("- Links:", document.querySelectorAll("a").length);
+  }
+
   storeAssignments(assignments);
 }
 

@@ -2,7 +2,7 @@
   <img src="https://github.com/user-attachments/assets/0833a286-ba32-42a2-a5ca-4ae8bda63168" alt="PulsePlan" width="355"/>
 </p>
 
-# PulsePlan – AI-Powered Academic Scheduler
+# PulsePlan – AI-Powered Planner
 
 PulsePlan is a mobile-first academic planning assistant that integrates with Canvas, Google Calendar, Apple Calendar, and Outlook to create adaptive schedules using AI. Designed for students, it streamlines planning with intelligent time-blocking, real-time task updates, and personalized assistance.
 
@@ -15,14 +15,14 @@ PulsePlan is a mobile-first academic planning assistant that integrates with Can
 * **Canvas Sync** – Browser extension imports assignments
 * **AI Scheduling** – Vector model with GPT-4o insights for smart planning
 * **Real-Time Adjustments** – Reacts to task status changes
-* **Calendar Integration** – Google, Outlook, Apple (EventKit)
+* **Calendar Integration** – Connects with Google, Outlook, and Apple
 * **Task Management** – Tap to complete, skip, or reschedule
 * **Authentication** – Google sign-in via Supabase Auth
 * **Freemium Model** – Free weekly plans; premium unlocks advanced scheduling
 
 ---
 
-## 🤖 Machine Learnng 
+## 📺️ ML Model: Design & Strategy
 
 ### 🧠 Purpose
 
@@ -66,7 +66,7 @@ PulsePlan is a mobile-first academic planning assistant that integrates with Can
 
 ---
 
-## 🗘️ Project Structure
+## 🗺️ Project Structure
 
 ```
 flyonthewalldev-pulseplan/
@@ -111,7 +111,7 @@ flyonthewalldev-pulseplan/
 
 ---
 
-## 💻 Tech Stack
+## 🔠 Tech Stack
 
 | Layer         | Technology                        |
 | ------------- | --------------------------------- |
@@ -127,7 +127,7 @@ flyonthewalldev-pulseplan/
 
 ---
 
-## 🧰 Setup Instructions
+## 🚀 Setup Instructions
 
 ### 1. Clone the Repository
 
@@ -210,9 +210,10 @@ npm run dev
 
 ## 🗓 Calendar Integration
 
-* Google: `googleapis`
-* Outlook: Microsoft Graph with `msal`
-* Apple: Local EventKit via React Native
+* Syncs with Google, Outlook, and Apple
+* Handles bidirectional sync and event conflict resolution
+* Background tasks manage token refresh and error handling
+* Focused on user-friendly connection setup and real-time performance
 
 ---
 

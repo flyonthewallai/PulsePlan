@@ -8,6 +8,7 @@ import stripeRoutes from './routes/stripeRoutes';
 import tasksRoutes from './routes/tasksRoutes';
 import scheduleBlocksRouter from './routes/scheduleBlocks';
 import chatRoutes from './routes/chat';
+import canvasRoutes from './routes/canvasRoutes';
 import { findAvailablePort } from './utils/portUtils';
 
 // Load environment variables
@@ -15,7 +16,7 @@ dotenv.config();
 
 // Initialize Express app
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000');
+const PORT = parseInt(process.env.PORT || '5000');
 
 // CORS configuration
 const corsOptions = {
@@ -49,6 +50,7 @@ app.use('/stripe', stripeRoutes);
 app.use('/tasks', tasksRoutes);
 app.use('/schedule-blocks', scheduleBlocksRouter);
 app.use('/chat', chatRoutes);
+app.use('/canvas', canvasRoutes);
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {
@@ -63,8 +65,11 @@ async function startServer() {
   try {
     const availablePort = await findAvailablePort(PORT);
     
-    app.listen(availablePort, () => {
+    app.listen(availablePort, '0.0.0.0', () => {
       console.log(`🚀 Server successfully started on port ${availablePort}`);
+      console.log(`🌐 Server accessible at:`);
+      console.log(`   - http://localhost:${availablePort}`);
+      console.log(`   - http://127.0.0.1:${availablePort}`);
       if (availablePort !== PORT) {
         console.log(`⚠️  Note: Default port ${PORT} was in use, using ${availablePort} instead`);
       }

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PulsePlan",
-    "slug": "rhythm",
+    "slug": "pulseplan",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,9 +16,9 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rhythm.app",
+      "bundleIdentifier": "com.pulseplan.app",
       "associatedDomains": [
-        "applinks:rhythm.app",
+        "applinks:pulseplan.app",
         "applinks:127.0.0.1:8081"
       ]
     },
@@ -27,18 +27,18 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.rhythm.app",
+      "package": "com.pulseplan.app",
       "intentFilters": [
         {
           "action": "VIEW",
           "autoVerify": true,
           "data": [
             {
-              "scheme": "rhythm",
+              "scheme": "pulseplan",
               "host": "reset-password"
             },
             {
-              "scheme": "rhythm",
+              "scheme": "pulseplan",
               "host": "auth",
               "pathPrefix": "/callback"
             },
@@ -70,16 +70,16 @@
       [
         "@stripe/stripe-react-native",
         {
-          "merchantIdentifier": "merchant.com.rhythm.app",
+          "merchantIdentifier": "merchant.com.pulseplan.app",
           "enableGooglePay": true
         }
       ],
       "expo-router"
     ],
-    "scheme": "rhythm",
-    "sdkVersion": "51.0.0",
+    "scheme": "pulseplan",
+    "sdkVersion": "53.0.0",
     "extra": {
-      "apiUrl": "http://localhost:5000",
+      "apiUrl": "http://10.0.0.4:5000",
       "apiPort": "5000",
       "stripePublishableKey": "pk_test_51RPGvL4cCEE1fltDtwqgVQIxe7rCsReNaQhzka3UGxvZcjkEveCiYTUjfA2KgzTPPAB7vq3WvaC0b2AmK59c87ak00q8wxgUAz",
       "supabaseUrl": "https://jwvohxsgokfcysfqhtzo.supabase.co",

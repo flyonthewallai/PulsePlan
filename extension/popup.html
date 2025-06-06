@@ -69,6 +69,23 @@
       background-color: #ccc;
       cursor: not-allowed;
     }
+
+    .button.secondary {
+      background-color: transparent;
+      color: #00AEEF;
+      border: 2px solid #00AEEF;
+    }
+
+    .button.secondary:hover {
+      background-color: rgba(0, 174, 239, 0.1);
+    }
+
+    .divider {
+      text-align: center;
+      margin: 12px 0;
+      color: #666;
+      font-size: 14px;
+    }
     
     .message {
       margin-top: 12px;
@@ -123,6 +140,11 @@
       <span>Ready to sync:</span>
       <span id="unsyncedCount" class="status-value">0</span>
     </div>
+  </div>
+
+  <div id="connectionSection" style="display: none;">
+    <button id="scanQRButton" class="button secondary">Scan QR Code</button>
+    <div class="divider">or</div>
   </div>
   
   <button id="syncButton" class="button">Sync to PulsePlan</button>

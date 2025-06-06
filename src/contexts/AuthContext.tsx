@@ -139,15 +139,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const isOnOnboardingPage = segments[0] === 'onboarding';
     const isOnIndexPage = segments.length === 0;
 
-    console.log('🧭 Navigation check:', {
-      segments,
-      user: !!user,
-      needsOnboarding,
-      isInAuthGroup,
-      isOnAuthPage,
-      isOnOnboardingPage,
-      isOnIndexPage
-    });
+
 
     if (!user) {
       // User not authenticated
