@@ -214,32 +214,155 @@ export const resetPassword = async (email: string) => {
   }
 };
 
+// OAuth Sign-In Functions
+export const signInWithGoogle = async () => {
+  try {
+    console.log('🔑 Attempting Google OAuth sign in...');
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: 'rhythm://auth/callback',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+    
+    console.log('Google OAuth result:', { 
+      success: !!data, 
+      error: error?.message,
+      url: data?.url ? 'OAuth URL generated' : 'No URL'
+    });
+    
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Google OAuth error:', error);
+    return { data: null, error };
+  }
+};
+
+export const signInWithMicrosoft = async () => {
+  try {
+    console.log('🔑 Attempting Microsoft OAuth sign in...');
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+      options: {
+        redirectTo: 'rhythm://auth/callback',
+        scopes: 'email profile openid',
+      },
+    });
+    
+    console.log('Microsoft OAuth result:', { 
+      success: !!data, 
+      error: error?.message,
+      url: data?.url ? 'OAuth URL generated' : 'No URL'
+    });
+    
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Microsoft OAuth error:', error);
+    return { data: null, error };
+  }
+};
+
+export const signInWithApple = async () => {
+  try {
+    console.log('🔑 Attempting Apple OAuth sign in...');
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: {
+        redirectTo: 'rhythm://auth/callback',
+        scopes: 'email name',
+      },
+    });
+    
+    console.log('Apple OAuth result:', { 
+      success: !!data, 
+      error: error?.message,
+      url: data?.url ? 'OAuth URL generated' : 'No URL'
+    });
+    
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Apple OAuth error:', error);
+    return { data: null, error };
+  }
+};
+
+// Helper function to determine if user is new (for onboarding)
+export const isNewUser = (user: any): boolean => {
+  if (!user) return false;
+  
+  // Check if user was created recently (within last 5 minutes)
+  const createdAt = new Date(user.created_at);
+  const now = new Date();
+  const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+  
+  const isNew = createdAt > fiveMinutesAgo;
+  console.log('🔍 User creation check:', {
+    email: user.email,
+    createdAt: createdAt.toISOString(),
+    fiveMinutesAgo: fiveMinutesAgo.toISOString(),
+    isNew
+  });
+  
+  return isNew;
+};
+
 export const signOut = async () => {
   try {
-    console.log('🚪 Attempting sign out...');
+    console.log('🚪 Starting comprehensive sign out process...');
+    console.log('🔍 Current session before logout:');
+    
+    // Check current session first
+    const { session: currentSession } = await getSession();
+    console.log('📊 Session details:', {
+      hasSession: !!currentSession,
+      userEmail: currentSession?.user?.email,
+      accessToken: currentSession?.access_token ? 'Present' : 'None',
+      refreshToken: currentSession?.refresh_token ? 'Present' : 'None'
+    });
     
     // First, try to sign out from Supabase
-    const { error } = await supabase.auth.signOut();
+    console.log('🔄 Calling Supabase signOut...');
+    const { error: signOutError } = await supabase.auth.signOut();
     
-    if (error) {
-      console.warn('Supabase sign out error (continuing with cleanup):', error.message);
+    if (signOutError) {
+      console.warn('⚠️ Supabase sign out error (continuing with cleanup):', signOutError.message);
     } else {
       console.log('✅ Supabase sign out successful');
     }
     
     // Always clear all local auth data regardless of Supabase response
-    await clearAllAuthData();
+    console.log('🧹 Clearing local auth data...');
+    const clearResult = await clearAllAuthData();
+    console.log('🗑️ Clear data result:', clearResult);
     
-    console.log('✅ Sign out completed successfully');
-    return { error: null };
+    // Verify session is cleared
+    console.log('🔍 Verifying session cleared...');
+    const { session: verifySession } = await getSession();
+    console.log('📊 Session after logout:', {
+      hasSession: !!verifySession,
+      userEmail: verifySession?.user?.email || 'None'
+    });
+    
+    console.log('✅ Sign out process completed successfully');
+    return { error: null, success: true };
   } catch (error: any) {
-    console.error('❌ Sign out error:', error);
+    console.error('❌ Unexpected sign out error:', error);
+    console.log('🛠️ Attempting emergency cleanup...');
     
     // Even if there's an error, try to clear local data
-    await clearAllAuthData();
+    try {
+      await clearAllAuthData();
+      console.log('🛠️ Emergency cleanup successful');
+    } catch (cleanupError) {
+      console.error('💥 Emergency cleanup failed:', cleanupError);
+    }
     
-    // Return success since we cleared local data
-    return { error: null };
+    // Return success since we attempted cleanup
+    return { error, success: false };
   }
 };
 

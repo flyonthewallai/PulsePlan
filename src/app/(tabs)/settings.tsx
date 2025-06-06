@@ -114,12 +114,46 @@ export default function SettingsScreen() {
           text: 'Log Out', 
           style: 'destructive',
           onPress: async () => {
+            console.log('🚪 User confirmed logout from settings page');
+            console.log('👤 Current user before logout:', {
+              email: user?.email,
+              id: user?.id,
+              fullName: user?.user_metadata?.full_name
+            });
+            
             try {
-              await signOut();
+              console.log('🔄 Calling enhanced signOut function...');
+              
+              // Call the enhanced signOut function
+              const result = await signOut();
+              
+              console.log('📊 SignOut result:', result);
+              
+              if (result && !result.success) {
+                console.error('⚠️ SignOut reported failure but continuing...');
+              }
+              
+              console.log('🔄 Refreshing auth context after signOut...');
               await refreshAuth();
+              
+              console.log('✅ Settings logout process completed');
+              console.log('📱 User should now be redirected to login screen');
+              
+              // Note: Navigation will be handled automatically by AuthContext
+              // when it detects the user is no longer authenticated
+              
             } catch (error) {
-              console.error('Error logging out:', error);
-              Alert.alert('Logout Error', 'An error occurred while logging out.');
+              console.error('❌ Unexpected error during settings logout:', error);
+              console.log('🛠️ Error details:', {
+                name: error instanceof Error ? error.name : 'Unknown',
+                message: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : 'No stack trace'
+              });
+              
+              Alert.alert(
+                'Logout Error', 
+                'An unexpected error occurred while logging out. You may need to restart the app.'
+              );
             }
           }
         }

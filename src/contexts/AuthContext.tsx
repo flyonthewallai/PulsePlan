@@ -72,27 +72,38 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const refreshAuth = async () => {
+    console.log('🔄 AuthContext: Starting refreshAuth...');
     try {
       const { session, error: sessionError } = await getSession();
+      console.log('📊 AuthContext: Session check result:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        userEmail: session?.user?.email,
+        error: sessionError?.message
+      });
       
       if (sessionError) {
-        console.error('Error refreshing session:', sessionError);
+        console.error('❌ AuthContext: Error refreshing session:', sessionError);
         setError('Failed to refresh authentication session');
         setSession(null);
         setUser(null);
         setNeedsOnboarding(false);
+        console.log('🚪 AuthContext: Cleared user state due to session error');
       } else if (!session) {
+        console.log('🚪 AuthContext: No session found, clearing user state');
         setSession(null);
         setUser(null);
         setError(null);
         setNeedsOnboarding(false);
       } else if (!session.user) {
+        console.log('🚪 AuthContext: Session exists but no user, clearing state');
         setSession(null);
         setUser(null);
         setError(null);
         setNeedsOnboarding(false);
       } else {
         // Session is valid - we have a session with user data
+        console.log('✅ AuthContext: Valid session found, updating user state');
         setSession(session);
         setUser(session.user);
         setError(null);
@@ -101,18 +112,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const hasCompletedOnboarding = await checkOnboardingStatus(session.user.id);
         setNeedsOnboarding(!hasCompletedOnboarding);
         
-        console.log('🔍 Auth refresh complete:', {
+        console.log('🔍 AuthContext: Auth refresh complete:', {
           userId: session.user.id,
           email: session.user.email,
           needsOnboarding: !hasCompletedOnboarding
         });
       }
     } catch (error) {
-      console.error('Error refreshing auth:', error);
+      console.error('❌ AuthContext: Unexpected error refreshing auth:', error);
       setError('Authentication refresh failed');
       setSession(null);
       setUser(null);
       setNeedsOnboarding(false);
+      console.log('🚪 AuthContext: Cleared user state due to unexpected error');
     }
   };
 
