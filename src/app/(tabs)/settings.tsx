@@ -109,60 +109,82 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Confirm Logout',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Log Out', 
-          style: 'destructive',
-          onPress: async () => {
-            console.log('🚪 User confirmed logout from settings page');
-            console.log('👤 Current user before logout:', {
-              email: user?.email,
-              id: user?.id,
-              fullName: user?.user_metadata?.full_name
-            });
-            
-            try {
-              console.log('🔄 Calling enhanced signOut function...');
-              
-              // Call the enhanced signOut function
-              const result = await signOut();
-              
-              console.log('📊 SignOut result:', result);
-              
-              if (result && !result.success) {
-                console.error('⚠️ SignOut reported failure but continuing...');
-              }
-              
-              console.log('🔄 Refreshing auth context after signOut...');
-              await refreshAuth();
-              
-              console.log('✅ Settings logout process completed');
-              console.log('📱 User should now be redirected to login screen');
-              
-              // Note: Navigation will be handled automatically by AuthContext
-              // when it detects the user is no longer authenticated
-              
-            } catch (error) {
-              console.error('❌ Unexpected error during settings logout:', error);
-              console.log('🛠️ Error details:', {
-                name: error instanceof Error ? error.name : 'Unknown',
-                message: error instanceof Error ? error.message : String(error),
-                stack: error instanceof Error ? error.stack : 'No stack trace'
-              });
-              
-              Alert.alert(
-                'Logout Error', 
-                'An unexpected error occurred while logging out. You may need to restart the app.'
-              );
-            }
-          }
-        }
-      ]
-    );
+    console.log('🚪 handleLogout function called - START');
+    
+    // Web-compatible confirmation dialog
+    const confirmLogout = () => {
+      if (typeof window !== 'undefined') {
+        // Web environment - use browser confirm
+        return window.confirm('Are you sure you want to log out?');
+      } else {
+        // Mobile environment - use Alert.alert
+        return new Promise((resolve) => {
+          Alert.alert(
+            'Confirm Logout',
+            'Are you sure you want to log out?',
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Log Out', style: 'destructive', onPress: () => resolve(true) }
+            ]
+          );
+        });
+      }
+    };
+
+    const shouldLogout = await confirmLogout();
+    console.log('🔍 User confirmation result:', shouldLogout);
+    
+    if (!shouldLogout) {
+      console.log('❌ User cancelled logout');
+      return;
+    }
+
+    console.log('✅ User confirmed logout, proceeding...');
+    console.log('👤 Current user before logout:', {
+      email: user?.email,
+      id: user?.id,
+      fullName: user?.user_metadata?.full_name
+    });
+    
+    try {
+      console.log('🔄 Calling enhanced signOut function...');
+      
+      // Call the enhanced signOut function
+      const result = await signOut();
+      
+      console.log('📊 SignOut result:', result);
+      
+      if (result && !result.success) {
+        console.error('⚠️ SignOut reported failure but continuing...');
+      }
+      
+      console.log('🔄 Refreshing auth context after signOut...');
+      await refreshAuth();
+      
+      console.log('✅ Settings logout process completed');
+      console.log('📱 User should now be redirected to login screen');
+      
+      // Note: Navigation will be handled automatically by AuthContext
+      // when it detects the user is no longer authenticated
+      
+    } catch (error) {
+      console.error('❌ Unexpected error during settings logout:', error);
+      console.log('🛠️ Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
+      
+      // Web-compatible error alert
+      if (typeof window !== 'undefined') {
+        window.alert('An unexpected error occurred while logging out. You may need to restart the app.');
+      } else {
+        Alert.alert(
+          'Logout Error', 
+          'An unexpected error occurred while logging out. You may need to restart the app.'
+        );
+      }
+    }
   };
 
   const handleThemeChange = async (themeId: string) => {
@@ -505,9 +527,17 @@ export default function SettingsScreen() {
         </View>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <LogOut size={20} color={themeColors.textSecondary} />
-          <Text style={[styles.logoutText, { color: themeColors.textSecondary }]}>Log Out</Text>
+        <TouchableOpacity 
+          style={[styles.logoutButton, { backgroundColor: themeColors.surface }]} 
+          onPress={() => {
+            console.log('🔴 LOGOUT BUTTON PRESSED - This should show in console');
+            handleLogout();
+          }}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <LogOut size={20} color={themeColors.error || '#FF6B6B'} />
+          <Text style={[styles.logoutText, { color: themeColors.error || '#FF6B6B' }]}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -867,7 +897,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
+    paddingHorizontal: 16,
     marginTop: 8,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
   },
   logoutText: {
     fontSize: 16,

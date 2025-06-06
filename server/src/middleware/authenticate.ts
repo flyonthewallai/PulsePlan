@@ -8,9 +8,10 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-// Extend Express Request type to include user
+// Extend Express Request type to include user and properly typed body
 export interface AuthenticatedRequest extends Request {
   user?: { id: string; email?: string };
+  body: any; // This ensures body property is available with proper typing
 }
 
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
