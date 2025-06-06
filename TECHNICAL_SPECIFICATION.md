@@ -720,3 +720,10 @@ The application demonstrates modern mobile development best practices including:
 - Extensible architecture for future feature additions
 
 This specification provides the foundation for any new developer to understand, modify, and extend the PulsePlan application effectively. 
+
+server/src/services/
+├── geminiService.ts          # AI integration for data extraction & optimization
+├── universalScraper.ts       # Multi-website data extraction 
+├── scheduleOptimizer.ts      # AI-powered schedule generation
+├── dataProcessor.ts          # Unified data processing pipeline
+└── websiteAnalyzer.ts        # Website structure analysis 

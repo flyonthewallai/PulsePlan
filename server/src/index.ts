@@ -9,6 +9,7 @@ import tasksRoutes from './routes/tasksRoutes';
 import scheduleBlocksRouter from './routes/scheduleBlocks';
 import chatRoutes from './routes/chat';
 import canvasRoutes from './routes/canvasRoutes';
+import scrapingRoutes from './routes/scrapingRoutes';
 import { findAvailablePort } from './utils/portUtils';
 
 // Load environment variables
@@ -51,6 +52,7 @@ app.use('/tasks', tasksRoutes);
 app.use('/schedule-blocks', scheduleBlocksRouter);
 app.use('/chat', chatRoutes);
 app.use('/canvas', canvasRoutes);
+app.use('/scraping', scrapingRoutes);
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {
