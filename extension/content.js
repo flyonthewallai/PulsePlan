@@ -1,498 +1,856 @@
 /**
- * content.js - Scrapes assignment data from Canvas LMS pages
- * This script runs on Canvas pages, detects assignments, and stores them for syncing
+ * content.js - AI-powered Canvas LMS assignment scraper using Gemini
+ * This script uses AI to intelligently extract assignment data from Canvas pages
  */
 
-// Cached assignments to avoid duplicates
-let cachedAssignments = [];
+// Immediate loading confirmation
+console.log("🎯 PulsePlan Content Script Loaded!");
+console.log(
+  "PulsePlan: Check out the repo! https://github.com/flyonthewalldev/pulseplan"
+);
+console.log("📍 Loading on:", window.location.href);
+console.log("🕒 Load time:", new Date().toISOString());
 
-// Check if we're on a Canvas page with assignments
-function isAssignmentPage() {
-  // Dashboard pages
-  const dashboardItems = document.querySelectorAll(
-    ".ic-DashboardCard, .todo-list-item"
-  );
-  // Course assignment pages
-  const assignmentItems = document.querySelectorAll(".ig-row");
-  // Assignment index pages
-  const assignmentListItems = document.querySelectorAll(
-    ".assignment-list .assignment, .assignment_list .assignment, " +
-      "[data-view='assignments'] .assignment, .assignments .assignment, " +
-      ".assignment-group-list .assignment, .assignment-group .assignment"
-  );
-  // Generic assignment selectors
-  const genericAssignments = document.querySelectorAll(
-    "[id*='assignment'], [class*='assignment'], [data-id*='assignment']"
-  );
+// Configuration
+const API_BASE_URL = "http://localhost:5000";
+const SCRAPING_COOLDOWN = 5000; // 5 seconds between AI requests
+const MAX_HTML_SIZE = 50000; // Limit HTML size for AI processing
 
-  return (
-    dashboardItems.length > 0 ||
-    assignmentItems.length > 0 ||
-    assignmentListItems.length > 0 ||
-    genericAssignments.length > 0
-  );
-}
+// State management
+let isProcessing = false;
+let lastScrapeTime = 0;
+let cachedResults = new Map();
 
-// Parse assignments from dashboard cards and todo items
-function scrapeAssignmentsFromDashboard() {
-  const assignments = [];
-
-  // Process dashboard todo items (most direct assignment references)
-  document.querySelectorAll(".todo-list-item").forEach((item) => {
-    const titleElement = item.querySelector(".todo-details__Title");
-    const courseElement = item.querySelector(".todo-details__CourseTitle");
-    const dateElement = item.querySelector(".todo-details__Info");
-    const gradeElement = item.querySelector(".todo-details__Grade, .points");
-
-    if (titleElement) {
-      const assignment = {
-        id: "canvas_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-        title: titleElement.textContent.trim(),
-        course: courseElement
-          ? courseElement.textContent.trim()
-          : "Unknown Course",
-        dueDate: dateElement ? extractDate(dateElement.textContent) : null,
-        url: titleElement.closest("a") ? titleElement.closest("a").href : null,
-        grade: gradeElement ? extractGrade(gradeElement.textContent) : null,
-        status: determineAssignmentStatus(item),
-        scraped: new Date().toISOString(),
-      };
-
-      assignments.push(assignment);
-    }
-  });
-
-  // Process dashboard cards with assignments
-  document.querySelectorAll(".ic-DashboardCard").forEach((card) => {
-    const courseName = card.querySelector(".ic-DashboardCard__header-title");
-
-    card
-      .querySelectorAll(".ic-DashboardCard__action-container a")
-      .forEach((link) => {
-        if (
-          link.textContent.includes("Assignment") ||
-          link.getAttribute("aria-label")?.includes("Assignment")
-        ) {
-          // For cards, we might only have partial info, so we get what we can
-          const assignment = {
-            id: "canvas_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-            title: link.getAttribute("aria-label") || link.textContent.trim(),
-            course: courseName
-              ? courseName.textContent.trim()
-              : "Unknown Course",
-            url: link.href,
-            scraped: new Date().toISOString(),
-          };
-
-          assignments.push(assignment);
-        }
-      });
-  });
-
-  return assignments;
-}
-
-// Parse assignments from a course assignments page
-function scrapeAssignmentsFromCoursePage() {
-  const assignments = [];
-  const courseTitle = document.querySelector(".context-course-info h1");
-
-  document.querySelectorAll(".ig-row").forEach((row) => {
-    const titleElement = row.querySelector(".ig-title");
-    const dateElement = row.querySelector(".date-due");
-    const gradeElement = row.querySelector(".grade, .points, .score");
-    const statusElement = row.querySelector(".submission-status, .status");
-
-    if (titleElement) {
-      const assignment = {
-        id: "canvas_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-        title: titleElement.textContent.trim(),
-        course: courseTitle ? courseTitle.textContent.trim() : "Unknown Course",
-        dueDate: dateElement ? extractDate(dateElement.textContent) : null,
-        url: titleElement.closest("a")
-          ? titleElement.closest("a").href
-          : window.location.href,
-        grade: gradeElement ? extractGrade(gradeElement.textContent) : null,
-        status: statusElement
-          ? extractStatus(statusElement.textContent)
-          : "pending",
-        scraped: new Date().toISOString(),
-      };
-
-      assignments.push(assignment);
-    }
-  });
-
-  return assignments;
-}
-
-// Parse assignments from assignment index/list pages
-function scrapeAssignmentsFromIndexPage() {
-  const assignments = [];
-  const courseTitle =
-    document.querySelector(
-      "h1, .course-title, [class*='course'], .context-course-info h1"
-    ) || document.querySelector("title");
-  const courseName = courseTitle
-    ? courseTitle.textContent.trim()
-    : "Unknown Course";
-
-  // Try multiple selectors for assignment items
-  const selectors = [
-    ".assignment", // Generic assignment class
-    "[id*='assignment']", // Elements with assignment in ID
-    ".assignment-list li", // Assignment list items
-    ".assignment-group .assignment", // Assignment group items
-    ".content-box", // Canvas content boxes
-    ".assignment_list_item", // Alternative assignment list
-    ".context_module_item", // Module items
-    "tr", // Table rows that might contain assignments
-  ];
-
-  let foundAssignments = false;
-
-  selectors.forEach((selector) => {
-    if (foundAssignments) return; // Skip if we already found assignments
-
-    const elements = document.querySelectorAll(selector);
-    if (elements.length === 0) return;
-
-    elements.forEach((element) => {
-      // Look for title in various ways
-      const titleElement =
-        element.querySelector(
-          "a[title], .title, .assignment-title, .ig-title, h3, h4"
-        ) ||
-        element.querySelector("a") ||
-        element;
-
-      if (!titleElement) return;
-
-      const titleText =
-        titleElement.getAttribute("title") || titleElement.textContent.trim();
-
-      // Skip if it doesn't look like an assignment
-      if (!titleText || titleText.length < 3) return;
-      if (
-        titleText.toLowerCase().includes("calendar") ||
-        titleText.toLowerCase().includes("people") ||
-        titleText.toLowerCase().includes("files")
-      )
-        return;
-
-      // Look for due date information
-      const dateElement = element.querySelector(
-        ".date-due, .due-date, .due_date, .date_due, " +
-          "[class*='due'], [class*='date'], .datetime"
-      );
-
-      // Look for grade information
-      const gradeElement = element.querySelector(
-        ".grade, .points, .score, .percentage, " +
-          "[class*='grade'], [class*='points'], [class*='score']"
-      );
-
-      // Get the assignment URL
-      const linkElement =
-        titleElement.tagName === "A"
-          ? titleElement
-          : element.querySelector("a");
-      const assignmentUrl = linkElement
-        ? linkElement.href
-        : window.location.href;
-
-      const assignment = {
-        id: "canvas_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
-        title: titleText,
-        course: courseName,
-        dueDate: dateElement ? extractDate(dateElement.textContent) : null,
-        url: assignmentUrl,
-        grade: gradeElement ? extractGrade(gradeElement.textContent) : null,
-        status: determineAssignmentStatus(element),
-        scraped: new Date().toISOString(),
-      };
-
-      assignments.push(assignment);
-      foundAssignments = true;
-    });
-  });
-
-  return assignments;
-}
-
-// Helper function to extract and standardize dates from text
-function extractDate(text) {
-  if (!text) return null;
-
-  text = text.trim();
-
-  // Try to extract date information from various formats
-  if (text.toLowerCase().includes("due:")) {
-    text = text.split("Due:")[1].trim();
+/**
+ * Main entry point - intelligently extract assignments using Gemini AI
+ */
+async function extractAssignmentsWithAI() {
+  if (isProcessing) {
+    console.log("🔄 PulsePlan: AI extraction already in progress...");
+    return [];
   }
 
-  // Handle "Due Jun 15 at 11:59pm" format
-  const dateMatch = text.match(/(\w+)\s+(\d+)(?:\s+at\s+(\d+):(\d+)([ap]m))?/i);
-  if (dateMatch) {
-    const monthNames = [
-      "jan",
-      "feb",
-      "mar",
-      "apr",
-      "may",
-      "jun",
-      "jul",
-      "aug",
-      "sep",
-      "oct",
-      "nov",
-      "dec",
+  const now = Date.now();
+  if (now - lastScrapeTime < SCRAPING_COOLDOWN) {
+    console.log("⏳ PulsePlan: Waiting for cooldown period...");
+    return [];
+  }
+
+  isProcessing = true;
+  lastScrapeTime = now;
+
+  try {
+    console.log("🤖 PulsePlan: Starting AI-powered assignment extraction...");
+
+    // Get page context and HTML
+    const pageData = await capturePageData();
+
+    // Check cache first
+    const cacheKey = generateCacheKey(pageData);
+    if (cachedResults.has(cacheKey)) {
+      console.log("💾 PulsePlan: Using cached results");
+      return cachedResults.get(cacheKey);
+    }
+
+    // Send to AI extraction service
+    const extractedData = await sendToGeminiService(pageData);
+
+    if (extractedData && extractedData.events) {
+      const assignments = processAIResults(extractedData);
+
+      // Cache results
+      cachedResults.set(cacheKey, assignments);
+
+      console.log(
+        `🎯 PulsePlan: AI extracted ${assignments.length} assignments`
+      );
+      return assignments;
+    }
+
+    return [];
+  } catch (error) {
+    console.error("❌ PulsePlan: AI extraction failed:", error);
+    return [];
+  } finally {
+    isProcessing = false;
+  }
+}
+
+/**
+ * Capture relevant page data for AI processing
+ */
+async function capturePageData() {
+  const pageData = {
+    url: window.location.href,
+    title: document.title,
+    html: "",
+    screenshot: null,
+    context: determinePageContext(),
+  };
+
+  // Get cleaned HTML content
+  const contentAreas = getRelevantContentAreas();
+  let combinedHTML = contentAreas.map((area) => area.outerHTML).join("\n");
+
+  // Limit HTML size for API efficiency
+  if (combinedHTML.length > MAX_HTML_SIZE) {
+    combinedHTML =
+      combinedHTML.substring(0, MAX_HTML_SIZE) +
+      "\n<!-- Content truncated for AI processing -->";
+  }
+
+  pageData.html = combinedHTML;
+
+  // Optionally capture screenshot for vision analysis
+  if (shouldUseVision()) {
+    pageData.screenshot = await captureScreenshot();
+  }
+
+  return pageData;
+}
+
+/**
+ * Determine the type of Canvas page we're on
+ */
+function determinePageContext() {
+  const url = window.location.href.toLowerCase();
+  const pathname = window.location.pathname.toLowerCase();
+
+  if (url.includes("/courses/") && url.includes("/assignments")) {
+    return "course_assignments";
+  } else if (pathname.includes("/dashboard") || pathname === "/") {
+    return "dashboard";
+  } else if (url.includes("/calendar")) {
+    return "calendar";
+  } else if (url.includes("/courses/") && url.includes("/modules")) {
+    return "course_modules";
+  } else if (url.includes("/courses/")) {
+    return "course_home";
+  } else if (url.includes("/grades")) {
+    return "grades";
+  }
+
+  return "unknown";
+}
+
+/**
+ * Get relevant content areas that likely contain assignment data
+ */
+function getRelevantContentAreas() {
+  const context = determinePageContext();
+
+  // Context-specific selectors for better extraction
+  const contextSelectors = {
+    dashboard: [
+      ".ic-DashboardCard",
+      ".ic-DashboardCard__header",
+      ".ic-DashboardCard__header-title",
+      ".ic-DashboardCard__box",
+      ".todo-list",
+      ".todo-list-item",
+      ".coming-up",
+      ".coming-up-item",
+      ".recent-feedback",
+      ".recent-feedback-item",
+      ".planner",
+      ".planner-item",
+      ".right-side-wrapper",
+    ],
+    course_assignments: [
+      "#assignment-list",
+      ".assignment-list",
+      ".assignment_list",
+      ".ig-list",
+      ".ig-row",
+      ".ig-header",
+      ".ig-details",
+      ".assignment-title",
+      ".due-date",
+      ".points",
+      ".assignment-row",
+      ".assignment-item",
+      ".content-box",
+    ],
+    course_modules: [
+      ".context_modules",
+      ".context_module",
+      ".context_module_item",
+      ".module-item",
+      ".module-item-title",
+      ".item-group-container",
+      ".ig-row",
+    ],
+    calendar: [
+      ".calendar",
+      ".calendar-event",
+      ".fc-event",
+      ".fc-event-title",
+      ".agenda-date",
+      ".agenda-event",
+      ".mini_calendar",
+      "#calendar-app",
+    ],
+    course_home: [
+      ".course-home-sub-navigation",
+      ".ic-app-course-menu",
+      ".recent-activity",
+      ".module-sequence",
+      ".home-content",
+      ".syllabus",
+      ".announcement",
+    ],
+  };
+
+  // Get context-specific selectors, fallback to general ones
+  const primarySelectors = contextSelectors[context] || [
+    "#content",
+    ".content",
+    "main",
+    '[role="main"]',
+  ];
+
+  // Always include these general assignment-related selectors
+  const generalSelectors = [
+    '[class*="assignment"]',
+    '[id*="assignment"]',
+    '[class*="due"]',
+    '[class*="todo"]',
+    "[data-event-type]",
+    ".student-planner",
+    ".planner-app",
+  ];
+
+  const allSelectors = [...primarySelectors, ...generalSelectors];
+  const foundElements = [];
+
+  for (const selector of allSelectors) {
+    try {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach((element) => {
+        // Skip if element is empty or just whitespace
+        if (!element.textContent.trim()) return;
+
+        // Skip navigation and header elements
+        if (element.closest("nav, header, footer, .navigation, .header"))
+          return;
+
+        // Avoid duplicates by checking if element is already included
+        if (
+          !foundElements.some(
+            (existing) =>
+              existing.contains(element) || element.contains(existing)
+          )
+        ) {
+          foundElements.push(element);
+        }
+      });
+    } catch (error) {
+      console.warn(`Selector failed: ${selector}`, error);
+    }
+  }
+
+  // Enhanced fallback with text content analysis
+  if (foundElements.length === 0) {
+    console.log("🔍 No specific content found, using intelligent fallback");
+
+    // Look for text that indicates assignments
+    const assignmentKeywords = [
+      "assignment",
+      "due",
+      "quiz",
+      "exam",
+      "project",
+      "homework",
+      "discussion",
+      "points",
+      "pts",
     ];
-    const month = monthNames.findIndex(
-      (m) => m === dateMatch[1].toLowerCase().substring(0, 3)
-    );
+    const textElements = document.querySelectorAll("*");
 
-    if (month !== -1) {
-      const now = new Date();
-      const year = now.getFullYear();
-      let day = parseInt(dateMatch[2]);
+    for (const element of textElements) {
+      const text = element.textContent.toLowerCase();
+      const hasAssignmentKeywords = assignmentKeywords.some((keyword) =>
+        text.includes(keyword)
+      );
 
-      // Simple time parsing if available
-      let hours = 23;
-      let minutes = 59;
-      if (dateMatch[3] && dateMatch[4]) {
-        hours = parseInt(dateMatch[3]);
-        minutes = parseInt(dateMatch[4]);
-        if (dateMatch[5]?.toLowerCase() === "pm" && hours < 12) {
-          hours += 12;
+      if (hasAssignmentKeywords && text.length > 10 && text.length < 500) {
+        // Check if this element or its parent seems relevant
+        const relevantParent = element.closest(
+          '[class*="content"], [class*="main"], [class*="body"]'
+        );
+        if (relevantParent && !foundElements.includes(relevantParent)) {
+          foundElements.push(relevantParent);
         }
       }
+    }
 
-      // Create the date string in ISO format
-      return `${year}-${(month + 1).toString().padStart(2, "0")}-${day
-        .toString()
-        .padStart(2, "0")}T${hours.toString().padStart(2, "0")}:${minutes
-        .toString()
-        .padStart(2, "0")}:00`;
+    // Ultimate fallback
+    if (foundElements.length === 0) {
+      const fallbackSelectors = ["#content", "main", ".main-content", "body"];
+      for (const selector of fallbackSelectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          foundElements.push(element);
+          break;
+        }
+      }
+    }
+  }
+
+  console.log(
+    `📄 Found ${foundElements.length} content areas for ${context} context`
+  );
+  return foundElements;
+}
+
+/**
+ * Determine if we should use vision analysis
+ */
+function shouldUseVision() {
+  // Use vision for complex layouts or when pattern recognition might be needed
+  const context = determinePageContext();
+  return ["dashboard", "calendar", "unknown"].includes(context);
+}
+
+/**
+ * Capture screenshot for vision analysis
+ */
+async function captureScreenshot() {
+  try {
+    // Since content scripts can't directly capture screenshots,
+    // we'll use a placeholder for now. In a full implementation,
+    // this would communicate with the background script
+    return null;
+  } catch (error) {
+    console.warn("Screenshot capture failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Generate cache key for results
+ */
+function generateCacheKey(pageData) {
+  const keyData = {
+    url: pageData.url,
+    htmlHash: simpleHash(pageData.html),
+    context: pageData.context,
+  };
+  return JSON.stringify(keyData);
+}
+
+/**
+ * Simple hash function for cache key generation
+ */
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString();
+}
+
+/**
+ * Send data to Gemini service for AI extraction
+ */
+async function sendToGeminiService(pageData) {
+  try {
+    const request = {
+      html: pageData.html,
+      screenshot: pageData.screenshot,
+      extractionType: "canvas_assignments",
+      context: `Canvas LMS page - ${pageData.context}. URL: ${pageData.url}. Page title: ${pageData.title}`,
+    };
+
+    const response = await fetch(`${API_BASE_URL}/scraping/extract-html`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI service error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error) {
+    console.error("Failed to call Gemini service:", error);
+
+    // Fallback to basic extraction if AI service fails
+    return await basicFallbackExtraction(pageData);
+  }
+}
+
+/**
+ * Process AI extraction results into assignment format
+ */
+function processAIResults(extractedData) {
+  const assignments = [];
+
+  if (!extractedData.events || !Array.isArray(extractedData.events)) {
+    return assignments;
+  }
+
+  for (const event of extractedData.events) {
+    // Validate and clean AI-extracted data
+    if (!event.title || event.title.trim().length === 0) {
+      continue;
+    }
+
+    const assignment = {
+      id: generateAssignmentId(event),
+      title: cleanTitle(event.title),
+      course: event.course || extractCourseFromContext(),
+      description: event.description || "",
+      dueDate: parseAIDate(event.dueDate),
+      url: validateURL(event.url) || window.location.href,
+      priority: mapPriority(event.priority),
+      estimatedMinutes: parseEstimatedTime(event.estimatedTime),
+      type: event.type || "assignment",
+      status: mapStatus(event.status),
+      confidence: event.confidence || 0.8,
+      extractionMethod: extractedData.metadata?.extractionMethod || "ai",
+      scraped: new Date().toISOString(),
+    };
+
+    assignments.push(assignment);
+  }
+
+  return assignments;
+}
+
+/**
+ * Generate unique assignment ID
+ */
+function generateAssignmentId(event) {
+  const uniqueString = `${event.title}_${event.course}_${
+    event.dueDate
+  }_${Date.now()}`;
+  return `canvas_ai_${simpleHash(uniqueString)}`;
+}
+
+/**
+ * Clean and normalize assignment title
+ */
+function cleanTitle(title) {
+  return title
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/^(Assignment|Task|Homework|HW|Quiz|Exam|Test):\s*/i, "")
+    .substring(0, 200); // Limit length
+}
+
+/**
+ * Extract course name from page context
+ */
+function extractCourseFromContext() {
+  // Try various selectors to find course name
+  const selectors = [
+    ".ic-DashboardCard__header-title",
+    ".context-course-info h1",
+    ".course-title",
+    "[data-course-name]",
+    "h1",
+  ];
+
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element && element.textContent.trim()) {
+      return element.textContent.trim();
+    }
+  }
+
+  // Extract from URL if possible
+  const urlMatch = window.location.pathname.match(/\/courses\/\d+/);
+  if (urlMatch) {
+    return `Course ${urlMatch[0].split("/").pop()}`;
+  }
+
+  return "Unknown Course";
+}
+
+/**
+ * Parse AI-provided date string
+ */
+function parseAIDate(dateString) {
+  if (!dateString) return null;
+
+  try {
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+  } catch (error) {
+    console.warn("Failed to parse AI date:", dateString);
+  }
+
+  return null;
+}
+
+/**
+ * Validate URL from AI extraction
+ */
+function validateURL(url) {
+  if (!url) return null;
+
+  try {
+    new URL(url);
+    return url;
+  } catch {
+    // Try to construct relative URL
+    if (url.startsWith("/")) {
+      return window.location.origin + url;
+    }
+    return null;
+  }
+}
+
+/**
+ * Map AI priority to our system
+ */
+function mapPriority(aiPriority) {
+  if (!aiPriority) return "medium";
+
+  const priority = aiPriority.toLowerCase();
+  if (["high", "urgent", "critical"].includes(priority)) return "high";
+  if (["low", "optional"].includes(priority)) return "low";
+  return "medium";
+}
+
+/**
+ * Parse estimated time from AI
+ */
+function parseEstimatedTime(timeString) {
+  if (!timeString) return null;
+
+  const match = timeString.match(/(\d+)\s*(hour|hr|minute|min)/i);
+  if (match) {
+    const value = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+
+    if (unit.startsWith("hour") || unit === "hr") {
+      return value * 60;
+    } else {
+      return value;
     }
   }
 
   return null;
 }
 
-// Helper function to extract grades from text
-function extractGrade(text) {
-  if (!text) return null;
+/**
+ * Map AI status to our system
+ */
+function mapStatus(aiStatus) {
+  if (!aiStatus) return "pending";
 
-  text = text.trim();
-
-  // Look for patterns like "85/100", "A-", "95%", "8.5/10"
-  const gradePatterns = [
-    /(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/, // "85/100" or "8.5/10"
-    /(\d+(?:\.\d+)?)%/, // "95%"
-    /([A-F][+-]?)/, // "A-", "B+", etc.
-    /(\d+(?:\.\d+)?)\s*pts?/i, // "85 pts"
-  ];
-
-  for (const pattern of gradePatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      if (pattern === gradePatterns[0]) {
-        // Points format: calculate percentage
-        const earned = parseFloat(match[1]);
-        const total = parseFloat(match[2]);
-        return {
-          points: earned,
-          maxPoints: total,
-          percentage: total > 0 ? Math.round((earned / total) * 100) : null,
-          display: text,
-        };
-      } else if (pattern === gradePatterns[1]) {
-        // Percentage format
-        return {
-          percentage: parseFloat(match[1]),
-          display: text,
-        };
-      } else if (pattern === gradePatterns[2]) {
-        // Letter grade
-        return {
-          letterGrade: match[1],
-          display: text,
-        };
-      } else if (pattern === gradePatterns[3]) {
-        // Points only
-        return {
-          points: parseFloat(match[1]),
-          display: text,
-        };
-      }
-    }
-  }
-
-  return { display: text };
-}
-
-// Helper function to determine assignment status
-function determineAssignmentStatus(element) {
-  const text = element.textContent.toLowerCase();
-
-  if (text.includes("submitted") || text.includes("complete")) {
-    return "completed";
-  } else if (text.includes("graded") || text.includes("scored")) {
-    return "graded";
-  } else if (text.includes("overdue") || text.includes("late")) {
-    return "overdue";
-  } else if (text.includes("missing")) {
-    return "missing";
-  }
-
+  const status = aiStatus.toLowerCase();
+  if (["completed", "done", "submitted"].includes(status)) return "completed";
+  if (["in progress", "started", "working"].includes(status))
+    return "in_progress";
   return "pending";
 }
 
-// Helper function to extract status from text
-function extractStatus(text) {
-  if (!text) return "pending";
+/**
+ * Basic fallback extraction when AI service fails
+ */
+async function basicFallbackExtraction(pageData) {
+  console.log("🔄 PulsePlan: Using fallback extraction...");
 
-  text = text.toLowerCase().trim();
+  // Simple pattern-based extraction as fallback
+  const assignments = [];
+  const elements = document.querySelectorAll(
+    ".todo-list-item, .ig-row, .assignment"
+  );
 
-  if (text.includes("submitted") || text.includes("complete")) {
-    return "completed";
-  } else if (text.includes("graded") || text.includes("scored")) {
-    return "graded";
-  } else if (text.includes("overdue") || text.includes("late")) {
-    return "overdue";
-  } else if (text.includes("missing")) {
-    return "missing";
-  }
-
-  return "pending";
-}
-
-// Main function to collect assignments
-function collectAssignments() {
-  if (!isAssignmentPage()) return [];
-
-  // Get assignments from all potential sources
-  const dashboardAssignments = scrapeAssignmentsFromDashboard();
-  const courseAssignments = scrapeAssignmentsFromCoursePage();
-  const indexAssignments = scrapeAssignmentsFromIndexPage();
-
-  // Combine results
-  const allAssignments = [
-    ...dashboardAssignments,
-    ...courseAssignments,
-    ...indexAssignments,
-  ];
-
-  // Filter out duplicates (based on title and course)
-  const uniqueAssignments = allAssignments.filter((assignment) => {
-    const isDuplicate = cachedAssignments.some(
-      (cached) =>
-        cached.title === assignment.title && cached.course === assignment.course
+  elements.forEach((element) => {
+    const titleElement = element.querySelector(
+      '[class*="title"], [class*="Title"], a, h3, h4'
     );
-    return !isDuplicate;
+    if (titleElement && titleElement.textContent.trim()) {
+      assignments.push({
+        id: `canvas_fallback_${Date.now()}_${Math.random()}`,
+        title: titleElement.textContent.trim(),
+        course: extractCourseFromContext(),
+        url: titleElement.href || window.location.href,
+        extractionMethod: "fallback",
+        confidence: 0.6,
+        scraped: new Date().toISOString(),
+      });
+    }
   });
 
-  // Update our cache
-  cachedAssignments = [...cachedAssignments, ...uniqueAssignments];
-
-  // Keep cache size reasonable
-  if (cachedAssignments.length > 100) {
-    cachedAssignments = cachedAssignments.slice(-100);
-  }
-
-  return uniqueAssignments;
+  return { events: assignments };
 }
 
-// Store assignments in chrome.storage
+/**
+ * Store assignments in extension storage with enhanced feedback
+ */
 function storeAssignments(assignments) {
   if (assignments.length === 0) return;
 
-  chrome.storage.local.get(["canvas_assignments"], function (result) {
-    const storedAssignments = result.canvas_assignments || [];
-
-    // Add new assignments, avoiding duplicates
-    const updatedAssignments = [...storedAssignments];
-
-    assignments.forEach((newAssignment) => {
-      const isDuplicate = storedAssignments.some(
-        (stored) =>
-          stored.title === newAssignment.title &&
-          stored.course === newAssignment.course
+  chrome.storage.local.get(
+    ["canvas_assignments", "unsynced_count"],
+    function (result) {
+      const existingAssignments = result.canvas_assignments || [];
+      const newAssignments = assignments.filter(
+        (newAssignment) =>
+          !existingAssignments.some(
+            (existing) =>
+              existing.title === newAssignment.title &&
+              existing.course === newAssignment.course
+          )
       );
 
-      if (!isDuplicate) {
-        updatedAssignments.push(newAssignment);
+      if (newAssignments.length > 0) {
+        const updatedAssignments = [...existingAssignments, ...newAssignments];
+        const newUnsyncedCount =
+          (result.unsynced_count || 0) + newAssignments.length;
+
+        // Calculate average AI confidence
+        const aiConfidence =
+          newAssignments.reduce(
+            (sum, assignment) => sum + (assignment.confidence || 0.8),
+            0
+          ) / newAssignments.length;
+
+        chrome.storage.local.set({
+          canvas_assignments: updatedAssignments,
+          unsynced_count: newUnsyncedCount,
+          last_scan: new Date().toISOString(),
+          ai_confidence: aiConfidence,
+          extraction_status: "success",
+        });
+
+        console.log(
+          `💾 PulsePlan: Stored ${newAssignments.length} new assignments`
+        );
+
+        // Notify popup of extraction completion
+        notifyPopup("complete", newAssignments.length);
+      }
+    }
+  );
+}
+
+/**
+ * Notify popup of extraction status updates
+ */
+function notifyPopup(status, count = 0) {
+  try {
+    chrome.runtime.sendMessage({
+      action: "extractionUpdate",
+      status: status,
+      count: count,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    // Popup might not be open, that's okay
+    console.log("Could not notify popup:", error.message);
+  }
+}
+
+// Rate limiting to prevent duplicate extractions
+let lastExtractionTime = 0;
+let isExtracting = false;
+
+/**
+ * Main execution function with enhanced status reporting and rate limiting
+ */
+async function runAIExtraction() {
+  // Rate limiting: prevent extractions within 10 seconds of each other
+  const now = Date.now();
+  if (isExtracting) {
+    console.log("⏳ PulsePlan: Extraction already in progress, skipping");
+    return;
+  }
+
+  if (now - lastExtractionTime < 10000) {
+    console.log("⏱️ PulsePlan: Rate limited, skipping extraction");
+    return;
+  }
+
+  try {
+    isExtracting = true;
+    lastExtractionTime = now;
+
+    console.log("🚀 PulsePlan: Starting AI-powered Canvas extraction...");
+    console.log("📍 Current URL:", window.location.href);
+    console.log("📄 Page context:", determinePageContext());
+
+    // Update extraction status
+    chrome.storage.local.set({ extraction_status: "extracting" });
+    notifyPopup("extracting");
+
+    const assignments = await extractAssignmentsWithAI();
+
+    if (assignments.length > 0) {
+      console.log(
+        `✅ PulsePlan: Successfully extracted ${assignments.length} assignments`
+      );
+      console.log("📋 Assignments:", assignments);
+      storeAssignments(assignments);
+    } else {
+      console.log("ℹ️ PulsePlan: No assignments found on this page");
+      chrome.storage.local.set({
+        extraction_status: "success",
+        last_scan: new Date().toISOString(),
+      });
+      notifyPopup("complete", 0);
+    }
+  } catch (error) {
+    console.error("❌ PulsePlan: Extraction failed:", error);
+    chrome.storage.local.set({ extraction_status: "error" });
+    notifyPopup("error");
+  } finally {
+    isExtracting = false;
+  }
+}
+
+/**
+ * Check if current page is relevant for assignment extraction
+ */
+function isRelevantPage() {
+  const url = window.location.href.toLowerCase();
+  const relevantPaths = [
+    "/dashboard",
+    "/courses/",
+    "/assignments",
+    "/calendar",
+    "/grades",
+  ];
+
+  return relevantPaths.some((path) => url.includes(path));
+}
+
+/**
+ * Smart page change detection
+ */
+function setupPageChangeDetection() {
+  let currentUrl = window.location.href;
+
+  // Monitor for URL changes (SPA navigation)
+  setInterval(() => {
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      if (isRelevantPage()) {
+        setTimeout(runAIExtraction, 2000); // Delay to let page load
+      }
+    }
+  }, 1000);
+
+  // Monitor for significant DOM changes
+  const observer = new MutationObserver((mutations) => {
+    let shouldRun = false;
+
+    mutations.forEach((mutation) => {
+      if (mutation.addedNodes.length > 0) {
+        // Check if relevant content was added
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node;
+            if (
+              element.classList &&
+              (element.classList.contains("todo-list-item") ||
+                element.classList.contains("ig-row") ||
+                element.classList.contains("ic-DashboardCard") ||
+                (element.querySelector &&
+                  element.querySelector('[class*="assignment"]')))
+            ) {
+              shouldRun = true;
+            }
+          }
+        });
       }
     });
 
-    // Store the updated list
-    chrome.storage.local.set({
-      canvas_assignments: updatedAssignments,
-      last_scan: new Date().toISOString(),
-    });
-
-    // Also store unsyncedCount for the badge
-    const unsyncedCount = updatedAssignments.filter((a) => !a.synced).length;
-    chrome.storage.local.set({ unsynced_count: unsyncedCount });
-
-    console.log(
-      `PulsePlan extension: Stored ${assignments.length} new assignments`
-    );
-  });
-}
-
-// Run the collection process
-function runCollection() {
-  console.log("🔍 PulsePlan: Starting assignment collection...");
-  console.log("📍 Current URL:", window.location.href);
-
-  const assignments = collectAssignments();
-  console.log(`📚 PulsePlan: Found ${assignments.length} assignments`);
-
-  if (assignments.length > 0) {
-    console.log("📋 Assignments found:", assignments);
-  } else {
-    console.log("🔍 Debug: Checking page elements...");
-    console.log(
-      "- Dashboard items:",
-      document.querySelectorAll(".ic-DashboardCard, .todo-list-item").length
-    );
-    console.log("- IG rows:", document.querySelectorAll(".ig-row").length);
-    console.log(
-      "- Generic assignments:",
-      document.querySelectorAll("[id*='assignment'], [class*='assignment']")
-        .length
-    );
-    console.log("- Table rows:", document.querySelectorAll("tr").length);
-    console.log("- Links:", document.querySelectorAll("a").length);
-  }
-
-  storeAssignments(assignments);
-}
-
-// Run on page load
-runCollection();
-
-// Also run when the page content changes significantly
-const observer = new MutationObserver(function (mutations) {
-  let shouldRun = false;
-
-  mutations.forEach(function (mutation) {
-    // Only run if relevant DOM elements were added
-    if (
-      mutation.addedNodes.length &&
-      (mutation.addedNodes[0].classList?.contains("ic-DashboardCard") ||
-        mutation.addedNodes[0].classList?.contains("todo-list-item") ||
-        mutation.addedNodes[0].classList?.contains("ig-row"))
-    ) {
-      shouldRun = true;
+    if (shouldRun && isRelevantPage()) {
+      setTimeout(runAIExtraction, 1000);
     }
   });
 
-  if (shouldRun) {
-    runCollection();
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+}
+
+/**
+ * Enhanced initialization with multiple triggers
+ */
+function initializePulsePlan() {
+  console.log("🚀 PulsePlan: Initializing Canvas extension...");
+  console.log(
+    "PulsePlan: Check out the repo! https://github.com/flyonthewalldev/pulseplan"
+  );
+  console.log("📍 Current URL:", window.location.href);
+  console.log("📄 Document ready state:", document.readyState);
+
+  if (isRelevantPage()) {
+    console.log("✅ PulsePlan: Relevant Canvas page detected");
+
+    // Run extraction with progressive delays to catch different loading states
+    setTimeout(() => runAIExtraction(), 1000); // Quick load
+    setTimeout(() => runAIExtraction(), 3000); // Normal load
+    setTimeout(() => runAIExtraction(), 5000); // Slow load
+
+    setupPageChangeDetection();
+  } else {
+    console.log(
+      "ℹ️ PulsePlan: Not a relevant Canvas page, skipping extraction"
+    );
+  }
+}
+
+// Multiple initialization triggers for reliability
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializePulsePlan);
+} else {
+  initializePulsePlan();
+}
+
+// Additional trigger for Canvas SPA navigation
+window.addEventListener("load", () => {
+  if (isRelevantPage()) {
+    setTimeout(runAIExtraction, 2000);
   }
 });
 
-observer.observe(document.body, { childList: true, subtree: true });
+// Canvas-specific navigation detection (they use pushState)
+const originalPushState = history.pushState;
+history.pushState = function () {
+  originalPushState.apply(history, arguments);
+  setTimeout(() => {
+    if (isRelevantPage()) {
+      console.log(
+        "🔄 PulsePlan: Canvas navigation detected, running extraction"
+      );
+      runAIExtraction();
+    }
+  }, 1500);
+};
+
+// Also detect popstate (back/forward navigation)
+window.addEventListener("popstate", () => {
+  setTimeout(() => {
+    if (isRelevantPage()) {
+      console.log(
+        "⬅️ PulsePlan: Browser navigation detected, running extraction"
+      );
+      runAIExtraction();
+    }
+  }, 1500);
+});
+
+// Clear cache periodically to prevent memory issues
+setInterval(() => {
+  if (cachedResults.size > 10) {
+    cachedResults.clear();
+    console.log("🧹 PulsePlan: Cleared extraction cache");
+  }
+}, 300000); // Every 5 minutes

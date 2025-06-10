@@ -3,158 +3,637 @@
 <head>
   <title>PulsePlan Canvas Sync</title>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-      width: 300px;
-      padding: 16px;
-      color: #333;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
     
-    header {
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+      width: 360px;
+      min-height: 480px;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+      color: #ffffff;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    /* Animated background gradient */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(ellipse at top, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    
+    .container {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Header Section */
+    .header {
+      padding: 20px 24px 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+    }
+    
+    .brand {
       display: flex;
       align-items: center;
-      margin-bottom: 16px;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 8px;
-    }
-    
-    .logo {
-      width: 24px;
-      height: 24px;
-      margin-right: 8px;
-    }
-    
-    h1 {
-      font-size: 18px;
-      margin: 0;
-      font-weight: 500;
-      color: #00AEEF;
-    }
-    
-    .content {
-      margin-bottom: 16px;
-    }
-    
-    .status {
-      display: flex;
-      justify-content: space-between;
-      font-size: 14px;
       margin-bottom: 12px;
     }
     
-    .status-value {
+    .logo {
+      width: 28px;
+      height: 28px;
+      margin-right: 12px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: white;
+    }
+    
+    .brand-text {
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+    
+    .ai-badge::before {
+      content: '🤖';
+      font-size: 12px;
+    }
+    
+    /* Stats Section */
+    .stats-section {
+      padding: 20px 24px;
+      flex: 1;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    
+    .stat-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 16px;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    
+    .stat-card:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(59, 130, 246, 0.3);
+      transform: translateY(-1px);
+    }
+    
+    .stat-card:hover::before {
+      opacity: 1;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #a1a1aa;
       font-weight: 500;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1;
+    }
+    
+    .stat-value.highlight {
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    /* Status Section */
+    .status-section {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+    
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+    }
+    
+    .status-row:not(:last-child) {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .status-label {
+      font-size: 14px;
+      color: #d4d4d8;
+      font-weight: 500;
+    }
+    
+    .status-value {
+      font-size: 14px;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    
+    .status-value.success {
+      color: #10b981;
+    }
+    
+    .status-value.warning {
+      color: #f59e0b;
+    }
+    
+    /* Action Section */
+    .action-section {
+      padding: 0 24px 24px;
     }
     
     .button {
       display: block;
       width: 100%;
-      padding: 10px 0;
-      background-color: #00AEEF;
+      padding: 14px 20px;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
       color: white;
       border: none;
-      border-radius: 4px;
-      font-size: 14px;
-      font-weight: 500;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
       cursor: pointer;
-      transition: background-color 0.2s;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+    }
+    
+    .button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s ease;
     }
     
     .button:hover {
-      background-color: #0096cc;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+    
+    .button:hover::before {
+      left: 100%;
+    }
+    
+    .button:active {
+      transform: translateY(0);
     }
     
     .button:disabled {
-      background-color: #ccc;
+      background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
       cursor: not-allowed;
-    }
-
-    .button.secondary {
-      background-color: transparent;
-      color: #00AEEF;
-      border: 2px solid #00AEEF;
-    }
-
-    .button.secondary:hover {
-      background-color: rgba(0, 174, 239, 0.1);
-    }
-
-    .divider {
-      text-align: center;
-      margin: 12px 0;
-      color: #666;
-      font-size: 14px;
+      transform: none;
+      box-shadow: none;
     }
     
+    .button:disabled:hover {
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .button:disabled::before {
+      display: none;
+    }
+    
+    .button.secondary {
+      background: transparent;
+      border: 2px solid rgba(59, 130, 246, 0.5);
+      color: #3b82f6;
+      box-shadow: none;
+      margin-bottom: 12px;
+    }
+    
+    .button.secondary:hover {
+      background: rgba(59, 130, 246, 0.1);
+      border-color: #3b82f6;
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+    }
+    
+    .button.secondary:disabled {
+      border-color: #374151;
+      color: #6b7280;
+      background: transparent;
+    }
+    
+    /* Message Section */
     .message {
-      margin-top: 12px;
-      font-size: 14px;
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
       text-align: center;
       min-height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
     }
     
-    .success {
-      color: #4CAF50;
+    .message.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: #10b981;
     }
     
-    .error {
-      color: #F44336;
+    .message.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #ef4444;
     }
     
-    .login-message {
+    .message.info {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      color: #3b82f6;
+    }
+    
+    /* Login Section */
+    .login-section {
       text-align: center;
-      margin-top: 24px;
-      font-size: 14px;
-      color: #666;
+      margin-top: 16px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .login-text {
+      font-size: 13px;
+      color: #a1a1aa;
+      margin-bottom: 8px;
     }
     
     .login-link {
-      color: #00AEEF;
+      color: #3b82f6;
       text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s ease;
     }
     
     .login-link:hover {
-      text-decoration: underline;
+      color: #60a5fa;
+    }
+    
+    /* Divider */
+    .divider {
+      text-align: center;
+      margin: 12px 0;
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 500;
+      position: relative;
+    }
+    
+    .divider::before,
+    .divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 45%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    }
+    
+    .divider::before {
+      left: 0;
+    }
+    
+    .divider::after {
+      right: 0;
+    }
+    
+    /* Loading Animation */
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #3b82f6;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 8px;
+    }
+    
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    
+    /* Pulse animation for the AI badge */
+    @keyframes pulse {
+      0%, 100% {
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+      }
+      50% {
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.6);
+      }
+    }
+    
+    .ai-badge {
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    /* QR Code Section */
+    .qr-section {
+      display: none;
+      text-align: center;
+      margin-top: 16px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+    
+    .qr-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #3b82f6;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .qr-container {
+      margin: 16px 0;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      border: 2px solid #3b82f6;
+      display: inline-block;
+    }
+    
+    .qr-container img {
+      display: block;
+      margin: 0 auto;
+      border-radius: 8px;
+    }
+    
+    .qr-instructions {
+      font-size: 12px;
+      color: #a1a1aa;
+      margin: 12px 0 8px 0;
+      line-height: 1.4;
+    }
+    
+    .qr-expiry {
+      font-size: 11px;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+    
+    .qr-status {
+      margin: 12px 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    .qr-status.waiting {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      color: #f59e0b;
+    }
+    
+    .qr-status.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: #10b981;
+    }
+    
+    .qr-status.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+    
+    .qr-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+    
+    .qr-button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .qr-button.refresh {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #3b82f6;
+    }
+    
+    .qr-button.refresh:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: #3b82f6;
+    }
+    
+    .qr-button.close {
+      background: rgba(156, 163, 175, 0.1);
+      border: 1px solid rgba(156, 163, 175, 0.3);
+      color: #9ca3af;
+    }
+    
+    .qr-button.close:hover {
+      background: rgba(156, 163, 175, 0.2);
+      color: #6b7280;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 380px) {
+      body {
+        width: 320px;
+      }
+      
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .qr-container {
+        padding: 12px;
+      }
     }
   </style>
 </head>
 <body>
-  <header>
-    <img src="icon.png" alt="PulsePlan Logo" class="logo">
-    <h1>PulsePlan Canvas Sync</h1>
-  </header>
-  
-  <div class="content">
-    <div class="status">
-      <span>Assignments found:</span>
-      <span id="assignmentCount" class="status-value">0</span>
+  <div class="container">
+    <div class="header">
+      <div class="brand">
+        <div class="brand-text">PulsePlan</div>
+      </div>
+      <div class="ai-badge">AI-Powered Extraction</div>
     </div>
     
-    <div class="status">
-      <span>Last scan:</span>
-      <span id="lastScan" class="status-value">Never</span>
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Assignments Found</div>
+          <div class="stat-value highlight" id="assignmentCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ready to Sync</div>
+          <div class="stat-value" id="unsyncedCount">0</div>
+        </div>
+      </div>
+      
+      <div class="status-section">
+        <div class="status-row">
+          <span class="status-label">Last Scan</span>
+          <span class="status-value" id="lastScan">Never</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Extraction Status</span>
+          <span class="status-value success" id="extractionStatus">Ready</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">AI Confidence</span>
+          <span class="status-value" id="aiConfidence">-</span>
+        </div>
+      </div>
     </div>
     
-    <div class="status">
-      <span>Ready to sync:</span>
-      <span id="unsyncedCount" class="status-value">0</span>
+    <div class="action-section">
+      <div id="connectionSection" style="display: none;">
+        <button id="scanQRButton" class="button secondary">
+          <span>📱 Connect with QR Code</span>
+        </button>
+        <div class="divider">or</div>
+      </div>
+      
+      <button id="syncButton" class="button">
+        <span id="syncButtonText">🚀 Sync to PulsePlan</span>
+      </button>
+      
+      <div id="message" class="message"></div>
+      
+      <div id="loginSection" style="display: none;" class="login-section">
+        <div class="login-text">Not logged in to PulsePlan</div>
+        <a href="https://pulseplan.app/auth" target="_blank" class="login-link">
+          Sign In →
+        </a>
+      </div>
+      
+      <!-- QR Code Login Section -->
+      <div id="qrSection" class="qr-section">
+        <div class="qr-title">
+          <span>📱</span>
+          <span>Login with Mobile App</span>
+        </div>
+        
+        <div id="qrContainer" class="qr-container">
+          <!-- QR code will be generated here -->
+        </div>
+        
+        <div class="qr-instructions">
+          Open your PulsePlan mobile app and scan this QR code to connect
+        </div>
+        
+        <div id="qrExpiry" class="qr-expiry">
+          <!-- Expiry time will be shown here -->
+        </div>
+        
+        <div id="qrStatus" class="qr-status waiting">
+          <span>⏳ Waiting for mobile app...</span>
+        </div>
+        
+        <div class="qr-actions">
+          <button id="refreshQRButton" class="qr-button refresh">
+            🔄 Refresh Code
+          </button>
+          <button id="closeQRButton" class="qr-button close">
+            ✕ Close
+          </button>
+        </div>
+      </div>
     </div>
   </div>
-
-  <div id="connectionSection" style="display: none;">
-    <button id="scanQRButton" class="button secondary">Scan QR Code</button>
-    <div class="divider">or</div>
-  </div>
   
-  <button id="syncButton" class="button">Sync to PulsePlan</button>
-  
-  <div id="message" class="message"></div>
-  
-  <div id="loginSection" style="display: none;" class="login-message">
-    Not logged in. <a href="https://pulseplan.flyonthewalldev.com/login" target="_blank" class="login-link">Log in to PulsePlan</a>
-  </div>
-  
+  <script src="qr-login.js"></script>
   <script src="popup.js"></script>
 </body>
 </html> 

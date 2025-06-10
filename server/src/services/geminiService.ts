@@ -166,52 +166,94 @@ Return a JSON response with this structure:
    * Build extraction prompt based on type and context
    */
   private buildExtractionPrompt(extractionType: string, context: string): string {
-    const basePrompt = `
-You are an expert at extracting academic schedule and assignment data from educational websites.
+    // Enhanced prompt for Canvas LMS specifically
+    const canvasPrompt = `
+You are an expert at extracting assignment and academic data from Canvas LMS websites.
 
 Context: ${context}
 Extraction Type: ${extractionType}
 
-Your task is to extract the following information from the provided HTML content and/or screenshot:
-1. Academic events, assignments, and deadlines
-2. Course/subject information
-3. Due dates and times (convert to ISO 8601 format)
-4. Descriptions or details
-5. Priority indicators
-6. Estimated duration if mentioned
-7. Event types (assignment, exam, project, reading, lecture, etc.)
+CANVAS LMS SPECIFIC INSTRUCTIONS:
+You are analyzing a Canvas Learning Management System page. Focus on these HTML patterns and extract assignments systematically:
 
-IMPORTANT GUIDELINES:
-- Only extract content that appears to be academic/educational
-- Provide confidence scores (0-1) for each extracted item
-- Parse dates carefully and convert to ISO 8601 format
-- If information is unclear or missing, indicate it clearly
-- Focus on actionable items (assignments, exams, deadlines)
-- Ignore navigation elements, headers, footers, and ads
+HTML STRUCTURE PATTERNS TO LOOK FOR:
+1. **Module Items**: Look for li class="context_module_item" elements containing assignment titles
+2. **Assignment Links**: Text patterns ending with "Assignment" (e.g., "Research Article Assignment")
+3. **Quiz Items**: Elements with classes containing "lti-quiz" or "also_assignment"
+4. **Todo Lists**: Elements with class "todo-list" containing assignment summaries
+5. **Due Date Indicators**: Text containing "Jun 29", "at 11:59pm", or similar date patterns
+6. **Point Values**: Text containing "points", "pts", or score indicators
+
+SPECIFIC CANVAS PATTERNS TO EXTRACT:
+- Assignment titles that end with "Assignment", "Quiz", "Discussion", "Project"
+- Due dates in format "Jun 29 at 11:59pm" or similar
+- Point values like "7 points" or "10 pts"
+- Course context from page titles or navigation
+
+EXTRACTION STRATEGY:
+1. Scan for any text containing "Assignment" followed by course/title information
+2. Look for associated due dates within the same HTML element or nearby
+3. Extract point values from the same context
+4. Use page title for course information if not found in individual items
+
+DATE PARSING RULES:
+- "Jun 29" → Convert to 2025-06-29T23:59:00Z (default to end of day)
+- "Jun 29 at 11:59pm" → Convert to 2025-06-29T23:59:00Z
+- Current context: ${new Date().toISOString()}
+- If year is missing, assume current year (2025)
+
+EXAMPLE EXTRACTION FROM YOUR HTML:
+If you see text like "Cite Research Articles Assignment...7 points Jun 29 at 11:59pm"
+Extract this as:
+{
+  "title": "Cite Research Articles Assignment",
+  "course": "CU SPUR Literature Research Summer 2025",
+  "dueDate": "2025-06-29T23:59:00Z",
+  "points": 7,
+  "type": "assignment",
+  "confidence": 0.9
+}
+
+CONFIDENCE SCORING:
+- 0.9-1.0: Clear assignment title + due date + points
+- 0.7-0.8: Assignment title + either due date OR points  
+- 0.5-0.6: Assignment title only
+- 0.1-0.4: Weak assignment indicators
+- 0.0: No academic content found
+
+CRITICAL: Look specifically for text patterns like:
+- "What are Research Articles? Assignment"
+- "Cite Research Articles Assignment" 
+- "Find a Research Article Assignment"
+- "Research Data Management Assignment"
+These are clear assignment titles that should be extracted with high confidence.
 
 Return ONLY a valid JSON object with this exact structure:
 {
   "events": [
     {
-      "title": "Assignment Title",
-      "description": "Description if available",
+      "title": "Assignment Name",
+      "description": "Assignment description or details",
       "dueDate": "2024-01-15T23:59:00Z",
-      "course": "Course name or code",
-      "priority": "high",
+      "course": "Course Code - Course Name",
+      "priority": "medium",
       "estimatedDuration": 120,
       "type": "assignment",
       "confidence": 0.9,
-      "sourceElement": "CSS selector or description"
+      "points": 25,
+      "status": "not_submitted",
+      "sourceElement": "assignment-item or similar"
     }
   ],
   "confidence": 0.85,
-  "reasoning": ["explanation1", "explanation2"]
+  "reasoning": ["Found 3 assignment items with clear due dates", "Extracted from Canvas dashboard view"]
 }
 
+CRITICAL: If you find NO assignments, still return the JSON structure with an empty events array and explain why in the reasoning field.
 Do not include any text outside the JSON object.
 `;
 
-    return basePrompt;
+    return canvasPrompt;
   }
 
   /**

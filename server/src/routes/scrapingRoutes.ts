@@ -108,6 +108,55 @@ router.post('/analyze-url', async (req, res) => {
 });
 
 /**
+ * POST /api/scraping/extract-html
+ * Extract schedule data directly from HTML content (for extensions)
+ */
+router.post('/extract-html', async (req, res) => {
+  try {
+    const { html, screenshot, extractionType, context } = req.body;
+
+    if (!html || typeof html !== 'string') {
+      return res.status(400).json({
+        error: 'HTML content is required',
+        message: 'Please provide HTML content to extract data from'
+      });
+    }
+
+    // Use Gemini service directly for HTML content
+    const geminiRequest = {
+      html: html.substring(0, 50000), // Limit size for API efficiency
+      screenshot,
+      extractionType: extractionType || 'canvas_assignments',
+      context: context || 'Canvas LMS page'
+    };
+
+    const aiData = await gemini.extractScheduleData(geminiRequest);
+
+    res.json({
+      success: true,
+      data: {
+        extractedAt: new Date().toISOString(),
+        events: aiData.events,
+        metadata: aiData.metadata,
+        extraction: {
+          method: aiData.metadata.extractionMethod,
+          confidence: aiData.metadata.overallConfidence,
+          eventsFound: aiData.events.length
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('HTML extraction error:', error);
+    res.status(500).json({
+      error: 'Extraction failed',
+      message: 'An error occurred while extracting data from HTML',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
  * POST /api/scraping/extract-data
  * Extract schedule data from a website
  */

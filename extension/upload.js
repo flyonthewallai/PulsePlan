@@ -3,11 +3,11 @@
  * This is a background service worker that processes messages from the popup
  */
 
-// API endpoint for Canvas data upload
-const API_ENDPOINT =
-  "https://api.pulseplan.flyonthewalldev.com/canvas/upload-data";
+// API endpoints for Canvas data sync
+const API_ENDPOINT = "http://localhost:5000/canvas/upload-data";
+const SYNC_ENDPOINT = "http://localhost:5000/canvas/sync-assignments";
 
-// Listen for messages from the popup
+// Listen for messages from the popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "syncAssignments") {
     // Start the sync process
@@ -22,69 +22,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Return true to indicate we'll respond asynchronously
     return true;
   }
-});
 
-// Auto-sync logic: Check for new assignments periodically
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "autoSync") {
-    console.log("🔄 Auto-sync triggered");
-    performAutoSync();
+  // Handle auth token from pulseplan.app
+  if (message.action === "AUTH_TOKEN_DETECTED") {
+    handleWebAuthToken(message, sender, sendResponse);
+    return true; // Async response
   }
 });
 
-// Set up auto-sync alarm when extension starts
+// Extension startup initialization
 chrome.runtime.onStartup.addListener(() => {
-  setupAutoSync();
+  console.log("🚀 PulsePlan Extension Started");
+  console.log(
+    "PulsePlan: Check out the repo! https://github.com/flyonthewalldev/pulseplan"
+  );
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  setupAutoSync();
+  console.log("🎉 PulsePlan Extension Installed/Updated");
+  console.log(
+    "PulsePlan: Check out the repo! https://github.com/flyonthewalldev/pulseplan"
+  );
 });
-
-function setupAutoSync() {
-  // Create alarm for weekly auto-sync
-  chrome.alarms.create("autoSync", {
-    delayInMinutes: 60, // First sync after 1 hour
-    periodInMinutes: 10080, // Then every week (7 days * 24 hours * 60 minutes)
-  });
-  console.log("📅 Auto-sync scheduled for weekly intervals");
-}
-
-async function performAutoSync() {
-  try {
-    // Check if user is logged in
-    const { pulseplan_jwt } = await getFromStorage(["pulseplan_jwt"]);
-
-    if (!pulseplan_jwt) {
-      console.log("⚠️ Auto-sync skipped: User not logged in");
-      return;
-    }
-
-    // Check if there are unsynced assignments
-    const { canvas_assignments } = await getFromStorage(["canvas_assignments"]);
-    const unsyncedAssignments = (canvas_assignments || []).filter(
-      (a) => !a.synced
-    );
-
-    if (unsyncedAssignments.length === 0) {
-      console.log("✅ Auto-sync: No new assignments to sync");
-      return;
-    }
-
-    // Perform sync
-    const result = await syncAssignmentsToPulsePlan();
-    console.log(`🎉 Auto-sync completed: ${result.count} assignments synced`);
-
-    // Update badge to show sync status
-    chrome.action.setBadgeText({ text: "" });
-    chrome.action.setBadgeBackgroundColor({ color: "#4CAF50" });
-  } catch (error) {
-    console.error("❌ Auto-sync failed:", error);
-    // Show error badge
-    chrome.action.setBadgeText({ text: "!" });
-    chrome.action.setBadgeBackgroundColor({ color: "#F44336" });
-  }
-}
 
 /**
  * Main function to sync assignments to PulsePlan
@@ -124,8 +83,8 @@ async function syncAssignmentsToPulsePlan() {
       version: chrome.runtime.getManifest().version,
     };
 
-    // Send data to API
-    const response = await fetchWithTimeout(API_ENDPOINT, {
+    // Send data to sync API
+    const response = await fetchWithTimeout(SYNC_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -188,6 +147,76 @@ async function markAssignmentsAsSynced(syncedAssignments) {
   await saveToStorage({
     canvas_assignments: updatedAssignments,
     unsynced_count: 0,
+  });
+}
+
+/**
+ * Handle authentication token received from pulseplan.app
+ */
+async function handleWebAuthToken(message, sender, sendResponse) {
+  try {
+    const { token, source, timestamp } = message;
+
+    console.log("🔐 Auth Bridge: Received token from", source);
+
+    // Validate token format (basic JWT check)
+    if (!token || typeof token !== "string" || !token.includes(".")) {
+      throw new Error("Invalid token format");
+    }
+
+    // Store the JWT token
+    await saveToStorage({
+      pulseplan_jwt: token,
+      auth_source: source,
+      auth_timestamp: timestamp,
+      auth_method: "web_bridge",
+    });
+
+    console.log("✅ Auth Bridge: Token stored successfully");
+
+    // Update extension badge to show connected status
+    chrome.action.setBadgeText({ text: "✓" });
+    chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
+
+    // Clear badge after 3 seconds
+    setTimeout(() => {
+      chrome.action.setBadgeText({ text: "" });
+    }, 3000);
+
+    // Notify all open popups of successful auth
+    notifyPopupsOfAuth();
+
+    sendResponse({
+      success: true,
+      message: "Authentication successful",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Auth Bridge: Token storage failed:", error);
+    sendResponse({
+      success: false,
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Notify all open extension popups of successful authentication
+ */
+function notifyPopupsOfAuth() {
+  // Send message to content scripts that might forward to popups
+  chrome.tabs.query({ url: "*://*.instructure.com/*" }, (tabs) => {
+    tabs.forEach((tab) => {
+      chrome.tabs
+        .sendMessage(tab.id, {
+          action: "AUTH_STATUS_CHANGED",
+          authenticated: true,
+          source: "web_login",
+        })
+        .catch(() => {
+          // Ignore errors for tabs without content script
+        });
+    });
   });
 }
 

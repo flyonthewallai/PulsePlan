@@ -19,19 +19,53 @@ dotenv.config();
 const app = express();
 const PORT = parseInt(process.env.PORT || '5000');
 
-// CORS configuration
+// CORS configuration - Permissive setup for extension support
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'development'
-    ? '*' // Allow all origins in development
-    : [
-        'http://localhost:19006',  // Expo web
-        'exp://localhost:19000',   // Expo Go
-        'exp://10.0.0.4:19000',   // Expo Go on your IP
-        'exp://192.168.1.*:19000' // Any local network IP
-      ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Allow Chrome extensions
+    if (origin && origin.startsWith('chrome-extension://')) {
+      return callback(null, true);
+    }
+    
+    // Allow Canvas domains (always)
+    if (origin && (origin.includes('.instructure.com') || origin.includes('.canvas.'))) {
+      return callback(null, true);
+    }
+    
+    // Allow PulsePlan domains
+    if (origin && (origin.includes('pulseplan.') || origin.includes('localhost'))) {
+      return callback(null, true);
+    }
+    
+    // Default to allow (for development and extension compatibility)
+    callback(null, true);
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'Accept', 
+    'Origin', 
+    'X-Requested-With',
+    'sentry-trace',           // Sentry monitoring
+    'baggage',               // Sentry context
+    'x-forwarded-for',       // Proxy headers
+    'x-real-ip',             // Real IP headers
+    'user-agent',            // User agent
+    'referer',               // Referer header
+    'cache-control',         // Cache control
+    'pragma',                // Pragma header
+    'expires',               // Expires header
+    '*'                      // Allow any header
+  ],
+  exposedHeaders: ['*'],     // Expose all response headers
+  optionsSuccessStatus: 200,
+  preflightContinue: false,
+  maxAge: 86400             // Cache preflight for 24 hours
 };
 
 // Middleware

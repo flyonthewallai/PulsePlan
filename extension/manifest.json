@@ -1,20 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "PulsePlan Canvas Sync",
-  "version": "1.0",
-  "description": "Sync Canvas LMS assignments to PulsePlan",
+  "name": "PulsePlan Canvas Sync - AI Powered",
+  "version": "2.4",
+  "description": "AI-powered Canvas LMS integration that intelligently extracts assignments and syncs them to PulsePlan using advanced machine learning.",
   "permissions": [
-    "activeTab",
-    "scripting",
     "storage",
-    "alarms"
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
-    "https://canvas.colorado.edu/*",
-    "*://*.instructure.com/*"
+    "*://*.instructure.com/*",
+    "*://canvas.colorado.edu/*",
+    "*://*.canvas.com/*",
+    "*://*.canvaslms.com/*",
+    "*://*.colorado.edu/*",
+    "http://localhost:5000/*",
+    "https://pulseplan.app/*"
   ],
   "action": {
     "default_popup": "popup.html",
+    "default_title": "PulsePlan Canvas Sync",
     "default_icon": {
       "16": "icon.png",
       "48": "icon.png",
@@ -23,13 +28,24 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.instructure.com/*"],
-      "js": ["content.js"]
+      "matches": [
+        "*://*.instructure.com/*",
+        "*://canvas.colorado.edu/*",
+        "*://*.canvas.com/*",
+        "*://*.canvaslms.com/*",
+        "*://*.colorado.edu/*"
+      ],
+      "js": ["config.js", "content.js"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["https://pulseplan.app/*"],
+      "js": ["config.js", "auth-bridge.js"],
+      "run_at": "document_end"
     }
   ],
   "background": {
-    "service_worker": "upload.js",
-    "type": "module"
+    "service_worker": "upload.js"
   },
   "icons": {
     "16": "icon.png",
