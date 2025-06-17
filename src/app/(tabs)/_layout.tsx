@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Calendar, Home, BarChart3, Settings } from 'lucide-react-native';
+import { Calendar, Home, Settings, BrainCircuit } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export default function TabLayout() {
@@ -40,10 +40,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="progress"
+        name="agent"
         options={{
-          title: 'Progress',
-          tabBarIcon: ({ color }) => <BarChart3 size={24} color={color} />,
+          title: 'Agent',
+          tabBarIcon: ({ color }) => <BrainCircuit size={24} color={color} />,
         }}
       />
       <Tabs.Screen

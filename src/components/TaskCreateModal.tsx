@@ -23,9 +23,10 @@ type TaskCreateModalProps = {
   initialTime?: Date;
   initialTimeEstimate?: string;
   editingTask?: Task | null;
+  onTaskCreated?: () => void;
 };
 
-export default function TaskCreateModal({ visible, onClose, initialDate, initialTime, initialTimeEstimate, editingTask }: TaskCreateModalProps) {
+export default function TaskCreateModal({ visible, onClose, initialDate, initialTime, initialTimeEstimate, editingTask, onTaskCreated }: TaskCreateModalProps) {
   const { createTask, updateTask, loading } = useTasks();
   const { currentTheme } = useTheme();
   const [isCreating, setIsCreating] = useState(false);
@@ -192,9 +193,11 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
         Alert.alert('Success', 'Task created successfully!');
       }
       
-      // Reset form and close modal
+      // Call onTaskCreated before resetting the form
+      onTaskCreated?.();
+      
+      // Reset form after successful creation
       resetForm();
-      onClose();
     } catch (error) {
       console.error('Error saving task:', error);
       Alert.alert('Error', `Failed to ${editingTask ? 'update' : 'create'} task. Please try again.`);
@@ -211,6 +214,7 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
     setSelectedTime(initialTime || new Date());
     setTimeEstimate(initialTimeEstimate || '60');
     setCurrentFocusedInput(null);
+    onClose();
   };
   
   // Populate form when editing
@@ -226,10 +230,13 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
       
       setTimeEstimate(editingTask.estimated_minutes?.toString() || '60');
     } else if (!editingTask && visible) {
-      // Reset form for new task
-      resetForm();
+      // Only reset form for new task when modal becomes visible
+      setTitle('');
+      setSubject('');
+      setPriority('medium');
+      setTimeEstimate('60');
     }
-  }, [editingTask, visible, initialDate, initialTime, initialTimeEstimate]);
+  }, [editingTask, visible]);
   
   const getPriorityColor = (value: string) => {
     switch (value) {

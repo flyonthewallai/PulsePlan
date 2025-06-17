@@ -6,37 +6,36 @@ import {
   Library, 
   Book, 
   GraduationCap, 
-  Clock, 
-  MoreVertical, 
-  Check 
+  Clock,
+  Check,
+  Square 
 } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { Task, useTasks } from '../contexts/TaskContext';
 import TaskDetailsModal from './TaskDetailsModal';
 
 interface TaskCardProps {
   task: Task;
-  isFirst?: boolean;
-  isLast?: boolean;
   onEdit?: (task: Task) => void;
 }
 
-export default function TaskCard({ task, isFirst, isLast, onEdit }: TaskCardProps) {
+export default function TaskCard({ task, onEdit }: TaskCardProps) {
   const { updateTask } = useTasks();
+  const { currentTheme } = useTheme();
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
+  const priorityColors = {
+    high: '#FF3B30',
+    medium: '#FF9500',
+    low: '#34C759',
+  };
+
   const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return '#FF5757';
-      case 'medium': return '#FFD60A'; 
-      case 'low': return '#30D158';
-      default: return colors.textSecondary;
-    }
+    return priorityColors[priority as keyof typeof priorityColors] || currentTheme.colors.textSecondary;
   };
 
   const getSubjectIcon = (subject: string) => {
-    const iconProps = { size: 12, color: colors.textSecondary };
+    const iconProps = { size: 14, color: currentTheme.colors.textSecondary };
     
     switch (subject.toLowerCase()) {
       case 'math': return <Calculator {...iconProps} />;
@@ -51,32 +50,29 @@ export default function TaskCard({ task, isFirst, isLast, onEdit }: TaskCardProp
   const formatTime = (dueDate: string) => {
     try {
       const date = new Date(dueDate);
+      if (isNaN(date.getTime())) return '';
       return date.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true
       });
     } catch (error) {
-      return ''; // fallback if parsing fails
+      return '';
     }
   };
 
   const formatDuration = (minutes?: number) => {
-    if (!minutes) return '';
+    if (minutes === undefined || minutes === null) return '';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     
-    if (hours > 0 && mins > 0) {
-      return `${hours}h ${mins}m`;
-    } else if (hours > 0) {
-      return `${hours}h`;
-    } else {
-      return `${mins} min`;
-    }
+    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+    if (hours > 0) return `${hours}h`;
+    return `${mins}m`;
   };
 
   const handleCompleteToggle = async (e: any) => {
-    e.stopPropagation(); // Prevent card tap
+    e.stopPropagation();
     try {
       const newStatus = task.status === 'completed' ? 'pending' : 'completed';
       await updateTask(task.id, { status: newStatus });
@@ -85,78 +81,115 @@ export default function TaskCard({ task, isFirst, isLast, onEdit }: TaskCardProp
     }
   };
 
-  const handleMenuPress = (e: any) => {
-    e.stopPropagation(); // Prevent card tap
-    if (onEdit) {
-      onEdit(task);
-    }
-  };
-
-  const handleCardPress = () => {
-    setShowDetailsModal(true);
-  };
-
+  const handleCardPress = () => setShowDetailsModal(true);
+  
   const isCompleted = task.status === 'completed';
+
+  const styles = StyleSheet.create({
+    container: {
+      backgroundColor: currentTheme.colors.surface,
+      borderRadius: 12,
+      marginBottom: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    contentContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    mainContent: {
+      flex: 1,
+      marginLeft: 8,
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: currentTheme.colors.textPrimary,
+      marginBottom: 6,
+    },
+    titleCompleted: {
+      textDecorationLine: 'line-through',
+      color: currentTheme.colors.textSecondary,
+    },
+    detailsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    timeContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    timeText: {
+      fontSize: 13,
+      color: currentTheme.colors.textSecondary,
+      fontWeight: '500',
+    },
+    subjectText: {
+      fontSize: 13,
+      color: currentTheme.colors.textSecondary,
+      fontWeight: '500',
+      opacity: 0.8,
+    },
+    divider: {
+      width: 3,
+      height: 3,
+      borderRadius: 1.5,
+      backgroundColor: currentTheme.colors.textSecondary,
+      opacity: 0.3,
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: currentTheme.colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: isCompleted ? currentTheme.colors.primary : 'transparent',
+    },
+  });
 
   return (
     <>
       <TouchableOpacity 
-        style={[
-          styles.container,
-          isFirst && styles.firstCard,
-          isLast && styles.lastCard
-        ]}
+        style={styles.container}
         onPress={handleCardPress}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
-        <View style={styles.cardContent}>
-          <LinearGradient
-            colors={[getPriorityColor(task.priority), getPriorityColor(task.priority) + '80']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.leftBorder}
-          />
-          
-          {/* Menu button - on left */}
-          <TouchableOpacity style={styles.menuButton} onPress={handleMenuPress}>
-            <MoreVertical size={16} color={colors.textSecondary} />
-          </TouchableOpacity>
-          
-          <View style={styles.content}>
-            <Text style={[
-              styles.title,
-              isCompleted && styles.titleCompleted
-            ]}>
-              {task.title}
-            </Text>
-            
-            <View style={styles.details}>
-              <View style={styles.subjectContainer}>
-                {getSubjectIcon(task.subject)}
-                <Text style={styles.subject}>{task.subject}</Text>
-              </View>
-              
-              <View style={styles.timeContainer}>
-                <Clock size={12} color={colors.textSecondary} />
-                <Text style={styles.time}>{formatTime(task.due_date)}</Text>
-              </View>
-              
-              <Text style={styles.duration}>{formatDuration(task.estimated_minutes)}</Text>
-            </View>
-          </View>
-          
-          {/* Completion checkbox - on right */}
+        <View style={styles.contentContainer}>
           <TouchableOpacity 
-            style={[
-              styles.checkbox,
-              isCompleted && styles.checkboxCompleted
-            ]}
             onPress={handleCompleteToggle}
+            style={styles.checkbox}
           >
             {isCompleted && (
               <Check size={14} color="#fff" />
             )}
           </TouchableOpacity>
+          
+          <View style={styles.mainContent}>
+            <Text style={[styles.title, isCompleted && styles.titleCompleted]}>
+              {task.title}
+            </Text>
+            
+            <View style={styles.detailsContainer}>
+              <View style={styles.timeContainer}>
+                <Clock size={13} color={currentTheme.colors.textSecondary} />
+                <Text style={styles.timeText}>{formatTime(task.due_date)}</Text>
+              </View>
+              <View style={styles.divider} />
+              <Text style={styles.subjectText}>{task.subject}</Text>
+            </View>
+          </View>
         </View>
       </TouchableOpacity>
 
@@ -169,108 +202,3 @@ export default function TaskCard({ task, isFirst, isLast, onEdit }: TaskCardProp
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 8,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    shadowColor: 'rgba(0, 0, 0, 0.3)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  firstCard: {
-    marginTop: 4,
-  },
-  lastCard: {
-    marginBottom: 16,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    position: 'relative',
-  },
-  leftBorder: {
-    width: 4,
-    height: '70%',
-    borderRadius: 2,
-    opacity: 0.8,
-    marginRight: 8,
-  },
-  menuButton: {
-    padding: 4,
-    marginRight: 4,
-  },
-  content: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 6,
-    letterSpacing: 0.2,
-  },
-  titleCompleted: {
-    textDecorationLine: 'line-through',
-    color: colors.textSecondary,
-    opacity: 0.7,
-  },
-  details: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  subjectContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  subject: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  time: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  duration: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-    fontWeight: '500',
-    minWidth: 35,
-    textAlign: 'center',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#4A4A4A',
-    marginLeft: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-  },
-  checkboxCompleted: {
-    backgroundColor: colors.primaryBlue,
-    borderColor: colors.primaryBlue,
-  },
-});

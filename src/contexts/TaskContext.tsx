@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 import { API_URL, testConnection } from '../config/api';
 import NetInfo from '@react-native-community/netinfo';
+import { useStreak } from './StreakContext';
 
 // Define task type
 export interface Task {
@@ -39,6 +40,7 @@ const LAST_SYNC_KEY = 'last_sync_timestamp';
 
 export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { session } = useAuth();
+  const { updateStreak } = useStreak();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -200,9 +202,12 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
-    if (!session?.access_token) throw new Error('Not authenticated');
+    if (!session?.access_token) {
+      throw new Error('Not authenticated');
+    }
 
     try {
+      setLoading(true);
       const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PATCH',
         headers: {
@@ -217,14 +222,28 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const updatedTask = await res.json();
-      const updatedTasks = tasks.map(task => 
-        task.id === taskId ? { ...task, ...updatedTask } : task
-      );
-      setTasks(updatedTasks);
-      await updateCache(updatedTasks);
+      
+      // Update local state
+      setTasks(prevTasks => {
+        const newTasks = prevTasks.map(task =>
+          task.id === taskId ? { ...task, ...updatedTask } : task
+        );
+        updateCache(newTasks);
+        return newTasks;
+      });
+
+      // Update streak if task was completed
+      if (updates.status === 'completed') {
+        await updateStreak(true);
+      }
+
+      return updatedTask;
     } catch (err) {
       console.error('Error updating task:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update task');
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 

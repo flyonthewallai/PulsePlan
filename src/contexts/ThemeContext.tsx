@@ -22,6 +22,24 @@ export interface Theme {
 
 export const themes: Theme[] = [
   {
+    id: 'dark-agent',
+    name: 'Dark Agent',
+    premium: false,
+    colors: {
+      primary: '#4F8CFF',
+      accent: '#8E6FFF',
+      background: '#000000',
+      surface: '#1C1C1E',
+      textPrimary: '#FFFFFF',
+      textSecondary: '#8A8A8E',
+      border: '#262628',
+      card: '#333333',
+      success: '#34D399',
+      warning: '#F59E0B',
+      error: '#EF4444',
+    },
+  },
+  {
     id: 'midnight',
     name: 'Midnight',
     premium: false,
@@ -207,4 +225,4 @@ export function useTheme() {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
-} 
+}

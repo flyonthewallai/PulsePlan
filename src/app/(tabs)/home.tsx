@@ -19,7 +19,9 @@ import {
   Target,
   Timer,
   FileText,
-  Zap,
+  Sun,
+  Sunrise,
+  Sunset,
 } from 'lucide-react-native';
 
 import TaskCard from '../../components/TaskCard';
@@ -27,31 +29,23 @@ import CompletionRing from '../../components/CompletionRing';
 import AIAssistantButton from '../../components/AIAssistantButton';
 import TaskCreateModal from '../../components/TaskCreateModal';
 import AIAssistantModal from '../../components/AIAssistantModal';
-import StreakModal from '../../components/StreakModal';
+import DailySummaryCard from '../../components/DailySummaryCard';
 import { useTasks, Task } from '../../contexts/TaskContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 type SortType = 'due' | 'priority' | 'subject';
 
 export default function HomeScreen() {
-  const { tasks, loading, refreshTasks } = useTasks();
+  const { tasks, refreshTasks, loading } = useTasks();
   const { currentTheme } = useTheme();
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
-  const [showStreakModal, setShowStreakModal] = useState(false);
+  const [sortType, setSortType] = useState<SortType>('due');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [sortBy, setSortBy] = useState<SortType>('due');
   
-  // Calculate completion percentage and streak
+  // Calculate completion percentage
   const completedTasks = tasks.filter(task => task.status === 'completed').length;
   const completion = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
-  
-  // Mock streak data (would come from context/storage in real app)
-  const streakData = {
-    currentStreak: 3,
-    weeklyHours: 9,
-    isActive: true
-  };
   
   // Filter tasks for today
   const today = new Date().toDateString();
@@ -71,9 +65,9 @@ export default function HomeScreen() {
     
     // Sort based on selected criteria
     return urgent.sort((a, b) => {
-      if (sortBy === 'due') {
+      if (sortType === 'due') {
         return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-      } else if (sortBy === 'priority') {
+      } else if (sortType === 'priority') {
         const priorityOrder = { high: 3, medium: 2, low: 1 };
         return priorityOrder[b.priority] - priorityOrder[a.priority];
       } else {
@@ -162,189 +156,182 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]} edges={['top']}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header with Greeting and Progress */}
-      <View style={styles.header}>
-        <View>
-          <Text style={[styles.greeting, { color: currentTheme.colors.textPrimary }]}>{getGreeting()}, Conner</Text>
-          <Text style={[styles.date, { color: currentTheme.colors.textSecondary }]}>
-            {new Date().toLocaleDateString('en-US', { 
-              weekday: 'long',
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </Text>
+      <View style={{ flex: 1 }}>
+        {/* Header with Greeting and Progress */}
+        <View style={styles.header}>
+          <View>
+            <Text style={[styles.greeting, { color: currentTheme.colors.textPrimary }]}>{getGreeting()}, Conner</Text>
+            <Text style={[styles.date, { color: currentTheme.colors.textSecondary }]}>
+              {new Date().toLocaleDateString('en-US', { 
+                weekday: 'long',
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </Text>
+          </View>
+          <View style={styles.progressContainer}>
+            <CompletionRing 
+              percentage={completion} 
+              size={50} 
+              strokeWidth={5}
+            />
+            <Text style={[styles.progressText, { color: currentTheme.colors.textPrimary }]}>{completion}%</Text>
+          </View>
         </View>
-        <View style={styles.progressContainer}>
-          <CompletionRing 
-            percentage={completion} 
-            size={50} 
-            strokeWidth={5}
-          />
-          <Text style={[styles.progressText, { color: currentTheme.colors.textPrimary }]}>{completion}%</Text>
-        </View>
-      </View>
 
-      <ScrollView 
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={refreshTasks}
-            tintColor={currentTheme.colors.primary}
-            colors={[currentTheme.colors.primary]}
-            progressBackgroundColor="transparent"
-          />
-        }
-      >
-        {/* Streak + Progress Widget */}
-        <TouchableOpacity 
-          style={[styles.streakWidget, { backgroundColor: currentTheme.colors.surface }]}
-          onPress={() => setShowStreakModal(true)}
-          activeOpacity={0.7}
+        <ScrollView 
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refreshTasks}
+              tintColor={currentTheme.colors.primary}
+              colors={[currentTheme.colors.primary]}
+              progressBackgroundColor="transparent"
+            />
+          }
         >
-          <View style={styles.streakContent}>
-            <Text style={styles.streakEmoji}>🌱</Text>
-            <View style={styles.streakInfo}>
-              <Text style={[styles.streakText, { color: currentTheme.colors.textPrimary }]}>
-                {streakData.currentStreak}-day streak
-              </Text>
-              <Text style={[styles.streakSubtext, { color: currentTheme.colors.textSecondary }]}>
-                {streakData.weeklyHours}h completed this week
-              </Text>
+          {/* Daily Summary Card */}
+          <DailySummaryCard />
+
+          {/* Priority Overview Section */}
+          {priorityTasks.length > 0 && (
+            <View style={[styles.section, { backgroundColor: currentTheme.colors.surface }]}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleContainer}>
+                  <Flame size={18} color="#FF5757" />
+                  <Text style={[styles.sectionTitle, { color: currentTheme.colors.textPrimary }]}>Priority Focus</Text>
+                </View>
+                <View style={styles.sortToggles}>
+                  <TouchableOpacity
+                    style={[styles.sortToggle, sortType === 'due' && { backgroundColor: currentTheme.colors.primary }]}
+                    onPress={() => setSortType('due')}
+                  >
+                    <Clock size={12} color={sortType === 'due' ? '#FFFFFF' : currentTheme.colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.sortToggle, sortType === 'priority' && { backgroundColor: currentTheme.colors.primary }]}
+                    onPress={() => setSortType('priority')}
+                  >
+                    <AlertTriangle size={12} color={sortType === 'priority' ? '#FFFFFF' : currentTheme.colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.sortToggle, sortType === 'subject' && { backgroundColor: currentTheme.colors.primary }]}
+                    onPress={() => setSortType('subject')}
+                  >
+                    <BookOpen size={12} color={sortType === 'subject' ? '#FFFFFF' : currentTheme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              {priorityTasks.map((task, index) => (
+                <View key={task.id} style={styles.priorityItem}>
+                  <Text style={styles.urgencyIndicator}>{getUrgencyEmoji(task)}</Text>
+                  <View style={styles.priorityContent}>
+                    <Text style={[styles.priorityTitle, { color: currentTheme.colors.textPrimary }]} numberOfLines={1}>
+                      {task.title}
+                    </Text>
+                    <Text style={[styles.priorityMeta, { color: currentTheme.colors.textSecondary }]}>
+                      Due {new Date(task.due_date).toDateString() === today ? 'Today' : 'Tomorrow'}
+                      {task.estimated_minutes && ` • ${formatDuration(task.estimated_minutes)}`}
+                    </Text>
+                  </View>
+                </View>
+              ))}
             </View>
-            {streakData.isActive && (
-              <View style={[styles.streakBadge, { backgroundColor: currentTheme.colors.primary }]}>
-                <Zap size={12} color="#FFFFFF" />
+          )}
+
+          {/* Today's Plan - Time Blocks with Task Cards */}
+          <View style={[styles.section, { backgroundColor: currentTheme.colors.surface }]}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: currentTheme.colors.textPrimary }]}>Today's Plan</Text>
+              <TouchableOpacity 
+                style={styles.addTaskButton}
+                onPress={() => setShowTaskModal(true)}
+              >
+                <Plus size={16} color={currentTheme.colors.primary} />
+                <Text style={[styles.addTaskText, { color: currentTheme.colors.primary }]}>Add Task</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={[styles.loadingText, { color: currentTheme.colors.textSecondary }]}>Loading tasks...</Text>
+              </View>
+            ) : todayTasks.length > 0 ? (
+              <>
+                {timeBlocks.morning.length > 0 && (
+                  <View style={styles.timeBlock}>
+                    <View style={styles.timeBlockHeader}>
+                      <Sunrise size={14} color={currentTheme.colors.textSecondary} style={{ opacity: 0.7 }} />
+                      <Text style={[styles.timeBlockTitle, { color: currentTheme.colors.textSecondary }]}>Morning</Text>
+                      <View style={[styles.timeBlockDivider, { backgroundColor: currentTheme.colors.textSecondary }]} />
+                    </View>
+                    {timeBlocks.morning.map((task, index) => (
+                      <View key={task.id} style={styles.timeBlockTaskCard}>
+                        <TaskCard 
+                          task={task} 
+                          isFirst={index === 0}
+                          isLast={index === timeBlocks.morning.length - 1}
+                          onEdit={handleEditTask}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+                
+                {timeBlocks.afternoon.length > 0 && (
+                  <View style={styles.timeBlock}>
+                    <View style={styles.timeBlockHeader}>
+                      <Sun size={14} color={currentTheme.colors.textSecondary} style={{ opacity: 0.7 }} />
+                      <Text style={[styles.timeBlockTitle, { color: currentTheme.colors.textSecondary }]}>Afternoon</Text>
+                      <View style={[styles.timeBlockDivider, { backgroundColor: currentTheme.colors.textSecondary }]} />
+                    </View>
+                    {timeBlocks.afternoon.map((task, index) => (
+                      <View key={task.id} style={styles.timeBlockTaskCard}>
+                        <TaskCard 
+                          task={task} 
+                          isFirst={index === 0}
+                          isLast={index === timeBlocks.afternoon.length - 1}
+                          onEdit={handleEditTask}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+                
+                {timeBlocks.evening.length > 0 && (
+                  <View style={styles.timeBlock}>
+                    <View style={styles.timeBlockHeader}>
+                      <Sunset size={14} color={currentTheme.colors.textSecondary} style={{ opacity: 0.7 }} />
+                      <Text style={[styles.timeBlockTitle, { color: currentTheme.colors.textSecondary }]}>Evening</Text>
+                      <View style={[styles.timeBlockDivider, { backgroundColor: currentTheme.colors.textSecondary }]} />
+                    </View>
+                    {timeBlocks.evening.map((task, index) => (
+                      <View key={task.id} style={styles.timeBlockTaskCard}>
+                        <TaskCard 
+                          task={task} 
+                          isFirst={index === 0}
+                          isLast={index === timeBlocks.evening.length - 1}
+                          onEdit={handleEditTask}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptyTitle, { color: currentTheme.colors.textPrimary }]}>No tasks for today</Text>
+                <Text style={[styles.emptyText, { color: currentTheme.colors.textSecondary }]}>
+                  Create your first task to get started!
+                </Text>
               </View>
             )}
           </View>
-        </TouchableOpacity>
-
-        {/* Priority Overview Section */}
-        {priorityTasks.length > 0 && (
-          <View style={[styles.section, { backgroundColor: currentTheme.colors.surface }]}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-                <Flame size={18} color="#FF5757" />
-                <Text style={[styles.sectionTitle, { color: currentTheme.colors.textPrimary }]}>Priority Focus</Text>
-              </View>
-              <View style={styles.sortToggles}>
-                <TouchableOpacity
-                  style={[styles.sortToggle, sortBy === 'due' && { backgroundColor: currentTheme.colors.primary }]}
-                  onPress={() => setSortBy('due')}
-                >
-                  <Clock size={12} color={sortBy === 'due' ? '#FFFFFF' : currentTheme.colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.sortToggle, sortBy === 'priority' && { backgroundColor: currentTheme.colors.primary }]}
-                  onPress={() => setSortBy('priority')}
-                >
-                  <AlertTriangle size={12} color={sortBy === 'priority' ? '#FFFFFF' : currentTheme.colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.sortToggle, sortBy === 'subject' && { backgroundColor: currentTheme.colors.primary }]}
-                  onPress={() => setSortBy('subject')}
-                >
-                  <BookOpen size={12} color={sortBy === 'subject' ? '#FFFFFF' : currentTheme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-            
-            {priorityTasks.map((task, index) => (
-              <View key={task.id} style={styles.priorityItem}>
-                <Text style={styles.urgencyIndicator}>{getUrgencyEmoji(task)}</Text>
-                <View style={styles.priorityContent}>
-                  <Text style={[styles.priorityTitle, { color: currentTheme.colors.textPrimary }]} numberOfLines={1}>
-                    {task.title}
-                  </Text>
-                  <Text style={[styles.priorityMeta, { color: currentTheme.colors.textSecondary }]}>
-                    Due {new Date(task.due_date).toDateString() === today ? 'Today' : 'Tomorrow'}
-                    {task.estimated_minutes && ` • ${formatDuration(task.estimated_minutes)}`}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Today's Plan - Time Blocks with Task Cards */}
-        <View style={[styles.section, { backgroundColor: currentTheme.colors.surface }]}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: currentTheme.colors.textPrimary }]}>Today's Plan</Text>
-            <TouchableOpacity 
-              style={styles.addTaskButton}
-              onPress={() => setShowTaskModal(true)}
-            >
-              <Plus size={16} color={currentTheme.colors.primary} />
-              <Text style={[styles.addTaskText, { color: currentTheme.colors.primary }]}>Add Task</Text>
-            </TouchableOpacity>
-          </View>
-
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={[styles.loadingText, { color: currentTheme.colors.textSecondary }]}>Loading tasks...</Text>
-            </View>
-          ) : todayTasks.length > 0 ? (
-            <>
-              {timeBlocks.morning.length > 0 && (
-                <View style={styles.timeBlock}>
-                  <Text style={[styles.timeBlockTitle, { color: currentTheme.colors.textSecondary }]}>🕛 Morning</Text>
-                  {timeBlocks.morning.map((task, index) => (
-                    <View key={task.id} style={styles.timeBlockTaskCard}>
-                      <TaskCard 
-                        task={task} 
-                        isFirst={index === 0}
-                        isLast={index === timeBlocks.morning.length - 1}
-                        onEdit={handleEditTask}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-              
-              {timeBlocks.afternoon.length > 0 && (
-                <View style={styles.timeBlock}>
-                  <Text style={[styles.timeBlockTitle, { color: currentTheme.colors.textSecondary }]}>🕒 Afternoon</Text>
-                  {timeBlocks.afternoon.map((task, index) => (
-                    <View key={task.id} style={styles.timeBlockTaskCard}>
-                      <TaskCard 
-                        task={task} 
-                        isFirst={index === 0}
-                        isLast={index === timeBlocks.afternoon.length - 1}
-                        onEdit={handleEditTask}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-              
-              {timeBlocks.evening.length > 0 && (
-                <View style={styles.timeBlock}>
-                  <Text style={[styles.timeBlockTitle, { color: currentTheme.colors.textSecondary }]}>🕖 Evening</Text>
-                  {timeBlocks.evening.map((task, index) => (
-                    <View key={task.id} style={styles.timeBlockTaskCard}>
-                      <TaskCard 
-                        task={task} 
-                        isFirst={index === 0}
-                        isLast={index === timeBlocks.evening.length - 1}
-                        onEdit={handleEditTask}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-            </>
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={[styles.emptyTitle, { color: currentTheme.colors.textPrimary }]}>No tasks for today</Text>
-              <Text style={[styles.emptyText, { color: currentTheme.colors.textSecondary }]}>
-                Create your first task to get started!
-              </Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       <AIAssistantButton onPress={() => setShowAIModal(true)} />
 
@@ -357,11 +344,6 @@ export default function HomeScreen() {
       <AIAssistantModal
         visible={showAIModal}
         onClose={() => setShowAIModal(false)}
-      />
-
-      <StreakModal
-        visible={showStreakModal}
-        onClose={() => setShowStreakModal(false)}
       />
     </SafeAreaView>
   );
@@ -399,39 +381,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-  },
-  
-  // Streak Widget
-  streakWidget: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  streakContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  streakEmoji: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  streakInfo: {
-    flex: 1,
-  },
-  streakText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  streakSubtext: {
-    fontSize: 14,
-  },
-  streakBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   
   // Section Styles
@@ -494,13 +443,26 @@ const styles = StyleSheet.create({
   
   // Time Blocks
   timeBlock: {
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  timeBlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
   },
   timeBlockTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     opacity: 0.7,
+    marginRight: 12,
+  },
+  timeBlockDivider: {
+    flex: 1,
+    height: 1,
+    opacity: 0.1,
   },
   timeBlockTaskCard: {
     marginBottom: 8,

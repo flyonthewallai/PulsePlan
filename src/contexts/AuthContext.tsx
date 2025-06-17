@@ -13,6 +13,7 @@ interface AuthContextType {
   refreshAuth: () => Promise<void>;
   needsOnboarding: boolean;
   markOnboardingComplete: () => Promise<void>;
+  subscriptionPlan: 'free' | 'premium';
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -24,6 +25,7 @@ const AuthContext = createContext<AuthContextType>({
   refreshAuth: async () => {},
   needsOnboarding: false,
   markOnboardingComplete: async () => {},
+  subscriptionPlan: 'free',
 });
 
 export const useAuth = () => {
@@ -48,6 +50,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [subscriptionPlan, setSubscriptionPlan] = useState<'free' | 'premium'>('free');
 
   const checkOnboardingStatus = async (userId: string) => {
     try {
@@ -134,44 +137,45 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       return;
     }
 
-    const isInAuthGroup = segments[0] === '(tabs)';
+    const inTabsGroup = segments[0] === '(tabs)';
+    const inSettingsGroup = segments[0] === '(settings)';
+    
+    // An authenticated route is one that requires a user to be logged in.
+    // These are the main app routes.
+    const isAuthenticatedRoute = inTabsGroup || inSettingsGroup;
+
     const isOnAuthPage = segments[0] === 'auth';
     const isOnOnboardingPage = segments[0] === 'onboarding';
-    const isOnIndexPage = segments.length === 0;
 
-
+    console.log('🔍 Auth navigation check:', {
+      hasUser: !!user,
+      isAuthenticatedRoute,
+      isOnAuthPage,
+      isOnOnboardingPage,
+      currentPath: segments.join('/')
+    });
 
     if (!user) {
       // User not authenticated
-      if (isInAuthGroup || isOnOnboardingPage) {
-        router.replace('/auth');
-      } else if (isOnIndexPage) {
-        // If user is on index page and not authenticated, redirect to auth
-        setTimeout(() => {
-          router.replace('/auth');
-        }, 500); // Small delay to ensure auth state is settled
-      } else if (!isOnAuthPage) {
+      if (isAuthenticatedRoute) {
+        console.log('🚪 Redirecting to auth (from protected route)...');
         router.replace('/auth');
       }
     } else {
       // User is authenticated
       if (needsOnboarding) {
-        // User needs onboarding
         if (!isOnOnboardingPage) {
           console.log('🎯 Redirecting to onboarding...');
           router.replace('/onboarding');
         }
-      } else {
-        // User has completed onboarding
-        if (!isInAuthGroup && !isOnIndexPage) {
-          console.log('🏠 Redirecting to main app...');
-          router.replace('/(tabs)/home');
-        } else if (isOnIndexPage || isOnOnboardingPage) {
-          // Special case: if user is on index page or onboarding and authenticated with completed onboarding
-          setTimeout(() => {
-            router.replace('/(tabs)/home');
-          }, 100); // Small delay to ensure routing is ready
-        }
+      } else if (isOnAuthPage) {
+        // If user is authenticated and on auth page, redirect to home
+        console.log('🏠 Redirecting to home (from auth page)...');
+        router.replace('/(tabs)/home');
+      } else if (!isAuthenticatedRoute && segments.length > 0) {
+        // If user is on a route that is not part of the authenticated app routes, redirect home
+        console.log('🏠 Redirecting to home (from other route)...');
+        router.replace('/(tabs)/home');
       }
     }
   }, [user, needsOnboarding, loading, segments, router]);
@@ -224,6 +228,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     refreshAuth,
     needsOnboarding,
     markOnboardingComplete,
+    subscriptionPlan,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
