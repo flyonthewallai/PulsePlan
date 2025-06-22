@@ -56,6 +56,7 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
   
   const logoAnim = useRef({ opacity: new Animated.Value(0), translateY: new Animated.Value(20), scale: new Animated.Value(0.9) }).current;
   const appNameAnim = useRef({ opacity: new Animated.Value(0), translateY: new Animated.Value(20) }).current;
@@ -288,131 +289,157 @@ export default function AuthScreen() {
             </Animated.Text>
           </View>
 
-          <View style={styles.socialAuthContainer}>
-            <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#2E2E2E' }]} onPress={handleGoogleSignIn} disabled={loading}>
-              <GoogleIcon />
-              <Text style={styles.socialButtonText}>Continue with Google</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#2E2E2E' }]} onPress={handleAppleSignIn} disabled={loading}>
-              <Ionicons name="logo-apple" size={26} color="white" style={{ marginRight: 12 }} />
-              <Text style={styles.socialButtonText}>Continue with Apple</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.dividerContainer}>
-            <View style={[styles.dividerLine, { backgroundColor: currentTheme.colors.border }]} />
-            <Text style={[styles.dividerText, { color: currentTheme.colors.textSecondary }]}>OR</Text>
-            <View style={[styles.dividerLine, { backgroundColor: currentTheme.colors.border }]} />
-          </View>
-
-          <View style={styles.formContainer}>
-            {!isLogin && (
-              <TextInput
-                style={[styles.input, { backgroundColor: currentTheme.colors.surface, color: currentTheme.colors.textPrimary }]}
-                placeholder="Full Name"
-                placeholderTextColor={currentTheme.colors.textSecondary}
-                value={name}
-                onChangeText={setName}
-                editable={!loading}
-              />
-            )}
-            <TextInput
-              style={[styles.input, { backgroundColor: currentTheme.colors.surface, color: currentTheme.colors.textPrimary }]}
-              placeholder="Email"
-              placeholderTextColor={currentTheme.colors.textSecondary}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              editable={!loading}
-            />
-            <TextInput
-              style={[styles.input, { backgroundColor: currentTheme.colors.surface, color: currentTheme.colors.textPrimary }]}
-              placeholder="Password"
-              placeholderTextColor={currentTheme.colors.textSecondary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              editable={!loading}
-              textContentType={isLogin ? 'password' : 'newPassword'}
-              selectionColor={currentTheme.colors.primary}
-            />
-            {!isLogin && password.length > 0 && (
-              <View style={styles.passwordFeedbackContainer}>
-                <View style={styles.strengthBar}>
-                  <View style={[styles.strengthFill, { 
-                    width: `${Math.min(100, (passwordStrength.strength === 'Weak' ? 33 : passwordStrength.strength === 'Medium' ? 66 : 100))}%`,
-                    backgroundColor: passwordStrength.color,
-                  }]} />
-                </View>
-                <Text style={[styles.strengthText, { color: passwordStrength.color }]}>
-                  Strength: {passwordStrength.strength}
-                </Text>
-                {passwordRequirements.map((req, index) => (
-                  <View key={index} style={styles.requirementRow}>
-                    <Ionicons 
-                      name={req.met ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={14} 
-                      color={req.met ? currentTheme.colors.success : currentTheme.colors.textSecondary} 
-                    />
-                    <Text style={[styles.requirementText, { color: req.met ? currentTheme.colors.success : currentTheme.colors.textSecondary }]}>
-                      {req.text}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-            {!isLogin && (
-              <TextInput
-                style={[styles.input, { backgroundColor: currentTheme.colors.surface, color: currentTheme.colors.textPrimary }]}
-                placeholder="Confirm Password"
-                placeholderTextColor={currentTheme.colors.textSecondary}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showConfirmPassword}
-                editable={!loading}
-                textContentType="oneTimeCode"
-                selectionColor={currentTheme.colors.primary}
-              />
-            )}
-            {isLogin && (
-              <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPasswordButton}>
-                <Text style={[styles.forgotPasswordText, { color: currentTheme.colors.textSecondary }]}>Forgot Password?</Text>
+          {!showEmailForm && (
+            <View style={styles.socialAuthContainer}>
+              <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#2E2E2E' }]} onPress={handleGoogleSignIn} disabled={loading}>
+                <GoogleIcon />
+                <Text style={styles.socialButtonText}>Continue with Google</Text>
               </TouchableOpacity>
-            )}
-          </View>
-
-          <TouchableOpacity onPress={isLogin ? handleSignIn : handleSignUp} disabled={loading}>
-            <LinearGradient
-              colors={currentTheme.id.includes('dark') ? [currentTheme.colors.primary, '#4A90E2'] : [currentTheme.colors.primary, '#63B4FF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.authButton}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.authButtonText}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-          
-          {isLogin && (
-            <TouchableOpacity style={styles.magicLinkButton} onPress={handleMagicLink} disabled={loading}>
-              <Text style={[styles.magicLinkText, { color: currentTheme.colors.textSecondary }]}>Sign in with Magic Link</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#2E2E2E' }]} onPress={handleAppleSignIn} disabled={loading}>
+                <Ionicons name="logo-apple" size={26} color="white" style={{ marginRight: 12 }} />
+                <Text style={styles.socialButtonText}>Continue with Apple</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.socialButton, { backgroundColor: '#2E2E2E' }]} 
+                onPress={() => setShowEmailForm(true)} 
+                disabled={loading}
+              >
+                <Ionicons name="mail" size={24} color="white" style={{ marginRight: 12 }} />
+                <Text style={styles.socialButtonText}>Continue with Email</Text>
+              </TouchableOpacity>
+            </View>
           )}
+          
+          {showEmailForm && (
+            <>
+              <View style={styles.formContainer}>
+                <View style={styles.formHeader}>
+                  <TouchableOpacity 
+                    onPress={() => setShowEmailForm(false)} 
+                    style={styles.backButton}
+                    disabled={loading}
+                  >
+                    <Ionicons name="arrow-back" size={24} color={currentTheme.colors.primary} />
+                  </TouchableOpacity>
+                  <Text style={[styles.formTitle, { color: currentTheme.colors.textPrimary }]}>
+                    {isLogin ? 'Sign In' : 'Create Account'}
+                  </Text>
+                </View>
 
-          <View style={styles.footer}>
-            <TouchableOpacity onPress={() => setActiveTab(isLogin ? 'signup' : 'login')} disabled={loading}>
-              <Text style={[styles.footerText, { color: currentTheme.colors.textSecondary }]}>
-                {isLogin ? "Don't have an account? " : "Already have an account? "}
-                <Text style={{ color: currentTheme.colors.primary, fontWeight: '600' }}>
-                  {isLogin ? 'Sign Up' : 'Sign In'}
-                </Text>
-              </Text>
-            </TouchableOpacity>
-          </View>
+                {!isLogin && (
+                  <TextInput
+                    style={[styles.input, { backgroundColor: currentTheme.colors.surface, color: currentTheme.colors.textPrimary }]}
+                    placeholder="Full Name"
+                    placeholderTextColor={currentTheme.colors.textSecondary}
+                    value={name}
+                    onChangeText={setName}
+                    editable={!loading}
+                  />
+                )}
+                <TextInput
+                  style={[styles.input, { backgroundColor: currentTheme.colors.surface, color: currentTheme.colors.textPrimary }]}
+                  placeholder="Email"
+                  placeholderTextColor={currentTheme.colors.textSecondary}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!loading}
+                />
+                <TextInput
+                  style={[styles.input, { backgroundColor: currentTheme.colors.surface, color: currentTheme.colors.textPrimary }]}
+                  placeholder="Password"
+                  placeholderTextColor={currentTheme.colors.textSecondary}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  editable={!loading}
+                  textContentType={isLogin ? 'password' : 'newPassword'}
+                  selectionColor={currentTheme.colors.primary}
+                />
+                {!isLogin && password.length > 0 && (
+                  <View style={styles.passwordFeedbackContainer}>
+                    <View style={styles.strengthBar}>
+                      <View style={[styles.strengthFill, { 
+                        width: `${Math.min(100, (passwordStrength.strength === 'Weak' ? 33 : passwordStrength.strength === 'Medium' ? 66 : 100))}%`,
+                        backgroundColor: passwordStrength.color,
+                      }]} />
+                    </View>
+                    <Text style={[styles.strengthText, { color: passwordStrength.color }]}>
+                      Strength: {passwordStrength.strength}
+                    </Text>
+                    {passwordRequirements.map((req, index) => (
+                      <View key={index} style={styles.requirementRow}>
+                        <Ionicons 
+                          name={req.met ? 'checkmark-circle' : 'ellipse-outline'}
+                          size={14} 
+                          color={req.met ? currentTheme.colors.success : currentTheme.colors.textSecondary} 
+                        />
+                        <Text style={[styles.requirementText, { color: req.met ? currentTheme.colors.success : currentTheme.colors.textSecondary }]}>
+                          {req.text}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {!isLogin && (
+                  <TextInput
+                    style={[styles.input, { backgroundColor: currentTheme.colors.surface, color: currentTheme.colors.textPrimary }]}
+                    placeholder="Confirm Password"
+                    placeholderTextColor={currentTheme.colors.textSecondary}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry={!showConfirmPassword}
+                    editable={!loading}
+                    textContentType="oneTimeCode"
+                    selectionColor={currentTheme.colors.primary}
+                  />
+                )}
+                {isLogin && (
+                  <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPasswordButton}>
+                    <Text style={[styles.forgotPasswordText, { color: currentTheme.colors.textSecondary }]}>Forgot Password?</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <TouchableOpacity onPress={isLogin ? handleSignIn : handleSignUp} disabled={loading}>
+                <LinearGradient
+                  colors={currentTheme.id.includes('dark') ? [currentTheme.colors.primary, '#4A90E2'] : [currentTheme.colors.primary, '#63B4FF']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.authButton}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.authButtonText}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            
+              {isLogin && (
+                <TouchableOpacity style={styles.magicLinkButton} onPress={handleMagicLink} disabled={loading}>
+                  <Text style={[styles.magicLinkText, { color: currentTheme.colors.textSecondary }]}>Sign in with Magic Link</Text>
+                </TouchableOpacity>
+              )}
+
+              <View style={styles.footer}>
+                <TouchableOpacity onPress={() => {
+                  setActiveTab(isLogin ? 'signup' : 'login');
+                  if (!showEmailForm) {
+                    setShowEmailForm(true);
+                  }
+                }} disabled={loading}>
+                  <Text style={[styles.footerText, { color: currentTheme.colors.textSecondary }]}>
+                    {isLogin ? "Don't have an account? " : "Already have an account? "}
+                    <Text style={{ color: currentTheme.colors.primary, fontWeight: '600' }}>
+                      {isLogin ? 'Sign Up' : 'Sign In'}
+                    </Text>
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -554,109 +581,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  formHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 12,
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
 });
-// Animated Neural Network Component
-const NeuralNetwork = () => {
-  const animatedValues = useRef(
-    Array.from({ length: 12 }, () => new Animated.Value(0))
-  ).current;
 
-  useEffect(() => {
-    const startAnimations = () => {
-      const animations = animatedValues.map((value, index) => 
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(value, {
-              toValue: 1,
-              duration: 2000 + (index * 200),
-              useNativeDriver: true,
-            }),
-            Animated.timing(value, {
-              toValue: 0,
-              duration: 2000 + (index * 200),
-              useNativeDriver: true,
-            }),
-          ])
-        )
-      );
-      
-      Animated.stagger(300, animations).start(() => {
-        setTimeout(startAnimations, 1000);
-      });
-    };
-
-    startAnimations();
-  }, []);
-
-  return (
-    <View style={styles.neuralNetworkContainer}>
-      {animatedValues.map((animValue, index) => (
-        <Animated.View
-          key={index}
-          style={[
-            styles.neuralNode,
-            {
-              left: `${(index % 4) * 25 + 10}%`,
-              top: `${Math.floor(index / 4) * 30 + 10}%`,
-              opacity: animValue,
-              transform: [
-                {
-                  scale: animValue.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.3, 1],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
-      ))}
-      
-      {/* Connection lines */}
-      {[...Array(8)].map((_, index) => (
-        <Animated.View
-          key={`line-${index}`}
-          style={[
-            styles.connectionLine,
-            {
-              opacity: animatedValues[index % animatedValues.length],
-              transform: [
-                {
-                  rotate: `${index * 45}deg`,
-                },
-              ],
-            },
-          ]}
-        />
-      ))}
-    </View>
-  );
-};
-
-// Floating Particles Component
-const FloatingParticles = () => {
-  const particles = useRef(
-    Array.from({ length: 20 }, () => ({
-      animValue: new Animated.Value(0),
-      x: Math.random() * width,
-      y: Math.random() * height,
-      size: Math.random() * 4 + 2,
-    }))
-  ).current;
-
-  useEffect(() => {
-    particles.forEach((particle, index) => {
-      const animate = () => {
-        Animated.loop(
-          Animated.timing(particle.animValue, {
-            toValue: 1,
-            duration: 3000 + Math.random() * 2000,
-            useNativeDriver: true,
-          })
-        ).start();
-      };
-      
-      setTimeout(animate, index * 100);
-    });
-  }, []);
-};

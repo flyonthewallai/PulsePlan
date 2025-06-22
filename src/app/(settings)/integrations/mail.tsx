@@ -1,35 +1,155 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Mail as MailIcon } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { ChevronLeft, Mail as MailIcon, Check } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { GmailService } from '@/services/gmailService';
 
 const SettingsRow = ({
   icon,
   title,
   onPress,
+  isConnected,
+  isLoading,
 }: {
   icon: React.ReactNode;
   title: string;
   onPress?: () => void;
+  isConnected?: boolean;
+  isLoading?: boolean;
 }) => {
   const { currentTheme } = useTheme();
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress}>
+    <TouchableOpacity style={styles.row} onPress={onPress} disabled={isLoading}>
       <View style={styles.rowLeft}>
         {icon}
         <Text style={[styles.rowTitle, { color: currentTheme.colors.textPrimary }]}>{title}</Text>
       </View>
+      <View style={styles.rowRight}>
+        {isLoading ? (
+          <Text style={[styles.statusText, { color: currentTheme.colors.textSecondary }]}>Loading...</Text>
+        ) : isConnected ? (
+          <Check size={20} color="#10B981" />
+        ) : (
       <ChevronLeft color={currentTheme.colors.textSecondary} size={20} style={{ transform: [{ rotate: '180deg' }] }} />
+        )}
+      </View>
     </TouchableOpacity>
   );
 };
 
+interface ConnectionStatus {
+  connected: boolean;
+  providers: Array<{
+    provider: 'google' | 'microsoft';
+    email: string;
+    connectedAt: string;
+    expiresAt?: string;
+    isActive: boolean;
+  }>;
+}
+
 export default function MailIntegrationScreen() {
   const router = useRouter();
   const { currentTheme } = useTheme();
+  const { user } = useAuth();
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isConnecting, setIsConnecting] = useState<{ google?: boolean; microsoft?: boolean }>({});
+
+  // Load connection status on component mount
+  useEffect(() => {
+    loadConnectionStatus();
+  }, [user]);
+
+  // Refresh connection status when screen comes into focus (after OAuth flow)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id) {
+        loadConnectionStatus();
+      }
+    }, [user?.id])
+  );
+
+  const loadConnectionStatus = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsLoading(true);
+      // Use the same connection status endpoint as calendar since they share the same OAuth tokens
+      const response = await fetch(`http://localhost:5000/calendar/status/${user.id}`);
+      if (response.ok) {
+        const status = await response.json();
+        setConnectionStatus(status);
+      }
+    } catch (error) {
+      console.error('Error loading connection status:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGmailConnect = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Please sign in to connect your Gmail account');
+      return;
+    }
+
+    try {
+      setIsConnecting({ ...isConnecting, google: true });
+      // Use the Gmail-specific OAuth endpoint
+      const url = `http://localhost:5000/gmail/auth?userId=${encodeURIComponent(user.id)}`;
+      
+      // Open OAuth URL
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = url;
+      } else {
+        // For React Native
+        const { Linking } = require('react-native');
+        await Linking.openURL(url);
+      }
+    } catch (error) {
+      console.error('Error connecting Gmail:', error);
+      Alert.alert('Error', 'Failed to connect Gmail account. Please try again.');
+    } finally {
+      setIsConnecting({ ...isConnecting, google: false });
+    }
+  };
+
+  const handleOutlookConnect = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Please sign in to connect your Outlook account');
+      return;
+    }
+
+    try {
+      setIsConnecting({ ...isConnecting, microsoft: true });
+      const url = `http://localhost:5000/auth/microsoft?userId=${encodeURIComponent(user.id)}`;
+      
+      // Open OAuth URL
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = url;
+      } else {
+        // For React Native
+        const { Linking } = require('react-native');
+        await Linking.openURL(url);
+      }
+    } catch (error) {
+      console.error('Error connecting Outlook:', error);
+      Alert.alert('Error', 'Failed to connect Outlook account. Please try again.');
+    } finally {
+      setIsConnecting({ ...isConnecting, microsoft: false });
+    }
+  };
+
+  // Check if a provider is connected
+  const isProviderConnected = (provider: 'google' | 'microsoft'): boolean => {
+    return connectionStatus?.providers?.some(p => p.provider === provider && p.isActive) || false;
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
@@ -56,19 +176,27 @@ export default function MailIntegrationScreen() {
           <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>SIGN IN WITH YOUR PROVIDER</Text>
           <View style={[styles.sectionBody, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
             <SettingsRow 
-              icon={<Image source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Gmail_Icon_%282020%29.svg/2560px-Gmail_Icon_%282020%29.svg.png' }} style={styles.providerIcon} />} 
+              icon={<Image source={require('@/assets/images/gmail.png')} style={styles.providerIcon} />} 
               title="Add Google Account" 
-              onPress={() => {}} 
+              onPress={handleGmailConnect}
+              isConnected={isProviderConnected('google')}
+              isLoading={isConnecting.google || isLoading}
             />
+            <View style={[styles.separator, { backgroundColor: currentTheme.colors.border }]} />
             <SettingsRow 
-              icon={<Image source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Apple_Mail_icon.svg/2048px-Apple_Mail_icon.svg.png' }} style={styles.providerIcon} />} 
+              icon={<Image source={require('@/assets/images/applecalendar.png')} style={styles.providerIcon} />} 
               title="Add iCloud Account" 
-              onPress={() => {}} 
+              onPress={() => Alert.alert('Coming Soon', 'iCloud Mail integration is coming soon!')}
+              isConnected={false}
+              isLoading={false}
             />
+            <View style={[styles.separator, { backgroundColor: currentTheme.colors.border }]} />
             <SettingsRow 
-              icon={<Image source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Microsoft_Outlook_2019-present.svg/2048px-Microsoft_Outlook_2019-present.svg.png' }} style={styles.providerIcon} />} 
+              icon={<Image source={require('@/assets/images/applecalendar.png')} style={styles.providerIcon} />} 
               title="Add Outlook Account" 
-              onPress={() => {}} 
+              onPress={handleOutlookConnect}
+              isConnected={isProviderConnected('microsoft')}
+              isLoading={isConnecting.microsoft || isLoading}
             />
           </View>
         </View>
@@ -87,7 +215,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
   },
   backButton: {
     padding: 4,
@@ -157,11 +284,23 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 17,
   },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   providerIcon: {
     width: 28,
     height: 28,
     borderRadius: 4,
-  }
+  },
+  separator: {
+    height: 1,
+    marginLeft: 60, // Align with text, accounting for icon + gap
+  },
 }); 
  
  

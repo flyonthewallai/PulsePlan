@@ -14,10 +14,11 @@ export interface AuthenticatedRequest extends Request {
   body: any; // This ensures body property is available with proper typing
 }
 
-export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+export const authenticate = (req: Request, res: Response, next: NextFunction): void => {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    return;
   }
   const token = authHeader.split(' ')[1];
   try {
@@ -25,6 +26,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     (req as AuthenticatedRequest).user = { id: payload.sub, email: payload.email };
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    res.status(401).json({ error: 'Invalid or expired token' });
+    return;
   }
 }; 

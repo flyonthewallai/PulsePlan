@@ -14,10 +14,12 @@ if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
   console.warn('Microsoft OAuth credentials not found in environment variables. Microsoft Calendar features will be disabled.');
 }
 
-// Define Microsoft Graph API scopes
+// Define Microsoft Graph API scopes for full integration
 export const SCOPES = [
   'Calendars.Read',
   'Calendars.ReadWrite',
+  'Mail.Read',
+  'Mail.ReadWrite',
   'User.Read',
   'offline_access'
 ];

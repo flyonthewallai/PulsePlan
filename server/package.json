@@ -10,7 +10,8 @@
     "dev:port": "lsof -ti:5000 | xargs kill -9 || true && npm run dev",
     "build": "tsc",
     "watch": "tsc --watch",
-    "ports": "lsof -i :5000-5010"
+    "ports": "lsof -i :5000-5010",
+    "test:n8n": "ts-node src/scripts/test-n8n-agent.ts"
   },
   "keywords": [
     "pulseplan",

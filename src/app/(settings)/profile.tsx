@@ -82,7 +82,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]} edges={['top']}>
-      <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ChevronLeft color={currentTheme.colors.textPrimary} size={24} />
         </TouchableOpacity>
@@ -106,13 +106,6 @@ export default function ProfileScreen() {
             value={user?.email || ''}
             editable={false}
           />
-          <ProfileField
-            icon={<Phone size={24} color={currentTheme.colors.textSecondary} />}
-            label="Phone"
-            value={phone}
-            onChangeText={setPhone}
-            isLastItem
-          />
         </SettingsSection>
       </ScrollView>
     </SafeAreaView>
@@ -129,7 +122,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
   },
   backButton: {
     padding: 4,

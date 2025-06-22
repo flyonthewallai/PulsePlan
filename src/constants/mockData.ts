@@ -15,57 +15,57 @@ export type Task = {
 export const mockTasks: Task[] = [
   {
     id: '1',
-    title: 'Complete Calculus Assignment',
+    title: 'Multivariable Calculus Problem Set 7',
     subject: 'Math',
     dueDate: '2025-06-12',
     dueTime: '14:00',
     priority: 'high',
     completed: false,
-    description: 'Pages 45-50, problems 1-15',
+    description: 'Double integrals and applications - problems 15.2: 1-23 odd',
     timeEstimate: 60,
   },
   {
     id: '2',
-    title: 'Study for Physics Quiz',
+    title: 'Thermodynamics Chapter 12 Quiz Prep',
     subject: 'Science',
     dueDate: '2025-06-12',
     dueTime: '16:00',
     priority: 'medium',
     completed: false,
-    description: 'Review chapters 7-9',
+    description: 'Review ideal gas laws, entropy, and heat engines',
     timeEstimate: 90,
   },
   {
     id: '3',
-    title: 'Read Literature Assignment',
+    title: 'Comparative Literature Essay: Modernist Themes',
     subject: 'English',
     dueDate: '2025-06-12',
     dueTime: '18:00',
     priority: 'low',
     completed: true,
-    description: 'Read chapters 4-5 of The Great Gatsby',
+    description: '1500-word analysis comparing Joyce and Woolf',
     timeEstimate: 45,
   },
   {
     id: '4',
-    title: 'Group Project Meeting',
+    title: 'World War I Research Presentation',
     subject: 'History',
     dueDate: '2025-06-12',
     dueTime: '19:30',
     priority: 'high',
     completed: false,
-    description: 'Discuss research findings',
+    description: 'Group presentation on causes of WWI - practice run',
     timeEstimate: 60,
   },
   {
     id: '5',
-    title: 'Submit Canvas Discussion Post',
+    title: 'Cognitive Psychology Discussion Board',
     subject: 'Psychology',
     dueDate: '2025-06-12',
     dueTime: '23:59',
     priority: 'medium',
     completed: false,
-    description: 'Post response to weekly discussion',
+    description: 'Respond to memory consolidation theory prompt',
     timeEstimate: 30,
   },
 ];
@@ -84,14 +84,14 @@ export const mockWeekData = {
   monday: [
     {
       id: 'w1',
-      title: 'Math Study Session',
+      title: 'Linear Algebra Practice Exam',
       time: '09:00-10:30',
       subject: 'Math',
       priority: 'high',
     },
     {
       id: 'w2',
-      title: 'English Essay',
+      title: 'Victorian Literature Essay Draft',
       time: '14:00-15:30',
       subject: 'English',
       priority: 'medium',
@@ -100,7 +100,7 @@ export const mockWeekData = {
   tuesday: [
     {
       id: 'w3',
-      title: 'Physics Lab',
+      title: 'Organic Chemistry Lab Report',
       time: '10:00-12:00',
       subject: 'Science',
       priority: 'high',
@@ -109,7 +109,7 @@ export const mockWeekData = {
   wednesday: [
     {
       id: 'w4',
-      title: 'History Research',
+      title: 'Constitutional Law Case Study',
       time: '13:00-15:00',
       subject: 'History',
       priority: 'medium',
@@ -118,7 +118,7 @@ export const mockWeekData = {
   thursday: [
     {
       id: 'w5',
-      title: 'Chemistry Review',
+      title: 'Biochemistry Pathway Analysis',
       time: '16:00-17:00',
       subject: 'Science',
       priority: 'low',
@@ -127,7 +127,7 @@ export const mockWeekData = {
   friday: [
     {
       id: 'w6',
-      title: 'Literature Analysis',
+      title: 'Modern Poetry Explication Paper',
       time: '11:00-12:30',
       subject: 'English',
       priority: 'medium',
@@ -137,7 +137,7 @@ export const mockWeekData = {
   sunday: [
     {
       id: 'w7',
-      title: 'Weekly Review',
+      title: 'Weekly Academic Planning Session',
       time: '19:00-20:00',
       subject: 'General',
       priority: 'low',
@@ -151,7 +151,7 @@ export const mockTasksByDay: Task[][] = [
   [
     {
       id: 'w7',
-      title: 'Weekly Review',
+      title: 'Weekly Academic Planning Session',
       subject: 'General',
       dueDate: '2025-06-15',
       dueTime: '19:00',
@@ -164,7 +164,7 @@ export const mockTasksByDay: Task[][] = [
   [
     {
       id: 'w1',
-      title: 'Math Study Session',
+      title: 'Linear Algebra Practice Exam',
       subject: 'Math',
       dueDate: '2025-06-16',
       dueTime: '09:00',
@@ -174,7 +174,7 @@ export const mockTasksByDay: Task[][] = [
     },
     {
       id: 'w2',
-      title: 'English Essay',
+      title: 'Victorian Literature Essay Draft',
       subject: 'English',
       dueDate: '2025-06-16',
       dueTime: '14:00',
@@ -187,7 +187,7 @@ export const mockTasksByDay: Task[][] = [
   [
     {
       id: 'w3',
-      title: 'Physics Lab',
+      title: 'Organic Chemistry Lab Report',
       subject: 'Science',
       dueDate: '2025-06-17',
       dueTime: '10:00',
@@ -200,7 +200,7 @@ export const mockTasksByDay: Task[][] = [
   [
     {
       id: 'w4',
-      title: 'History Research',
+      title: 'Constitutional Law Case Study',
       subject: 'History',
       dueDate: '2025-06-18',
       dueTime: '13:00',
@@ -213,7 +213,7 @@ export const mockTasksByDay: Task[][] = [
   [
     {
       id: 'w5',
-      title: 'Chemistry Review',
+      title: 'Biochemistry Pathway Analysis',
       subject: 'Science',
       dueDate: '2025-06-19',
       dueTime: '16:00',
@@ -226,7 +226,7 @@ export const mockTasksByDay: Task[][] = [
   [
     {
       id: 'w6',
-      title: 'Literature Analysis',
+      title: 'Modern Poetry Explication Paper',
       subject: 'English',
       dueDate: '2025-06-20',
       dueTime: '11:00',

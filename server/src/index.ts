@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import calendarRoutes from './routes/calendarRoutes';
+import gmailRoutes from './routes/gmailRoutes';
+import contactsRoutes from './routes/contactsRoutes';
 import schedulingRoutes from './routes/schedulingRoutes';
 import stripeRoutes from './routes/stripeRoutes';
 import tasksRoutes from './routes/tasksRoutes';
@@ -10,6 +12,23 @@ import scheduleBlocksRouter from './routes/scheduleBlocks';
 import chatRoutes from './routes/chat';
 import canvasRoutes from './routes/canvasRoutes';
 import scrapingRoutes from './routes/scrapingRoutes';
+
+// Try to import agent routes with error handling
+let agentRoutes;
+try {
+  agentRoutes = require('./routes/agentRoutes').default;
+  console.log('✅ Agent routes imported successfully');
+} catch (error) {
+  console.error('❌ Agent routes import failed:', error instanceof Error ? error.message : String(error));
+  // Create a minimal fallback router
+  const { Router } = require('express');
+  agentRoutes = Router();
+  agentRoutes.get('/health', (req: Request, res: Response) => {
+    res.json({ healthy: false, error: 'Agent routes module failed to load', timestamp: new Date().toISOString() });
+  });
+  console.log('🔧 Created fallback agent routes');
+}
+
 import { findAvailablePort } from './utils/portUtils';
 
 // Load environment variables
@@ -80,6 +99,8 @@ app.use(express.json());
 // Routes
 app.use('/auth', authRoutes);
 app.use('/calendar', calendarRoutes);
+app.use('/gmail', gmailRoutes);
+app.use('/contacts', contactsRoutes);
 app.use('/scheduling', schedulingRoutes);
 app.use('/stripe', stripeRoutes);
 app.use('/tasks', tasksRoutes);
@@ -87,6 +108,7 @@ app.use('/schedule-blocks', scheduleBlocksRouter);
 app.use('/chat', chatRoutes);
 app.use('/canvas', canvasRoutes);
 app.use('/scraping', scrapingRoutes);
+app.use('/agent', agentRoutes);
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {

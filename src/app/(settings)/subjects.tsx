@@ -46,7 +46,7 @@ export default function SubjectsScreen() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
-            <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
+            <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <ChevronLeft color={currentTheme.colors.textPrimary} size={24} />
                 </TouchableOpacity>
@@ -72,7 +72,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: 12,
         paddingHorizontal: 16,
-        borderBottomWidth: 1,
     },
     backButton: { padding: 4 },
     addButton: { padding: 4 },

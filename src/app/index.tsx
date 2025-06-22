@@ -3,6 +3,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import PulseLoadingScreen from '@/components/PulseLoadingScreen';
 
 // This is the index page - the first page users land on
 // Navigation logic is handled in AuthContext, so this just shows loading
@@ -25,13 +26,6 @@ export default function Index() {
   }, [loading, router]);
 
   return (
-    <View style={{ 
-      flex: 1, 
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      backgroundColor: currentTheme.colors.background 
-    }}>
-      <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-    </View>
+    <PulseLoadingScreen visible={loading} text="Initializing PulsePlan..." />
   );
 }

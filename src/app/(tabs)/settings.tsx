@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
@@ -20,6 +20,7 @@ import {
   Clock,
   Star,
   School,
+  Bell,
 } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
@@ -129,16 +130,44 @@ export default function SettingsScreen() {
         </SettingsSection>
           
         <SettingsSection title="Preferences">
+          <SettingsRow icon={<Bell color={currentTheme.colors.textSecondary} size={24} />} title="Reminders" onPress={() => router.push('/(settings)/reminders')} />
           <SettingsRow icon={<Palette color={currentTheme.colors.textSecondary} size={24} />} title="Appearance" onPress={() => router.push('/(settings)/appearance')} />
           <SettingsRow icon={<Clock color={currentTheme.colors.textSecondary} size={24} />} title="Study Times" onPress={() => router.push('/(settings)/study')} />
           <SettingsRow icon={<GraduationCap color={currentTheme.colors.textSecondary} size={24} />} title="Subjects" onPress={() => router.push('/(settings)/subjects')} isLastItem />
         </SettingsSection>
         
         <SettingsSection title="Integrations">
-          <SettingsRow icon={<Calendar color={currentTheme.colors.textSecondary} size={24} />} title="Calendar" value="Not Connected" onPress={() => router.push('/(settings)/integrations/calendar')} />
-          <SettingsRow icon={<Mails color={currentTheme.colors.textSecondary} size={24} />} title="Mail" value="Not Connected" onPress={() => router.push('/(settings)/integrations/mail')} />
-          <SettingsRow icon={<School color={currentTheme.colors.textSecondary} size={24} />} title="Canvas" value="Not Connected" onPress={() => router.push('/(settings)/integrations/canvas')} />
-          <SettingsRow icon={<BookText color={currentTheme.colors.textSecondary} size={24} />} title="Notes" value="Not Connected" onPress={() => router.push('/(settings)/integrations/notes')} isLastItem />
+          <SettingsRow 
+            icon={<Image source={require('@/assets/images/applecalendar.png')} style={{ width: 24, height: 24 }} />} 
+            title="Calendar" 
+            value="Not Connected" 
+            onPress={() => router.push('/(settings)/integrations/calendar')} 
+          />
+          <SettingsRow 
+            icon={<Image source={require('@/assets/images/gmail.png')} style={{ width: 24, height: 24 }} />} 
+            title="Mail" 
+            value="Not Connected" 
+            onPress={() => router.push('/(settings)/integrations/mail')} 
+          />
+          <SettingsRow 
+            icon={<Image source={require('@/assets/images/applecontacts.webp')} style={{ width: 24, height: 24 }} />} 
+            title="Contacts" 
+            value="Not Connected" 
+            onPress={() => router.push('/(settings)/integrations/contacts')} 
+          />
+          <SettingsRow 
+            icon={<Image source={require('@/assets/images/canvas.png')} style={{ width: 24, height: 24 }} />} 
+            title="Canvas" 
+            value="Not Connected" 
+            onPress={() => router.push('/(settings)/integrations/canvas')} 
+          />
+          <SettingsRow 
+            icon={<Image source={require('@/assets/images/notion.png')} style={{ width: 24, height: 24 }} />} 
+            title="Notes" 
+            value="Not Connected" 
+            onPress={() => router.push('/(settings)/integrations/notes')} 
+            isLastItem 
+          />
         </SettingsSection>
 
         <SettingsSection title="About">
@@ -160,7 +189,12 @@ export default function SettingsScreen() {
               title="Terms of Service" 
               onPress={() => Linking.openURL('https://pulseplan.app/terms')} 
             />
-            <SettingsRow icon={<Info color={currentTheme.colors.textSecondary} size={24} />} title="Contact Us" onPress={() => {}} isLastItem={subscriptionPlan !== 'free'} />
+            <SettingsRow 
+              icon={<Info color={currentTheme.colors.textSecondary} size={24} />} 
+              title="Contact Us" 
+              onPress={() => Linking.openURL('mailto:hello@pulseplan.app')} 
+              isLastItem={subscriptionPlan !== 'free'} 
+            />
         </SettingsSection>
         
         <SettingsSection title="">

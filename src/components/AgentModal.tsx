@@ -24,6 +24,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useTasks } from '../contexts/TaskContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { chatAPIService, ChatMessage } from '../services/chatService';
+import { agentAPIService, AgentMessage } from '../services/agentService';
 import { schedulingAPIService } from '../services/schedulingService';
 import { formatAIResponse } from '../utils/markdownParser';
 
@@ -55,6 +56,7 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string>('');
   const [showQuickActions, setShowQuickActions] = useState(true);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -97,7 +99,6 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
         isUser: false 
       }]);
       
-      setShowQuickActions(true);
       setConversationHistory([]);
       
       setTimeout(() => {
@@ -107,6 +108,14 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
       }, 300);
     }
   }, [visible]);
+
+  // Hide quick actions when there are user messages in the conversation
+  useEffect(() => {
+    const hasUserMessages = messages.some(msg => msg.isUser);
+    setShowQuickActions(!hasUserMessages);
+  }, [messages]);
+
+
 
   // Keyboard event listeners for better handling
   useEffect(() => {
@@ -143,26 +152,71 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
     setMessages(prev => [...prev, newUserMessage]);
     if (!messageText) setInput('');
     setIsTyping(true);
-    setShowQuickActions(false);
     
     try {
-      // Special handling for scheduling requests
-      if (textToSend.toLowerCase().includes('schedule') && textToSend.toLowerCase().includes('optimized')) {
-        await handleIntelligentScheduling(textToSend);
-        return;
+      // Send to n8n agent instead of direct OpenAI
+      const context = {
+        currentPage: 'agent_modal',
+        recentTasks: tasks.slice(0, 5), // Include recent tasks for context
+        chatHistory: conversationHistory.slice(-4), // Last 4 messages for context
+        conversationId: conversationId,
+        workingHours: workingHours,
+      };
+
+      const response = await agentAPIService.sendChatMessage(textToSend, conversationId, context);
+      
+      // DEBUG: Log the full response
+      console.log('Full agent response:', JSON.stringify(response, null, 2));
+      console.log('Response data:', response.data);
+      console.log('Response data.response:', response.data?.response);
+      
+      // Update conversation ID if provided
+      if (response.conversationId) {
+        setConversationId(response.conversationId);
+      }
+
+      let responseText = '';
+      if (response.success) {
+        // Handle successful response from n8n agent
+        if (response.data && typeof response.data.response === 'string') {
+          responseText = response.data.response;
+        } else if (response.data && response.data.data && typeof response.data.data.response === 'string') {
+          // Handle nested data structure
+          responseText = response.data.data.response;
+        } else if (response.message) {
+          responseText = response.message;
+        } else if (response.data) {
+          // If the agent returns structured data, format it nicely
+          responseText = `✅ **Task completed successfully!**\n\n`;
+          if (response.data.summary) {
+            responseText += response.data.summary;
+          } else {
+            responseText += 'I have successfully completed your request.';
+          }
+          
+          // Add any additional information from the agent
+          if (response.data.details) {
+            responseText += `\n\n**Details:**\n${response.data.details}`;
+          }
+          
+          if (response.data.next_steps) {
+            responseText += `\n\n**Next Steps:**\n${response.data.next_steps}`;
+          }
+        } else {
+          responseText = 'Task completed successfully!';
+        }
+      } else {
+        // Handle error from n8n agent, but provide a helpful message
+        responseText = response.error || 'I encountered an issue processing your request. Could you try rephrasing it?';
       }
       
-      // Build conversation history for API
-      const messagesToSend: ChatMessage[] = [
-        ...conversationHistory,
-        { role: 'user', content: textToSend }
-      ];
+      // Ensure we always have some response text
+      if (!responseText || responseText.trim() === '') {
+        responseText = 'Hello! I received your message but had trouble generating a response. Please try again.';
+      }
       
-      // Send to GPT API
-      const response = await chatAPIService.sendMessage(messagesToSend);
-      
-      // Format the AI response to clean markdown
-      const formattedResponse = formatAIResponse(response.content);
+      // Format the AI response
+      const formattedResponse = formatAIResponse(responseText);
       
       // Add AI response
       const newAIMessage = {
@@ -173,19 +227,19 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
       
       setMessages(prev => [...prev, newAIMessage]);
       
-      // Update conversation history
+      // Update conversation history for context
       setConversationHistory(prev => [
         ...prev,
         { role: 'user', content: textToSend },
-        { role: 'assistant', content: response.content }
+        { role: 'assistant', content: responseText }
       ]);
       
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error processing your request:', error);
       
       const errorMessage = {
         id: (Date.now() + 1).toString(),
-        text: error instanceof Error ? error.message : 'Sorry, I encountered an error. Please try again.',
+        text: error instanceof Error ? error.message : 'Sorry, I encountered an error connecting to our servers. Please try again.',
         isUser: false,
       };
       
@@ -195,7 +249,7 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
       if (error instanceof Error && error.message.includes('Authentication')) {
         Alert.alert(
           'Authentication Error',
-          'Please log in again to continue using the AI assistant.',
+          'Please log in again.',
           [{ text: 'OK', onPress: onClose }]
         );
       }
@@ -279,6 +333,7 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
   };
 
   const handleQuickAction = (action: QuickAction) => {
+    // This will trigger sendMessage which handles hiding quick actions permanently
     sendMessage(action.prompt);
   };
   
@@ -319,7 +374,7 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
       onRequestClose={onClose}
     >
       <View style={[styles.modalContainer, { backgroundColor: currentTheme.colors.background }]}>
-        <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
+        <View style={styles.header}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <ArrowLeft color={currentTheme.colors.textSecondary} size={24} />
           </TouchableOpacity>
@@ -340,21 +395,26 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
           keyboardShouldPersistTaps="handled"
         >
           {messages.map(message => (
-            <View key={message.id} style={styles.chatContainer}>
-              {!message.isUser && (
+            <View key={message.id}>
+              {message.isUser ? (
+                // User message with gray bubble
+                <View style={[styles.messageRow, styles.userMessageRow]}>
+                  <View style={styles.userBubble}>
+                    <Text style={styles.userMessage}>
+                      {message.text}
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                // AI message using original format
+                <View style={styles.chatContainer}>
                 <View style={[styles.logoContainer, { backgroundColor: currentTheme.colors.card }]}>
                   <BrainCircuit color={currentTheme.colors.textPrimary} size={24} />
                 </View>
-              )}
-              <View style={[
-                styles.messageWrapper,
-                message.isUser ? styles.userMessageWrapper : null
-              ]}>
-                {!message.isUser && (
+                  <View style={styles.messageWrapper}>
                   <Text style={[styles.agentName, { color: currentTheme.colors.textPrimary }]}>
                     Pulse
                   </Text>
-                )}
                 <Text style={[
                   styles.messageText,
                   { color: currentTheme.colors.textPrimary }
@@ -362,6 +422,8 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
                   {message.text}
                 </Text>
               </View>
+                </View>
+              )}
             </View>
           ))}
           
@@ -467,7 +529,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
   },
   closeButton: {
     padding: 4,
@@ -511,6 +572,33 @@ const styles = StyleSheet.create({
   },
   userMessageWrapper: {
     alignItems: 'flex-end',
+  },
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 6,
+  },
+  userMessageRow: {
+    justifyContent: 'flex-end',
+    paddingLeft: 44, // 32px (icon width) + 12px (gap) to mirror Pulse's layout
+    paddingRight: 0, // Remove extra padding since messageContent already has padding
+    marginTop: 12,
+    marginBottom: 24,
+  },
+  userBubble: {
+    backgroundColor: '#3C3C3E',
+    alignSelf: 'flex-end',
+    maxWidth: '85%',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginRight: 0, // Align to the right edge like Pulse's text aligns to the left
+  },
+  userMessage: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '400',
   },
   agentName: {
     fontWeight: 'bold',

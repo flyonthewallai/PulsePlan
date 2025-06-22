@@ -101,7 +101,7 @@ export default function CanvasIntegrationModal({ visible, onClose }: CanvasInteg
     <ScrollView 
       style={styles.content}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FFFFFF" />
       }
     >
       {/* Header */}
@@ -381,7 +381,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
   },
   closeButton: {
     padding: 4,

@@ -67,7 +67,6 @@ export default function HourlyScheduleView({
   const tempPanRef = useRef(new Animated.ValueXY()).current;
   const taskCreationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const scheduleRef = useRef<View>(null);
-  const [scrollOffset, setScrollOffset] = useState(0);
   
   // Ensure we have valid study hours with fallbacks
   const validStartHour = studyStartHour || 9;
@@ -194,10 +193,10 @@ export default function HourlyScheduleView({
     const finalY = temporaryTask.startY + translationY;
     
     // Calculate hour based on the final position
-    const hourIndex = Math.floor((finalY + scrollOffset + HOUR_HEIGHT / 2) / TOTAL_HOUR_HEIGHT);
+    const hourIndex = Math.floor((finalY + HOUR_HEIGHT / 2) / TOTAL_HOUR_HEIGHT);
     const newHour = Math.max(validStartHour, Math.min(validEndHour, validStartHour + hourIndex));
     const newHourIndex = newHour - validStartHour;
-    const snappedY = newHourIndex * TOTAL_HOUR_HEIGHT - scrollOffset;
+    const snappedY = newHourIndex * TOTAL_HOUR_HEIGHT;
     
     setTemporaryTask(prev => {
       if (!prev) return null;
@@ -382,7 +381,7 @@ export default function HourlyScheduleView({
     }
 
     const { y } = event;
-    const hour = getHourFromPosition(y + scrollOffset);
+    const hour = getHourFromPosition(y);
     
     if (hour < validStartHour || hour > validEndHour) {
       console.log('Long press outside valid hours');
@@ -531,17 +530,13 @@ export default function HourlyScheduleView({
         onScrollEndDrag={() => {
           setTimeout(() => setIsScrolling(false), 200);
         }}
-        onScroll={(event) => {
-          // Capture current vertical scroll offset for use in coordinate calculations
-          setScrollOffset(event.nativeEvent.contentOffset.y);
-        }}
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={loading}
             onRefresh={refreshTasks}
-            tintColor={currentTheme.colors.primary}
-            colors={[currentTheme.colors.primary]}
+            tintColor="#FFFFFF"
+            colors={["#FFFFFF"]}
             progressBackgroundColor="transparent"
           />
         }

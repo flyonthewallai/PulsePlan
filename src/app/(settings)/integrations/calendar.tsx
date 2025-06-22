@@ -1,36 +1,140 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Calendar as CalendarIcon, Mail, Book, Building } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { ChevronLeft, Calendar as CalendarIcon, Mail, Book, Building, Check, X } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { CalendarService } from '@/services/calendarService';
 
-// Reusable components from SettingsScreen (could be moved to a separate file)
+// Simple SettingsRow component matching the design
 const SettingsRow = ({
   icon,
   title,
   onPress,
+  isConnected,
+  isLoading,
 }: {
   icon: React.ReactNode;
   title: string;
   onPress?: () => void;
+  isConnected?: boolean;
+  isLoading?: boolean;
 }) => {
   const { currentTheme } = useTheme();
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress}>
+    <TouchableOpacity style={styles.row} onPress={onPress} disabled={isLoading}>
       <View style={styles.rowLeft}>
         {icon}
         <Text style={[styles.rowTitle, { color: currentTheme.colors.textPrimary }]}>{title}</Text>
       </View>
+      <View style={styles.rowRight}>
+        {isLoading ? (
+          <Text style={[styles.statusText, { color: currentTheme.colors.textSecondary }]}>Loading...</Text>
+        ) : isConnected ? (
+          <Check size={20} color="#10B981" />
+        ) : (
       <ChevronLeft color={currentTheme.colors.textSecondary} size={20} style={{ transform: [{ rotate: '180deg' }] }} />
+        )}
+      </View>
     </TouchableOpacity>
   );
 };
 
+interface ConnectionStatus {
+  connected: boolean;
+  providers: Array<{
+    provider: 'google' | 'microsoft';
+    email: string;
+    connectedAt: string;
+    expiresAt?: string;
+    isActive: boolean;
+  }>;
+}
+
 export default function CalendarIntegrationScreen() {
   const router = useRouter();
   const { currentTheme } = useTheme();
+  const { user } = useAuth();
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isConnecting, setIsConnecting] = useState<{ google?: boolean; microsoft?: boolean }>({});
+
+  // Load connection status on component mount and when screen comes into focus
+  useEffect(() => {
+    loadConnectionStatus();
+  }, [user]);
+
+  // Refresh connection status when screen comes into focus (after OAuth flow)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id) {
+        loadConnectionStatus();
+      }
+    }, [user?.id])
+  );
+
+  const loadConnectionStatus = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsLoading(true);
+      const status = await CalendarService.getConnectionStatus(user.id);
+      setConnectionStatus(status);
+    } catch (error) {
+      console.error('Error loading connection status:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleConnect = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Please sign in to connect your Google account');
+      return;
+    }
+
+    try {
+      setIsConnecting({ ...isConnecting, google: true });
+      await CalendarService.connectGoogle(user.id);
+      // Connection status will be updated when user returns from OAuth flow
+    } catch (error) {
+      console.error('Error connecting Google:', error);
+      Alert.alert('Error', 'Failed to connect Google account. Please try again.');
+    } finally {
+      setIsConnecting({ ...isConnecting, google: false });
+    }
+  };
+
+  const handleMicrosoftConnect = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Please sign in to connect your Microsoft account');
+      return;
+    }
+
+    try {
+      setIsConnecting({ ...isConnecting, microsoft: true });
+      await CalendarService.connectMicrosoft(user.id);
+      // Connection status will be updated when user returns from OAuth flow
+    } catch (error) {
+      console.error('Error connecting Microsoft:', error);
+      Alert.alert('Error', 'Failed to connect Microsoft account. Please try again.');
+    } finally {
+      setIsConnecting({ ...isConnecting, microsoft: false });
+    }
+  };
+
+  // Check if a provider is connected
+  const isProviderConnected = (provider: 'google' | 'microsoft'): boolean => {
+    return connectionStatus?.providers?.some(p => p.provider === provider && p.isActive) || false;
+  };
+
+  // Get provider email if connected
+  const getProviderEmail = (provider: 'google' | 'microsoft'): string | undefined => {
+    return connectionStatus?.providers?.find(p => p.provider === provider && p.isActive)?.email;
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
@@ -47,9 +151,9 @@ export default function CalendarIntegrationScreen() {
           <View style={[styles.promoIconContainer, { backgroundColor: currentTheme.colors.background }]}>
             <CalendarIcon size={32} color={currentTheme.colors.textPrimary} />
           </View>
-          <Text style={[styles.promoTitle, { color: currentTheme.colors.textPrimary }]}>Give PulsePlan your calendar</Text>
+          <Text style={[styles.promoTitle, { color: currentTheme.colors.textPrimary }]}>Connect your accounts</Text>
           <Text style={[styles.promoDescription, { color: currentTheme.colors.textSecondary }]}>
-            PulsePlan can fetch, create, and edit events on command. It also proactively checks your schedule when drafting emails or scheduling tasks on your behalf.
+            Connect your Google and Microsoft accounts to let PulsePlan access your calendar and Gmail. This enables AI-powered scheduling, email management, and seamless task creation.
           </Text>
         </View>
 
@@ -57,14 +161,27 @@ export default function CalendarIntegrationScreen() {
           <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>SIGN IN WITH YOUR PROVIDER</Text>
           <View style={[styles.sectionBody, { backgroundColor: currentTheme.colors.surface }]}>
             <SettingsRow 
-              icon={<Image source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg' }} style={styles.providerIcon} />} 
+              icon={<Image source={require('@/assets/images/googlecalendar.png')} style={styles.providerIcon} />} 
               title="Add Google Calendar" 
-              onPress={() => {}} 
+              onPress={handleGoogleConnect}
+              isConnected={isProviderConnected('google')}
+              isLoading={isConnecting.google || isLoading}
             />
+            <View style={[styles.separator, { backgroundColor: currentTheme.colors.border }]} />
             <SettingsRow 
-              icon={<Image source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Apple_Mail_icon.svg/2048px-Apple_Mail_icon.svg.png' }} style={styles.providerIcon} />} 
+              icon={<Image source={require('@/assets/images/applecalendar.png')} style={styles.providerIcon} />} 
               title="Add iCloud Calendar" 
-              onPress={() => {}} 
+              onPress={() => Alert.alert('Coming Soon', 'iCloud Calendar integration is coming soon!')}
+              isConnected={false}
+              isLoading={false}
+            />
+            <View style={[styles.separator, { backgroundColor: currentTheme.colors.border }]} />
+            <SettingsRow 
+              icon={<Image source={require('@/assets/images/applecalendar.png')} style={styles.providerIcon} />} 
+              title="Add Outlook Calendar" 
+              onPress={handleMicrosoftConnect}
+              isConnected={isProviderConnected('microsoft')}
+              isLoading={isConnecting.microsoft || isLoading}
             />
           </View>
         </View>
@@ -83,7 +200,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
   },
   backButton: {
     padding: 4,
@@ -141,7 +257,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
   },
   rowLeft: {
     flexDirection: 'row',
@@ -151,11 +266,23 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 17,
   },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   providerIcon: {
     width: 28,
     height: 28,
     borderRadius: 4,
-  }
+  },
+  separator: {
+    height: 1,
+    marginLeft: 60, // Align with text, accounting for icon + gap
+  },
 }); 
  
  

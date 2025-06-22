@@ -26,10 +26,11 @@ import {
 
 import TaskCard from '../../components/TaskCard';
 import CompletionRing from '../../components/CompletionRing';
-import AIAssistantButton from '../../components/AIAssistantButton';
+import AIAssistantButton from '../../components/AgentButton';
 import TaskCreateModal from '../../components/TaskCreateModal';
-import AIAssistantModal from '../../components/AIAssistantModal';
+import AIAssistantModal from '../../components/AgentModal';
 import DailySummaryCard from '../../components/DailySummaryCard';
+import SimpleTodosCard from '../../components/SimpleTodosCard';
 import { useTasks, Task } from '../../contexts/TaskContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -186,14 +187,17 @@ export default function HomeScreen() {
             <RefreshControl
               refreshing={loading}
               onRefresh={refreshTasks}
-              tintColor={currentTheme.colors.primary}
-              colors={[currentTheme.colors.primary]}
+              tintColor="#FFFFFF"
+              colors={["#FFFFFF"]}
               progressBackgroundColor="transparent"
             />
           }
         >
           {/* Daily Summary Card */}
           <DailySummaryCard />
+
+          {/* Simple Todos Card */}
+          <SimpleTodosCard />
 
           {/* Priority Overview Section */}
           {priorityTasks.length > 0 && (
@@ -205,22 +209,22 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.sortToggles}>
                   <TouchableOpacity
-                    style={[styles.sortToggle, sortType === 'due' && { backgroundColor: currentTheme.colors.primary }]}
+                    style={[styles.sortToggle, sortType === 'due' && styles.sortToggleActive]}
                     onPress={() => setSortType('due')}
                   >
-                    <Clock size={12} color={sortType === 'due' ? '#FFFFFF' : currentTheme.colors.textSecondary} />
+                    <Clock size={12} color="#FFFFFF" />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.sortToggle, sortType === 'priority' && { backgroundColor: currentTheme.colors.primary }]}
+                    style={[styles.sortToggle, sortType === 'priority' && styles.sortToggleActive]}
                     onPress={() => setSortType('priority')}
                   >
-                    <AlertTriangle size={12} color={sortType === 'priority' ? '#FFFFFF' : currentTheme.colors.textSecondary} />
+                    <AlertTriangle size={12} color="#FFFFFF" />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.sortToggle, sortType === 'subject' && { backgroundColor: currentTheme.colors.primary }]}
+                    style={[styles.sortToggle, sortType === 'subject' && styles.sortToggleActive]}
                     onPress={() => setSortType('subject')}
                   >
-                    <BookOpen size={12} color={sortType === 'subject' ? '#FFFFFF' : currentTheme.colors.textSecondary} />
+                    <BookOpen size={12} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -416,7 +420,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'transparent',
+  },
+  sortToggleActive: {
+    borderColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   
   // Priority Items

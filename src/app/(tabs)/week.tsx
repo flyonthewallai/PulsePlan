@@ -14,8 +14,8 @@ import { ChevronLeft, ChevronRight, Sparkles, Sprout } from 'lucide-react-native
 
 import TaskCard from '../../components/TaskCard';
 import HourlyScheduleView from '../../components/HourlyScheduleView';
-import AIAssistantButton from '../../components/AIAssistantButton';
-import AIAssistantModal from '../../components/AIAssistantModal';
+import AIAssistantButton from '../../components/AgentButton';
+import AIAssistantModal from '../../components/AgentModal';
 import { StreakModal } from '../../components/StreakModal';
 import { useTasks } from '../../contexts/TaskContext';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -175,8 +175,8 @@ export default function WeekScreen() {
                 <RefreshControl
                   refreshing={loading}
                   onRefresh={refreshTasks}
-                  tintColor={currentTheme.colors.primary}
-                  colors={[currentTheme.colors.primary]}
+                  tintColor="#FFFFFF"
+                  colors={["#FFFFFF"]}
                   progressBackgroundColor="transparent"
                 />
               }

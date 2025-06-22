@@ -1,5 +1,6 @@
 import { getApiUrl } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabaseAuth } from '@/lib/supabase-rn';
 
 export interface SchedulingTask {
   id: string;
@@ -42,18 +43,21 @@ export interface SchedulingResult {
 class SchedulingAPIService {
   private async getAuthToken(): Promise<string | null> {
     try {
-      // Get the session from the Supabase storage format
-      const sessionData = await AsyncStorage.getItem('supabase.auth.token');
+      // Use the Supabase client to get the current session
+      const { data: { session }, error } = await supabaseAuth.auth.getSession();
       
-      if (!sessionData) {
-        console.error('No session found in AsyncStorage');
+      if (error) {
+        console.error('Error getting session:', error.message);
         return null;
       }
 
-      const session = JSON.parse(sessionData);
-      
-      if (!session || !session.access_token) {
-        console.error('Invalid session or missing access token');
+      if (!session) {
+        console.error('No session found');
+        return null;
+      }
+
+      if (!session.access_token) {
+        console.error('No access token in session');
         return null;
       }
 

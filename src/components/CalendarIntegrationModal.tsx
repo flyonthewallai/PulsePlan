@@ -445,7 +445,7 @@ export default function CalendarIntegrationModal({ visible, onClose }: CalendarI
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor={currentTheme.colors.primary}
+              tintColor="#FFFFFF"
             />
           }
         >
