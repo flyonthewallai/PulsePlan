@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  User,
+  Brain,
   Bell,
   Mic,
   Plus,
@@ -34,6 +34,7 @@ import { useTasks } from '@/contexts/TaskContext';
 import { agentAPIService } from '@/services/agentService';
 import SubscriptionModal from '@/components/SubscriptionModal';
 import AgentInstructionsModal from '@/components/AgentInstructionsModal';
+import NotificationModal from '@/components/NotificationModal';
 import { MarkdownText } from '@/components/MarkdownText';
 
 const FIRST_VISIT_KEY = '@pulse_first_visit';
@@ -53,6 +54,7 @@ export default function AgentScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const [isSubscriptionModalVisible, setIsSubscriptionModalVisible] = useState(false);
   const [isInstructionsModalVisible, setIsInstructionsModalVisible] = useState(false);
+  const [isNotificationModalVisible, setIsNotificationModalVisible] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(true);
 
   useEffect(() => {
@@ -374,7 +376,7 @@ export default function AgentScreen() {
         style={styles.headerIcon}
         onPress={() => setIsInstructionsModalVisible(true)}
       >
-        <User size={24} color={currentTheme.colors.textSecondary} />
+        <Brain size={24} color={currentTheme.colors.textSecondary} />
       </TouchableOpacity>
       <View style={styles.headerCenter}>
         {subscriptionPlan === 'free' && (
@@ -387,7 +389,10 @@ export default function AgentScreen() {
           </TouchableOpacity>
         )}
       </View>
-      <TouchableOpacity style={styles.headerIcon}>
+      <TouchableOpacity 
+        style={styles.headerIcon}
+        onPress={() => setIsNotificationModalVisible(true)}
+      >
         <Bell size={24} color={currentTheme.colors.textSecondary} />
       </TouchableOpacity>
     </View>
@@ -676,6 +681,11 @@ export default function AgentScreen() {
         <AgentInstructionsModal
           visible={isInstructionsModalVisible}
           onClose={() => setIsInstructionsModalVisible(false)}
+        />
+
+        <NotificationModal 
+          visible={isNotificationModalVisible}
+          onClose={() => setIsNotificationModalVisible(false)}
         />
       </SafeAreaView>
     </KeyboardAvoidingView>

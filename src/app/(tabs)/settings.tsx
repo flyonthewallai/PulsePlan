@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as Location from 'expo-location';
 import { 
   ChevronRight,
   LogOut,
@@ -21,10 +22,12 @@ import {
   Star,
   School,
   Bell,
+  MapPin,
 } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/contexts/ProfileContext';
 import { signOut } from '@/lib/supabase-rn';
 import SubscriptionModal from '@/components/SubscriptionModal';
 
@@ -79,7 +82,81 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { currentTheme } = useTheme();
   const { user, refreshAuth, subscriptionPlan } = useAuth();
+  const { profileData, updateLocation, getLocationData } = useProfile();
   const [isSubscriptionModalVisible, setIsSubscriptionModalVisible] = useState(false);
+  const [isLocationLoading, setIsLocationLoading] = useState(false);
+
+  // Get current timezone
+  const getCurrentTimezone = () => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (error) {
+      console.error('Error getting timezone:', error);
+      return 'UTC';
+    }
+  };
+
+  const handleLocationUpdate = async () => {
+    setIsLocationLoading(true);
+    
+    try {
+      // Request location permissions
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Location permission is required to update your location. Please enable it in settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() }
+          ]
+        );
+        setIsLocationLoading(false);
+        return;
+      }
+
+      // Get current location
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      // Reverse geocode to get city name
+      const reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      if (reverseGeocode.length > 0) {
+        const address = reverseGeocode[0];
+        const cityName = address.city || address.district || address.region || 'Unknown City';
+        const timezone = getCurrentTimezone();
+        
+        // Save location and timezone to profile context
+        await updateLocation(cityName, timezone);
+        
+        Alert.alert('Location Updated', `Your location has been set to ${cityName}`);
+      } else {
+        Alert.alert('Error', 'Could not determine your city location. Please try again.');
+      }
+    } catch (error) {
+      console.error('Location error:', error);
+      Alert.alert('Error', 'Failed to get your location. Please check your internet connection and try again.');
+    } finally {
+      setIsLocationLoading(false);
+    }
+  };
+
+  const formatLocationValue = () => {
+    if (isLocationLoading) return 'Updating...';
+    
+    const { city, timezone } = getLocationData();
+    if (city) {
+      const shortTimezone = timezone?.split('/').pop() || timezone;
+      return `${city} (${shortTimezone})`;
+    }
+    return 'Not set';
+  };
 
   const handleLogout = async () => {
     try {
@@ -109,7 +186,6 @@ export default function SettingsScreen() {
     );
   };
 
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]} edges={['top']}>
       <View style={styles.header}>
@@ -125,6 +201,12 @@ export default function SettingsScreen() {
             title="Profile" 
             value={user?.user_metadata?.full_name || user?.email}
             onPress={() => router.push('/(settings)/profile')} 
+          />
+          <SettingsRow 
+            icon={<MapPin color={currentTheme.colors.textSecondary} size={24} />} 
+            title="Location" 
+            value={formatLocationValue()}
+            onPress={handleLocationUpdate}
             isLastItem
           />
         </SettingsSection>

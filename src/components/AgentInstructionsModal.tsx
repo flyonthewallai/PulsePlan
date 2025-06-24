@@ -9,11 +9,13 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { X } from 'lucide-react-native';
+import { X, Lock } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { usePremium } from '@/contexts/PremiumContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const INSTRUCTIONS_KEY = '@pulse_agent_instructions';
+const MEMORIES_KEY = '@pulse_agent_memories';
 
 interface AgentInstructionsModalProps {
   visible: boolean;
@@ -22,12 +24,15 @@ interface AgentInstructionsModalProps {
 
 export default function AgentInstructionsModal({ visible, onClose }: AgentInstructionsModalProps) {
   const { currentTheme } = useTheme();
+  const { isPremium } = usePremium();
   const [instructions, setInstructions] = useState('');
+  const [memories, setMemories] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     if (visible) {
       loadInstructions();
+      loadMemories();
     }
   }, [visible]);
 
@@ -42,23 +47,48 @@ export default function AgentInstructionsModal({ visible, onClose }: AgentInstru
     }
   };
 
+  const loadMemories = async () => {
+    try {
+      const savedMemories = await AsyncStorage.getItem(MEMORIES_KEY);
+      if (savedMemories) {
+        setMemories(savedMemories);
+      }
+    } catch (error) {
+      console.error('Error loading memories:', error);
+    }
+  };
+
   const saveInstructions = async () => {
     try {
       await AsyncStorage.setItem(INSTRUCTIONS_KEY, instructions);
-      setHasChanges(false);
     } catch (error) {
       console.error('Error saving instructions:', error);
     }
   };
 
-  const handleTextChange = (text: string) => {
+  const saveMemories = async () => {
+    try {
+      await AsyncStorage.setItem(MEMORIES_KEY, memories);
+    } catch (error) {
+      console.error('Error saving memories:', error);
+    }
+  };
+
+  const handleInstructionsChange = (text: string) => {
     setInstructions(text);
     setHasChanges(true);
   };
 
-  const handleClose = () => {
+  const handleMemoriesChange = (text: string) => {
+    setMemories(text);
+    setHasChanges(true);
+  };
+
+  const handleClose = async () => {
     if (hasChanges) {
-      saveInstructions();
+      await saveInstructions();
+      await saveMemories();
+      setHasChanges(false);
     }
     onClose();
   };
@@ -91,14 +121,14 @@ export default function AgentInstructionsModal({ visible, onClose }: AgentInstru
             onPress={handleClose}
           >
             <Text style={[styles.doneButtonText, { color: currentTheme.colors.primary }]}>
-              Done
+              Save
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Content */}
         <View style={styles.content}>
-          {/* Section Header */}
+          {/* Additional Instructions Section */}
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>
               ADDITIONAL INSTRUCTIONS
@@ -108,12 +138,11 @@ export default function AgentInstructionsModal({ visible, onClose }: AgentInstru
             </Text>
           </View>
 
-          {/* Text Input */}
           <View style={[styles.inputContainer, { backgroundColor: currentTheme.colors.surface }]}>
             <TextInput
               style={[styles.textInput, { color: currentTheme.colors.textPrimary }]}
               value={instructions}
-              onChangeText={handleTextChange}
+              onChangeText={handleInstructionsChange}
               placeholder="Ex: Speak in a formal and professional tone, use emojis in your responses, call me sir."
               placeholderTextColor={currentTheme.colors.textSecondary}
               multiline
@@ -122,10 +151,54 @@ export default function AgentInstructionsModal({ visible, onClose }: AgentInstru
             />
           </View>
 
-          {/* Description */}
           <Text style={[styles.description, { color: currentTheme.colors.textSecondary }]}>
-            Specify any personality traits or speaking styles you'd like Martin to have. Provide additional context about your life or your work for Martin to take into account.
+            Specify any personality traits or speaking styles you'd like Pulse to have. Provide additional context about your life or your work for Pulse to take into account.
           </Text>
+
+          {/* Memories Section */}
+          <View style={styles.memoriesContainer}>
+            <View style={[styles.sectionHeader, styles.memoriesSection]}>
+              <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>
+                MEMORIES
+              </Text>
+              <Text style={[styles.characterCount, { color: currentTheme.colors.textSecondary }]}>
+                {memories.length}/500
+              </Text>
+            </View>
+
+            <View style={[styles.inputContainer, { backgroundColor: currentTheme.colors.surface }]}>
+              <TextInput
+                style={[styles.textInput, { color: currentTheme.colors.textPrimary }]}
+                value={memories}
+                onChangeText={handleMemoriesChange}
+                placeholder="Ex: I'm a college student majoring in computer science, I work part-time at a coffee shop, I prefer studying in the evenings."
+                placeholderTextColor={currentTheme.colors.textSecondary}
+                multiline
+                maxLength={500}
+                textAlignVertical="top"
+                editable={isPremium}
+              />
+            </View>
+
+            <Text style={[styles.description, { color: currentTheme.colors.textSecondary }]}>
+              Provide context about your life, preferences, schedule, and any important details you'd like Pulse to remember when assisting you.
+            </Text>
+
+            {/* Premium Overlay */}
+            {!isPremium && (
+              <View style={[styles.premiumOverlay, { backgroundColor: `${currentTheme.colors.background}CC` }]}>
+                <View style={[styles.premiumContent, { backgroundColor: currentTheme.colors.surface }]}>
+                  <Lock color={currentTheme.colors.textSecondary} size={24} />
+                  <Text style={[styles.premiumTitle, { color: currentTheme.colors.textPrimary }]}>
+                    Premium Feature
+                  </Text>
+                  <Text style={[styles.premiumSubtitle, { color: currentTheme.colors.textSecondary }]}>
+                    Upgrade to Premium to access memories
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
       </SafeAreaView>
     </Modal>
@@ -173,6 +246,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  memoriesSection: {
+    marginTop: 32,
+  },
+  memoriesContainer: {
+    position: 'relative',
+  },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '500',
@@ -198,5 +277,38 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
     marginTop: 8,
+  },
+  premiumOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  premiumContent: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  premiumTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  premiumSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
   },
 }); 
