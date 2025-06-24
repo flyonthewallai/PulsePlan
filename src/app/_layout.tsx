@@ -1,5 +1,5 @@
 import '../../polyfills';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,6 +8,8 @@ import { TaskProvider } from '../contexts/TaskContext';
 import { SettingsProvider } from '../contexts/SettingsContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { StreakProvider } from '../contexts/StreakContext';
+import { PremiumProvider, usePremium } from '../contexts/PremiumContext';
+import { ProfileProvider } from '../contexts/ProfileContext';
 
 function AppWithTheme() {
   const { currentTheme } = useTheme();
@@ -30,19 +32,33 @@ function AppWithTheme() {
   );
 }
 
+function ThemeWrapper({ children }: { children: React.ReactNode }) {
+  const { isPremium } = usePremium();
+  
+  return (
+    <ThemeProvider isPremium={isPremium}>
+      {children}
+    </ThemeProvider>
+  );
+}
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <ThemeProvider isPremium={true}>
-          <SettingsProvider>
-            <TaskProvider>
-              <StreakProvider>
-                <AppWithTheme />
-              </StreakProvider>
-            </TaskProvider>
-          </SettingsProvider>
-        </ThemeProvider>
+        <PremiumProvider>
+          <ProfileProvider>
+            <ThemeWrapper>
+              <SettingsProvider>
+                <TaskProvider>
+                  <StreakProvider>
+                    <AppWithTheme />
+                  </StreakProvider>
+                </TaskProvider>
+              </SettingsProvider>
+            </ThemeWrapper>
+          </ProfileProvider>
+        </PremiumProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

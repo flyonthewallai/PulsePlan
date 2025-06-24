@@ -4,11 +4,8 @@ import supabase from '../config/supabase';
 export interface N8nAgentPayload {
   userId: string;
   userEmail?: string;
-  taskTitle: string;
-  dueDate: string; // ISO 8601 timestamp
-  duration: number; // minutes
-  priority: 'high' | 'medium' | 'low';
-  subject: string;
+  userName?: string;
+  isPremium?: boolean;
   source: 'agent' | 'user';
   tool?: string; // Optional for master agent
   [key: string]: any; // Allow arbitrary additional properties
@@ -17,6 +14,8 @@ export interface N8nAgentPayload {
 export interface N8nNaturalLanguagePayload {
   userId: string;
   userEmail?: string;
+  userName?: string;
+  isPremium?: boolean;
   query: string;
   date: string; // ISO 8601 timestamp (current date/time)
   duration?: number; // Optional duration in minutes
@@ -24,7 +23,6 @@ export interface N8nNaturalLanguagePayload {
   context?: {
     currentPage?: string;
     userPreferences?: any;
-    recentTasks?: any[];
     chatHistory?: any[];
     workingHours?: any;
     [key: string]: any; // Allow arbitrary additional context properties
@@ -38,6 +36,13 @@ export interface N8nNaturalLanguagePayload {
       expiresAt?: string;
     };
     microsoft?: {
+      accessToken: string;
+      refreshToken?: string;
+      email: string;
+      expiresAt?: string;
+    };
+    canvas?: {
+      canvasDomain: string;
       accessToken: string;
       refreshToken?: string;
       email: string;
@@ -181,7 +186,7 @@ export class N8nAgentService {
         }
         return {
           success: false,
-          error: `n8n agent error: ${error.message}`,
+          error: `Agent error: ${error.message}`,
         };
       }
       
@@ -308,18 +313,18 @@ export class N8nAgentService {
         timestamp: data.timestamp,
       };
     } catch (error) {
-      console.error('Error processing natural language query:', error);
+      console.error('Error processing query:', error);
       
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           return {
             success: false,
-            error: 'Natural language query timed out',
+            error: 'Query timed out',
           };
         }
         return {
           success: false,
-          error: `n8n agent error: ${error.message}`,
+          error: `Agent error: ${error.message}`,
         };
       }
       

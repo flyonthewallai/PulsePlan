@@ -20,7 +20,10 @@
       "associatedDomains": [
         "applinks:pulseplan.app",
         "applinks:127.0.0.1:8081"
-      ]
+      ],
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app uses location to provide personalized recommendations and improve your experience."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -28,6 +31,10 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.pulseplan.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
@@ -72,6 +79,12 @@
         {
           "merchantIdentifier": "merchant.com.pulseplan.app",
           "enableGooglePay": true
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "This app uses location to provide personalized recommendations and improve your experience."
         }
       ],
       "expo-router"

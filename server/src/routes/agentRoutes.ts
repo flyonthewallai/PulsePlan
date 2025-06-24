@@ -155,8 +155,8 @@ router.post('/query', authenticate, async (req: AuthenticatedRequest, res: Respo
     const agentResponse = await n8nAgentService.processNaturalLanguage(payload);
     res.json(agentResponse);
   } catch (error) {
-    console.error('Error in natural language processing:', error);
-    res.status(500).json({ error: 'Failed to process natural language query' });
+    console.error('Error in processing query:', error);
+    res.status(500).json({ error: 'Failed to process query' });
   }
 });
 

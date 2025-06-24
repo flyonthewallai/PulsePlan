@@ -24,11 +24,39 @@ export interface AgentQueryPayload {
     recentTasks?: any[];
     chatHistory?: AgentMessage[];
     conversationId?: string;
+    location?: {
+      city?: string;
+      timezone?: string;
+    };
   };
   duration?: number;
 }
 
 class AgentAPIService {
+  private async getLocationData(): Promise<{ city?: string; timezone?: string }> {
+    try {
+      const profileData = await AsyncStorage.getItem('profileData');
+      if (profileData) {
+        const parsed = JSON.parse(profileData);
+        return {
+          city: parsed.city,
+          timezone: parsed.timezone
+        };
+      }
+    } catch (error) {
+      console.error('Error getting location data:', error);
+    }
+    return {};
+  }
+
+  private async enrichContextWithLocation(context: any = {}): Promise<any> {
+    const locationData = await this.getLocationData();
+    return {
+      ...context,
+      location: locationData
+    };
+  }
+
   private async getAuthToken(): Promise<string | null> {
     try {
       // Use the Supabase client to get the current session
@@ -77,13 +105,19 @@ class AgentAPIService {
         throw new Error('Authentication required. Please log in again.');
       }
 
+      // Enrich context with location data
+      const enrichedPayload = {
+        ...payload,
+        context: await this.enrichContextWithLocation(payload.context)
+      };
+
       const response = await fetch(getApiUrl('/agent/query'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(enrichedPayload),
       });
 
       if (!response.ok) {
@@ -120,6 +154,9 @@ class AgentAPIService {
         throw new Error('Authentication required. Please log in again.');
       }
 
+      // Enrich context with location data
+      const enrichedContext = await this.enrichContextWithLocation(context);
+
       const response = await fetch(getApiUrl('/agent/chat'), {
         method: 'POST',
         headers: {
@@ -129,7 +166,7 @@ class AgentAPIService {
         body: JSON.stringify({ 
           message,
           conversationId,
-          context
+          context: enrichedContext
         }),
       });
 
