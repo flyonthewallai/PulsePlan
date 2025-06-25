@@ -1,248 +1,160 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
-  SafeAreaView,
-  StatusBar,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, ChevronRight, Bell, Mail, Clock, Calendar } from 'lucide-react-native';
+import { ChevronLeft, Bell, Calendar, Mail, Smartphone } from 'lucide-react-native';
+
 import { useTheme } from '@/contexts/ThemeContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const REMINDERS_SETTINGS_KEY = '@pulse_reminders_settings';
-
-interface ReminderSettings {
-  weeklyPulse: boolean;
-  morningBriefing: boolean;
-  taskReminders: boolean;
-  missedTaskSummary: boolean;
-}
-
-interface SettingRowProps {
-  title: string;
-  description?: string;
-  icon: React.ReactNode;
-  value: boolean;
-  onValueChange: (value: boolean) => void;
-  showChevron?: boolean;
-  onPress?: () => void;
-}
-
-const SettingRow: React.FC<SettingRowProps> = ({
-  title,
-  description,
-  icon,
-  value,
-  onValueChange,
-  showChevron = false,
-  onPress,
-}) => {
+const SettingsSection = ({ title, children }: { title: string; children: React.ReactNode }) => {
   const { currentTheme } = useTheme();
-
-  const handlePress = () => {
-    if (onPress) {
-      onPress();
-    } else {
-      onValueChange(!value);
-    }
-  };
-
   return (
-    <TouchableOpacity 
-      style={[styles.settingRow, { backgroundColor: currentTheme.colors.surface }]} 
-      onPress={handlePress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.settingLeft}>
-        {icon}
-        <View style={styles.settingInfo}>
-          <Text style={[styles.settingTitle, { color: currentTheme.colors.textPrimary }]}>
-            {title}
-          </Text>
-          {description && (
-            <Text style={[styles.settingDescription, { color: currentTheme.colors.textSecondary }]}>
-              {description}
-            </Text>
-          )}
-        </View>
+    <View style={styles.sectionContainer}>
+      <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>{title.toUpperCase()}</Text>
+      <View style={[styles.sectionBody, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+        {children}
       </View>
-      <View style={styles.settingRight}>
-        {showChevron ? (
-          <ChevronRight size={20} color={currentTheme.colors.textSecondary} />
-        ) : (
-          <Switch
-            value={value}
-            onValueChange={onValueChange}
-            trackColor={{ false: currentTheme.colors.border, true: currentTheme.colors.primary + '40' }}
-            thumbColor={value ? currentTheme.colors.primary : currentTheme.colors.textSecondary}
-            ios_backgroundColor={currentTheme.colors.border}
-          />
-        )}
-      </View>
-    </TouchableOpacity>
+    </View>
   );
 };
 
-export default function RemindersScreen() {
+const SettingsRow = ({
+  icon,
+  title,
+  subtitle,
+  value,
+  onPress,
+  showSwitch = false,
+  switchValue = false,
+  onSwitchChange,
+  isLastItem = false,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  value?: string;
+  onPress?: () => void;
+  showSwitch?: boolean;
+  switchValue?: boolean;
+  onSwitchChange?: (value: boolean) => void;
+  isLastItem?: boolean;
+}) => {
   const { currentTheme } = useTheme();
+  
+  return (
+    <View>
+      <TouchableOpacity 
+        style={styles.fieldContainer} 
+        onPress={onPress}
+        disabled={!onPress && !showSwitch}
+        activeOpacity={onPress ? 0.7 : 1}
+      >
+        <View style={styles.fieldLeft}>
+          {icon}
+          <View style={styles.fieldContent}>
+            <Text style={[styles.fieldTitle, { color: currentTheme.colors.textPrimary }]}>{title}</Text>
+            {subtitle && (
+              <Text style={[styles.fieldSubtitle, { color: currentTheme.colors.textSecondary }]}>{subtitle}</Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.fieldRight}>
+          {value && <Text style={[styles.fieldValue, { color: currentTheme.colors.textSecondary }]}>{value}</Text>}
+          {showSwitch && (
+            <Switch
+              value={switchValue}
+              onValueChange={onSwitchChange}
+              trackColor={{ false: currentTheme.colors.border, true: currentTheme.colors.primary }}
+              thumbColor={switchValue ? '#ffffff' : '#f4f3f4'}
+            />
+          )}
+          {onPress && !showSwitch && <ChevronLeft color={currentTheme.colors.textSecondary} size={16} style={{ transform: [{ rotate: '180deg' }] }} />}
+        </View>
+      </TouchableOpacity>
+      {!isLastItem && (
+        <View style={[styles.divider, { backgroundColor: currentTheme.colors.border }]} />
+      )}
+    </View>
+  );
+};
+
+
+
+export default function RemindersScreen() {
   const router = useRouter();
-  const [settings, setSettings] = useState<ReminderSettings>({
-    weeklyPulse: false,
-    morningBriefing: false,
-    taskReminders: true,
-    missedTaskSummary: true,
-  });
-
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    try {
-      const savedSettings = await AsyncStorage.getItem(REMINDERS_SETTINGS_KEY);
-      if (savedSettings) {
-        setSettings(JSON.parse(savedSettings));
-      }
-    } catch (error) {
-      console.error('Error loading reminder settings:', error);
-    }
-  };
-
-  const saveSettings = async (newSettings: ReminderSettings) => {
-    try {
-      await AsyncStorage.setItem(REMINDERS_SETTINGS_KEY, JSON.stringify(newSettings));
-      setSettings(newSettings);
-    } catch (error) {
-      console.error('Error saving reminder settings:', error);
-    }
-  };
-
-  const updateSetting = (key: keyof ReminderSettings, value: boolean) => {
-    const newSettings = { ...settings, [key]: value };
-    saveSettings(newSettings);
-  };
-
-  const handleDeliveryPreferences = () => {
-    router.push('/(settings)/delivery-preferences');
-  };
+  const { currentTheme } = useTheme();
+  
+  // State for reminder settings
+  const [taskReminders, setTaskReminders] = useState(true);
+  const [missedTaskSummary, setMissedTaskSummary] = useState(true);
+  
+  // Delivery method toggles (can enable multiple)
+  const [emailDelivery, setEmailDelivery] = useState(false);
+  const [inAppDelivery, setInAppDelivery] = useState(true);
+  const [pushDelivery, setPushDelivery] = useState(false);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={currentTheme.colors.background} />
-      
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: currentTheme.colors.background }]}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => router.back()}
-        >
-          <ArrowLeft color={currentTheme.colors.textPrimary} size={24} />
+    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ChevronLeft color={currentTheme.colors.textPrimary} size={24} />
         </TouchableOpacity>
-        
-        <Text style={[styles.headerTitle, { color: currentTheme.colors.textPrimary }]}>
-          Reminders
-        </Text>
-        
-        <View style={styles.headerRight} />
+        <Text style={[styles.headerTitle, { color: currentTheme.colors.textPrimary }]}>Reminders</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Weekly Pulse Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>
-            WEEKLY PULSE
-          </Text>
-          
-          <View style={[styles.sectionContainer, { backgroundColor: currentTheme.colors.surface }]}>
-            <SettingRow
-              title="Weekly Pulse"
-              description="Get an email every Monday with your personalized weekly plan and insights"
-              icon={<Mail size={24} color={currentTheme.colors.textSecondary} />}
-              value={settings.weeklyPulse}
-              onValueChange={(value) => updateSetting('weeklyPulse', value)}
-            />
-          </View>
-        </View>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <Text style={[styles.description, { color: currentTheme.colors.textSecondary }]}>
+          Configure your notification preferences and delivery methods
+        </Text>
 
-        {/* Agent Notifications Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>
-            AGENT NOTIFICATIONS
-          </Text>
-          
-          <View style={[styles.sectionContainer, { backgroundColor: currentTheme.colors.surface }]}>
-            <SettingRow
-              title="Morning Briefing"
-              description="Daily push notification and email with your schedule and priorities"
-              icon={<Clock size={24} color={currentTheme.colors.textSecondary} />}
-              value={settings.morningBriefing}
-              onValueChange={(value) => updateSetting('morningBriefing', value)}
-            />
-          </View>
-        </View>
+        <SettingsSection title="Task Reminders">
+          <SettingsRow
+            icon={<Bell size={24} color={currentTheme.colors.textSecondary} />}
+            title="Task Reminders"
+            subtitle="Get notified before tasks are due"
+            showSwitch
+            switchValue={taskReminders}
+            onSwitchChange={setTaskReminders}
+          />
+          <SettingsRow
+            icon={<Calendar size={24} color={currentTheme.colors.textSecondary} />}
+            title="Missed Task Summary"
+            subtitle="Daily summary of incomplete tasks"
+            showSwitch
+            switchValue={missedTaskSummary}
+            onSwitchChange={setMissedTaskSummary}
+            isLastItem
+          />
+        </SettingsSection>
 
-        {/* Task Reminders Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>
-            TASK REMINDERS
-          </Text>
-          
-          <View style={[styles.sectionContainer, { backgroundColor: currentTheme.colors.surface }]}>
-            <SettingRow
-              title="Task Reminders"
-              description="Get notified before tasks are due"
-              icon={<Bell size={24} color={currentTheme.colors.textSecondary} />}
-              value={settings.taskReminders}
-              onValueChange={(value) => updateSetting('taskReminders', value)}
-            />
-            
-            <View style={[styles.separator, { backgroundColor: currentTheme.colors.border }]} />
-            
-            <SettingRow
-              title="Missed Task Summary"
-              description="Daily summary of incomplete tasks at the end of each day"
-              icon={<Calendar size={24} color={currentTheme.colors.textSecondary} />}
-              value={settings.missedTaskSummary}
-              onValueChange={(value) => updateSetting('missedTaskSummary', value)}
-            />
-          </View>
-        </View>
-
-        {/* Delivery Preferences Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>
-            DELIVERY PREFERENCES
-          </Text>
-          
-          <View style={[styles.sectionContainer, { backgroundColor: currentTheme.colors.surface }]}>
-            <TouchableOpacity
-              style={styles.deliveryRow}
-              onPress={handleDeliveryPreferences}
-              activeOpacity={0.7}
-            >
-              <View style={styles.deliveryLeft}>
-                <Mail size={24} color={currentTheme.colors.textSecondary} />
-                <View style={styles.settingInfo}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.textPrimary }]}>
-                    Delivery Preferences
-                  </Text>
-                  <Text style={[styles.settingDescription, { color: currentTheme.colors.textSecondary }]}>
-                    Configure when and how you receive notifications
-                  </Text>
-                </View>
-              </View>
-              <ChevronRight size={20} color={currentTheme.colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Bottom spacing */}
-        <View style={styles.bottomSpacing} />
+        <SettingsSection title="Delivery Method">
+          <SettingsRow
+            icon={<Mail size={24} color={currentTheme.colors.textSecondary} />}
+            title="Email"
+            subtitle="Receive notifications via email"
+            showSwitch
+            switchValue={emailDelivery}
+            onSwitchChange={setEmailDelivery}
+          />
+          <SettingsRow
+            icon={<Bell size={24} color={currentTheme.colors.textSecondary} />}
+            title="In-App"
+            subtitle="Show notifications within the app"
+            showSwitch
+            switchValue={inAppDelivery}
+            onSwitchChange={setInAppDelivery}
+          />
+          <SettingsRow
+            icon={<Smartphone size={24} color={currentTheme.colors.textSecondary} />}
+            title="Push"
+            subtitle="Send push notifications to your device"
+            showSwitch
+            switchValue={pushDelivery}
+            onSwitchChange={setPushDelivery}
+            isLastItem
+          />
+        </SettingsSection>
       </ScrollView>
     </SafeAreaView>
   );
@@ -256,87 +168,80 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   backButton: {
-    padding: 8,
-    marginLeft: -8,
+    padding: 4,
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
+  },
+  scrollView: {
     flex: 1,
-    textAlign: 'center',
+  },
+  scrollContent: {
+    paddingVertical: 20,
+  },
+  description: {
+    fontSize: 15,
+    lineHeight: 20,
     marginHorizontal: 16,
+    marginBottom: 24,
+    textAlign: 'center',
   },
-  headerRight: {
-    width: 32,
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    marginTop: 24,
-    paddingHorizontal: 16,
+  sectionContainer: {
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    fontWeight: '400',
     marginBottom: 8,
+    marginLeft: 16,
   },
-  sectionContainer: {
-    borderRadius: 12,
+  sectionBody: {
+    borderRadius: 10,
+    marginHorizontal: 16,
     overflow: 'hidden',
+    borderWidth: 1,
   },
-  settingRow: {
+  fieldContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  settingLeft: {
+  fieldLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
     gap: 16,
-  },
-  settingInfo: {
     flex: 1,
   },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: '500',
+  fieldContent: {
+    flex: 1,
+  },
+  fieldTitle: {
+    fontSize: 17,
     marginBottom: 2,
   },
-  settingDescription: {
+  fieldSubtitle: {
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 16,
   },
-  settingRight: {
-    marginLeft: 12,
-  },
-  separator: {
-    height: 0.5,
-    marginLeft: 40,
-  },
-  deliveryRow: {
+  fieldRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    gap: 8,
   },
-  deliveryLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 16,
+  fieldValue: {
+    fontSize: 17,
   },
-  bottomSpacing: {
-    height: 40,
+  divider: {
+    height: 1,
+    marginLeft: 56,
+    marginRight: 16,
+    opacity: 1,
   },
 }); 

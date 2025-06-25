@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/authenticate';
 import { n8nAgentService } from '../services/n8nAgentService';
 import supabase from '../config/supabase';
+import n8nAgentConfig from '../config/n8nAgent';
 
 export interface BatchTaskPayload {
   tasks: Array<{
@@ -17,6 +18,31 @@ export interface BatchTaskPayload {
     focusSessionDuration?: number;
   };
 }
+
+/**
+ * Execute database query with timeout handling
+ */
+const executeWithTimeout = async <T>(
+  operation: () => Promise<T>,
+  timeoutMs: number,
+  operationName: string
+): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`Database operation '${operationName}' timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    operation()
+      .then((result) => {
+        clearTimeout(timeoutId);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+};
 
 /**
  * Process multiple tasks through the n8n agent for intelligent scheduling
@@ -108,30 +134,44 @@ export const triggerIntelligentRescheduling = async (req: AuthenticatedRequest, 
   }
 
   try {
-    // Fetch user's existing tasks
-    let query = supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', userId);
+    // Fetch user's existing tasks with timeout handling
+    const queryTimeout = n8nAgentConfig.databaseBatchTimeout;
+    console.log(`Fetching tasks for rescheduling with timeout ${queryTimeout}ms`);
 
-    if (!includeCompleted) {
-      query = query.neq('status', 'completed');
-    }
+    const tasks = await executeWithTimeout(
+      async () => {
+        if (!supabase) {
+          throw new Error('Supabase client not available');
+        }
 
-    if (priorityFilter) {
-      query = query.eq('priority', priorityFilter);
-    }
+        let query = supabase
+          .from('tasks')
+          .select('*')
+          .eq('user_id', userId);
 
-    if (subjectFilter) {
-      query = query.eq('subject', subjectFilter);
-    }
+        if (!includeCompleted) {
+          query = query.neq('status', 'completed');
+        }
 
-    const { data: tasks, error } = await query.order('due_date', { ascending: true });
+        if (priorityFilter) {
+          query = query.eq('priority', priorityFilter);
+        }
 
-    if (error) {
-      res.status(500).json({ error: error.message });
-      return;
-    }
+        if (subjectFilter) {
+          query = query.eq('subject', subjectFilter);
+        }
+
+        const { data: tasks, error } = await query.order('due_date', { ascending: true });
+
+        if (error) {
+          throw error;
+        }
+
+        return tasks;
+      },
+      queryTimeout,
+      'fetchTasksForRescheduling'
+    );
 
     if (!tasks || tasks.length === 0) {
       res.json({ message: 'No tasks found for rescheduling', tasksProcessed: 0 });
@@ -268,20 +308,34 @@ export const analyzeUpcomingDeadlines = async (req: AuthenticatedRequest, res: R
     const now = new Date();
     const futureDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
 
-    // Fetch tasks with upcoming deadlines
-    const { data: upcomingTasks, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('due_date', now.toISOString())
-      .lte('due_date', futureDate.toISOString())
-      .neq('status', 'completed')
-      .order('due_date', { ascending: true });
+    // Fetch tasks with upcoming deadlines with timeout handling
+    const queryTimeout = n8nAgentConfig.databaseQueryTimeout;
+    console.log(`Fetching upcoming deadlines with timeout ${queryTimeout}ms`);
 
-    if (error) {
-      res.status(500).json({ error: error.message });
-      return;
-    }
+    const upcomingTasks = await executeWithTimeout(
+      async () => {
+        if (!supabase) {
+          throw new Error('Supabase client not available');
+        }
+
+        const { data: upcomingTasks, error } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('user_id', userId)
+          .gte('due_date', now.toISOString())
+          .lte('due_date', futureDate.toISOString())
+          .neq('status', 'completed')
+          .order('due_date', { ascending: true });
+
+        if (error) {
+          throw error;
+        }
+
+        return upcomingTasks;
+      },
+      queryTimeout,
+      'fetchUpcomingDeadlines'
+    );
 
     if (!upcomingTasks || upcomingTasks.length === 0) {
       res.json({ 

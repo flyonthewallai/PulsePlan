@@ -23,6 +23,9 @@ import {
   School,
   Bell,
   MapPin,
+  Heart,
+  Newspaper,
+  Mail,
 } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
@@ -30,6 +33,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { signOut } from '@/lib/supabase-rn';
 import SubscriptionModal from '@/components/SubscriptionModal';
+import PremiumMemberModal from '@/components/PremiumMemberModal';
 
 const SettingsSection = ({ title, children }: { title: string; children: React.ReactNode }) => {
     const { currentTheme } = useTheme();
@@ -48,6 +52,8 @@ const SettingsRow = ({
   onPress,
   isDestructive = false,
   isLastItem = false,
+  isPremium = false,
+  isLocked = false,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -55,9 +61,15 @@ const SettingsRow = ({
   onPress?: () => void;
   isDestructive?: boolean;
   isLastItem?: boolean;
+  isPremium?: boolean;
+  isLocked?: boolean;
 }) => {
   const { currentTheme } = useTheme();
-  const titleColor = isDestructive ? currentTheme.colors.error : currentTheme.colors.textPrimary;
+  const titleColor = isDestructive 
+    ? currentTheme.colors.error 
+    : isLocked 
+      ? currentTheme.colors.textSecondary 
+      : currentTheme.colors.textPrimary;
 
   return (
     <View>
@@ -68,6 +80,11 @@ const SettingsRow = ({
         </View>
         <View style={styles.rowRight}>
           {value && <Text style={[styles.rowValue, { color: currentTheme.colors.textSecondary }]}>{value}</Text>}
+          {isPremium && isLocked && (
+            <Text style={[styles.premiumText, { color: currentTheme.colors.textSecondary }]}>
+              Upgrade
+            </Text>
+          )}
           {onPress && !isDestructive && <ChevronRight color={currentTheme.colors.textSecondary} size={20} />}
         </View>
       </TouchableOpacity>
@@ -84,6 +101,7 @@ export default function SettingsScreen() {
   const { user, refreshAuth, subscriptionPlan } = useAuth();
   const { profileData, updateLocation, getLocationData } = useProfile();
   const [isSubscriptionModalVisible, setIsSubscriptionModalVisible] = useState(false);
+  const [isPremiumMemberModalVisible, setIsPremiumMemberModalVisible] = useState(false);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
 
   // Get current timezone
@@ -153,7 +171,7 @@ export default function SettingsScreen() {
     const { city, timezone } = getLocationData();
     if (city) {
       const shortTimezone = timezone?.split('/').pop() || timezone;
-      return `${city} (${shortTimezone})`;
+      return `${city}`;
     }
     return 'Not set';
   };
@@ -197,54 +215,89 @@ export default function SettingsScreen() {
       >
         <SettingsSection title="Profile">
           <SettingsRow 
-            icon={<User color={currentTheme.colors.textSecondary} size={24} />} 
+            icon={<User color={currentTheme.colors.textSecondary} size={20} />} 
             title="Profile" 
             value={user?.user_metadata?.full_name || user?.email}
             onPress={() => router.push('/(settings)/profile')} 
           />
           <SettingsRow 
-            icon={<MapPin color={currentTheme.colors.textSecondary} size={24} />} 
+            icon={<MapPin color={currentTheme.colors.textSecondary} size={20} />} 
             title="Location" 
             value={formatLocationValue()}
             onPress={handleLocationUpdate}
             isLastItem
           />
         </SettingsSection>
+
+        <SettingsSection title="Tools">
+          <SettingsRow 
+            icon={<Newspaper color={currentTheme.colors.textSecondary} size={20} />} 
+            title="Briefings" 
+            onPress={subscriptionPlan === 'premium' 
+              ? () => router.push('/(settings)/briefings') 
+              : () => setIsSubscriptionModalVisible(true)
+            }
+            isPremium={true}
+            isLocked={subscriptionPlan !== 'premium'}
+          />
+          <SettingsRow 
+            icon={<Mail color={currentTheme.colors.textSecondary} size={20} />} 
+            title="Weekly Pulse" 
+            onPress={subscriptionPlan === 'premium' 
+              ? () => router.push('/(settings)/weekly-pulse') 
+              : () => setIsSubscriptionModalVisible(true)
+            }
+            isPremium={true}
+            isLocked={subscriptionPlan !== 'premium'}
+            isLastItem
+          />
+        </SettingsSection>
           
         <SettingsSection title="Preferences">
-          <SettingsRow icon={<Bell color={currentTheme.colors.textSecondary} size={24} />} title="Reminders" onPress={() => router.push('/(settings)/reminders')} />
-          <SettingsRow icon={<Palette color={currentTheme.colors.textSecondary} size={24} />} title="Appearance" onPress={() => router.push('/(settings)/appearance')} />
-          <SettingsRow icon={<Clock color={currentTheme.colors.textSecondary} size={24} />} title="Study Times" onPress={() => router.push('/(settings)/study')} />
-          <SettingsRow icon={<GraduationCap color={currentTheme.colors.textSecondary} size={24} />} title="Subjects" onPress={() => router.push('/(settings)/subjects')} isLastItem />
+          <SettingsRow icon={<Bell color={currentTheme.colors.textSecondary} size={20} />} title="Reminders" onPress={() => router.push('/(settings)/reminders')} />
+          <SettingsRow icon={<Clock color={currentTheme.colors.textSecondary} size={20} />} title="Study Times" onPress={() => router.push('/(settings)/study')} />
+          <SettingsRow icon={<GraduationCap color={currentTheme.colors.textSecondary} size={20} />} title="Subjects" onPress={() => router.push('/(settings)/subjects')} />
+          <SettingsRow icon={<Palette color={currentTheme.colors.textSecondary} size={20} />} title="Appearance" onPress={() => router.push('/(settings)/appearance')} />
+          <SettingsRow 
+            icon={<Heart color={currentTheme.colors.textSecondary} size={20} />} 
+            title="Hobbies" 
+            onPress={subscriptionPlan === 'premium' 
+              ? () => router.push('/(settings)/hobbies') 
+              : () => setIsSubscriptionModalVisible(true)
+            }
+            isPremium={true}
+            isLocked={subscriptionPlan !== 'premium'}
+            isLastItem 
+          />
         </SettingsSection>
         
         <SettingsSection title="Integrations">
           <SettingsRow 
-            icon={<Image source={require('@/assets/images/applecalendar.png')} style={{ width: 24, height: 24 }} />} 
+            icon={<Image source={require('@/assets/images/applecalendar.png')} style={{ width: 20, height: 20 }} />} 
             title="Calendar" 
             value="Not Connected" 
             onPress={() => router.push('/(settings)/integrations/calendar')} 
           />
           <SettingsRow 
-            icon={<Image source={require('@/assets/images/gmail.png')} style={{ width: 24, height: 24 }} />} 
+            icon={<Image source={require('@/assets/images/gmail.png')} style={{ width: 20, height: 20 }} />} 
             title="Mail" 
             value="Not Connected" 
             onPress={() => router.push('/(settings)/integrations/mail')} 
           />
           <SettingsRow 
-            icon={<Image source={require('@/assets/images/applecontacts.webp')} style={{ width: 24, height: 24 }} />} 
+            icon={<Image source={require('@/assets/images/applecontacts.webp')} style={{ width: 20, height: 20 }} />} 
             title="Contacts" 
             value="Not Connected" 
             onPress={() => router.push('/(settings)/integrations/contacts')} 
           />
           <SettingsRow 
-            icon={<Image source={require('@/assets/images/canvas.png')} style={{ width: 24, height: 24 }} />} 
+            icon={<Image source={require('@/assets/images/canvas.png')} style={{ width: 20, height: 20 }} />} 
             title="Canvas" 
             value="Not Connected" 
             onPress={() => router.push('/(settings)/integrations/canvas')} 
           />
           <SettingsRow 
-            icon={<Image source={require('@/assets/images/notion.png')} style={{ width: 24, height: 24 }} />} 
+            icon={<Image source={require('@/assets/images/notion.png')} style={{ width: 20, height: 20 }} />} 
             title="Notes" 
             value="Not Connected" 
             onPress={() => router.push('/(settings)/integrations/notes')} 
@@ -253,40 +306,45 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         <SettingsSection title="About">
-            {subscriptionPlan === 'free' && (
-              <SettingsRow 
-                icon={<Star color={currentTheme.colors.textSecondary} size={24} />} 
-                title="Premium" 
-                onPress={() => setIsSubscriptionModalVisible(true)} 
-              />
-            )}
-            <SettingsRow icon={<LifeBuoy color={currentTheme.colors.textSecondary} size={24} />} title="Help Center" onPress={() => {}} />
             <SettingsRow 
-              icon={<Shield color={currentTheme.colors.textSecondary} size={24} />} 
+              icon={<Star color={currentTheme.colors.textSecondary} size={20} />} 
+              title="Premium" 
+              onPress={subscriptionPlan === 'premium' 
+                ? () => setIsPremiumMemberModalVisible(true)
+                : () => setIsSubscriptionModalVisible(true)
+              } 
+            />
+            <SettingsRow icon={<LifeBuoy color={currentTheme.colors.textSecondary} size={20} />} title="Help Center" onPress={() => {}} />
+            <SettingsRow 
+              icon={<Shield color={currentTheme.colors.textSecondary} size={20} />} 
               title="Privacy Policy" 
               onPress={() => Linking.openURL('https://pulseplan.app/privacy')} 
             />
             <SettingsRow 
-              icon={<FileText color={currentTheme.colors.textSecondary} size={24} />} 
+              icon={<FileText color={currentTheme.colors.textSecondary} size={20} />} 
               title="Terms of Service" 
               onPress={() => Linking.openURL('https://pulseplan.app/terms')} 
             />
             <SettingsRow 
-              icon={<Info color={currentTheme.colors.textSecondary} size={24} />} 
+              icon={<Info color={currentTheme.colors.textSecondary} size={20} />} 
               title="Contact Us" 
               onPress={() => Linking.openURL('mailto:hello@pulseplan.app')} 
-              isLastItem={subscriptionPlan !== 'free'} 
+              isLastItem 
             />
         </SettingsSection>
         
-        <SettingsSection title="">
-            <SettingsRow icon={<LogOut color={currentTheme.colors.textSecondary} size={24} />} title="Log Out" onPress={confirmLogout} />
-            <SettingsRow icon={<Trash2 color={currentTheme.colors.error} size={24} />} title="Delete Account" onPress={confirmDeleteAccount} isDestructive isLastItem />
+        <SettingsSection title="Account">
+            <SettingsRow icon={<LogOut color={currentTheme.colors.textSecondary} size={20} />} title="Log Out" onPress={confirmLogout} />
+            <SettingsRow icon={<Trash2 color={currentTheme.colors.error} size={20} />} title="Delete Account" onPress={confirmDeleteAccount} isDestructive isLastItem />
         </SettingsSection>
       </ScrollView>
       <SubscriptionModal 
         visible={isSubscriptionModalVisible}
         onClose={() => setIsSubscriptionModalVisible(false)}
+      />
+      <PremiumMemberModal 
+        visible={isPremiumMemberModalVisible}
+        onClose={() => setIsPremiumMemberModalVisible(false)}
       />
     </SafeAreaView>
   );
@@ -331,7 +389,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
   },
   rowLeft: {
@@ -349,6 +407,10 @@ const styles = StyleSheet.create({
   },
   rowValue: {
     fontSize: 17,
+  },
+  premiumText: {
+    fontSize: 15,
+    fontWeight: '500',
   },
   divider: {
     height: 1,

@@ -141,6 +141,8 @@ const SimpleTodosCard: React.FC<SimpleTodosCardProps> = ({ onPress }) => {
   ]);
   const [showModal, setShowModal] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
+  const [currentTodoIndex, setCurrentTodoIndex] = useState(0);
+  const cardTranslateX = React.useRef(new Animated.Value(0)).current;
 
   const toggleTodo = (id: string) => {
     const updatedTodos = todos.map(todo => 
@@ -178,52 +180,147 @@ const SimpleTodosCard: React.FC<SimpleTodosCardProps> = ({ onPress }) => {
   const completedCount = todos.filter(todo => todo.completed).length;
   const totalCount = todos.length;
 
-  return (
-    <>
-      <TouchableOpacity
-        style={[styles.card]}
-        onPress={() => setShowModal(true)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.cardContent}>
-          {/* First todo item */}
-          <View style={styles.todoItem}>
-            <TouchableOpacity
-              style={[
-                styles.checkbox,
-                todos[0]?.completed && styles.checkboxCompleted
-              ]}
-              onPress={() => todos[0] && toggleTodo(todos[0].id)}
-            >
-              {todos[0]?.completed && (
-                <Check size={12} color="#FFFFFF" strokeWidth={3} />
-              )}
-            </TouchableOpacity>
-            <Text style={[
-              styles.todoText,
-              todos[0]?.completed && styles.todoTextCompleted
-            ]}>
-              {todos[0]?.text || 'No todos yet'}
-            </Text>
-          </View>
+  // Card swipe handlers
+  const onCardGestureEvent = Animated.event(
+    [{ nativeEvent: { translationX: cardTranslateX } }],
+    { useNativeDriver: true }
+  );
 
-          {/* Progress indicators */}
-          <View style={styles.progressContainer}>
-            {todos.slice(0, 3).map((todo, index) => (
-              <View
-                key={todo.id}
-                style={[
-                  styles.progressDot,
-                  todo.completed ? styles.progressDotCompleted : styles.progressDotIncomplete
-                ]}
-              />
-            ))}
-            {todos.length > 3 && (
-              <Text style={styles.moreIndicator}>—</Text>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
+  const onCardHandlerStateChange = (event: any) => {
+    const { state, translationX: gestureTranslationX, velocityX } = event.nativeEvent;
+    
+    if (state === GestureState.END) {
+      // If swiped left significantly or with high velocity, go to next todo
+      if ((gestureTranslationX < -40 || velocityX < -200) && todos.length > 1) {
+        // Animate slide out to left
+        Animated.timing(cardTranslateX, {
+          toValue: -400,
+          duration: 150,
+          useNativeDriver: true,
+        }).start(() => {
+          // Update to next todo
+          setCurrentTodoIndex((prevIndex) => (prevIndex + 1) % todos.length);
+          // Reset position and animate in from right
+          cardTranslateX.setValue(400);
+          Animated.timing(cardTranslateX, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }).start();
+        });
+      }
+      // If swiped right significantly or with high velocity, go to previous todo
+      else if ((gestureTranslationX > 40 || velocityX > 200) && todos.length > 1) {
+        // Animate slide out to right
+        Animated.timing(cardTranslateX, {
+          toValue: 400,
+          duration: 150,
+          useNativeDriver: true,
+        }).start(() => {
+          // Update to previous todo
+          setCurrentTodoIndex((prevIndex) => (prevIndex - 1 + todos.length) % todos.length);
+          // Reset position and animate in from left
+          cardTranslateX.setValue(-400);
+          Animated.timing(cardTranslateX, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }).start();
+        });
+      } else {
+        // Snap back to original position
+        Animated.spring(cardTranslateX, {
+          toValue: 0,
+          tension: 120,
+          friction: 10,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else if (state === GestureState.CANCELLED || state === GestureState.FAILED) {
+      // Reset position if gesture is cancelled
+      Animated.spring(cardTranslateX, {
+        toValue: 0,
+        tension: 120,
+        friction: 10,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+  const currentTodo = todos[currentTodoIndex] || todos[0];
+
+  return (
+    <GestureHandlerRootView>
+      <RNGHPanGestureHandler
+        onGestureEvent={onCardGestureEvent}
+        onHandlerStateChange={onCardHandlerStateChange}
+        activeOffsetX={[-10, 10]}
+        failOffsetY={[-30, 30]}
+        shouldCancelWhenOutside={false}
+      >
+        <Animated.View
+          style={{
+            transform: [{ translateX: cardTranslateX }],
+          }}
+        >
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => setShowModal(true)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.cardContent}>
+              {/* Current todo item */}
+              <View style={styles.todoItem}>
+                <TouchableOpacity
+                  style={[
+                    styles.checkbox,
+                    currentTodo?.completed && styles.checkboxCompleted
+                  ]}
+                  onPress={() => currentTodo && toggleTodo(currentTodo.id)}
+                >
+                  {currentTodo?.completed && (
+                    <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                  )}
+                </TouchableOpacity>
+                <Text style={[
+                  styles.todoText,
+                  { color: currentTheme.colors.textPrimary },
+                  currentTodo?.completed && { 
+                    textDecorationLine: 'line-through',
+                    color: currentTheme.colors.textSecondary 
+                  }
+                ]}>
+                  {currentTodo?.text || 'No todos yet'}
+                </Text>
+              </View>
+
+              {/* Status indicator */}
+              {totalCount > 1 && (
+                <Text style={[styles.statusText, { color: currentTheme.colors.textSecondary }]}>
+                  {currentTodoIndex + 1} of {totalCount}
+                </Text>
+              )}
+
+              {/* Progress indicators */}
+              <View style={styles.progressContainer}>
+                {todos.slice(0, 4).map((todo, index) => (
+                  <View
+                    key={todo.id}
+                    style={[
+                      styles.progressDot,
+                      todo.completed ? styles.progressDotCompleted : styles.progressDotIncomplete,
+                      index === currentTodoIndex && styles.progressDotActive
+                    ]}
+                  />
+                ))}
+                {totalCount > 4 && (
+                  <Text style={styles.moreIndicator}>•••</Text>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      </RNGHPanGestureHandler>
 
       {/* Full Modal */}
       <Modal
@@ -307,7 +404,7 @@ const SimpleTodosCard: React.FC<SimpleTodosCardProps> = ({ onPress }) => {
         </View>
         </GestureHandlerRootView>
       </Modal>
-    </>
+    </GestureHandlerRootView>
   );
 };
 
@@ -318,8 +415,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     padding: 16,
-    marginHorizontal: 20,
-    marginTop: 8,
     marginBottom: 24,
   },
   cardContent: {
@@ -346,16 +441,10 @@ const styles = StyleSheet.create({
   todoText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
     flex: 1,
-  },
-  todoTextCompleted: {
-    textDecorationLine: 'line-through',
-    color: '#999999',
   },
   statusText: {
     fontSize: 14,
-    color: '#999999',
     marginLeft: 32,
   },
   progressContainer: {
@@ -374,6 +463,10 @@ const styles = StyleSheet.create({
   },
   progressDotIncomplete: {
     backgroundColor: '#666666',
+  },
+  progressDotActive: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
   },
   moreIndicator: {
     color: '#666666',

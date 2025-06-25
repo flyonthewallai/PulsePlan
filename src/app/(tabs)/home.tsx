@@ -11,93 +11,35 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { 
-  Plus, 
-  Flame, 
-  Clock, 
-  AlertTriangle, 
-  BookOpen,
-  Target,
-  Timer,
-  FileText,
-  Sun,
-  Sunrise,
-  Sunset,
+  Plus,
+  CheckSquare,
+  ListTodo,
+  BarChart3,
+  Calendar,
 } from 'lucide-react-native';
 
-import TaskCard from '../../components/TaskCard';
+
 import CompletionRing from '../../components/CompletionRing';
 import AIAssistantButton from '../../components/AgentButton';
 import TaskCreateModal from '../../components/TaskCreateModal';
 import AIAssistantModal from '../../components/AgentModal';
 import DailySummaryCard from '../../components/DailySummaryCard';
 import SimpleTodosCard from '../../components/SimpleTodosCard';
+import TasksCard from '../../components/TasksCard';
+import EventsCard from '../../components/EventsCard';
 import { useTasks, Task } from '../../contexts/TaskContext';
 import { useTheme } from '../../contexts/ThemeContext';
-
-type SortType = 'due' | 'priority' | 'subject';
 
 export default function HomeScreen() {
   const { tasks, refreshTasks, loading } = useTasks();
   const { currentTheme } = useTheme();
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
-  const [sortType, setSortType] = useState<SortType>('due');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   
   // Calculate completion percentage
   const completedTasks = tasks.filter(task => task.status === 'completed').length;
   const completion = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
-  
-  // Filter tasks for today
-  const today = new Date().toDateString();
-  const todayTasks = tasks.filter(task => {
-    const taskDate = new Date(task.due_date).toDateString();
-    return taskDate === today;
-  });
-  
-  // Get priority tasks (high priority or due soon)
-  const getPriorityTasks = () => {
-    const now = new Date();
-    const urgent = tasks.filter(task => {
-      const dueDate = new Date(task.due_date);
-      const hoursUntilDue = (dueDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-      return (task.priority === 'high' || hoursUntilDue <= 24) && task.status !== 'completed';
-    });
-    
-    // Sort based on selected criteria
-    return urgent.sort((a, b) => {
-      if (sortType === 'due') {
-        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-      } else if (sortType === 'priority') {
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
-        return priorityOrder[b.priority] - priorityOrder[a.priority];
-      } else {
-        return a.subject.localeCompare(b.subject);
-      }
-    }).slice(0, 3); // Show max 3 priority tasks
-  };
-  
-  // Group today's tasks by time blocks
-  const getTimeBlocks = () => {
-    const blocks = {
-      morning: [] as Task[],
-      afternoon: [] as Task[],
-      evening: [] as Task[]
-    };
-    
-    todayTasks.forEach(task => {
-      const hour = new Date(task.due_date).getHours();
-      if (hour < 12) {
-        blocks.morning.push(task);
-      } else if (hour < 18) {
-        blocks.afternoon.push(task);
-      } else {
-        blocks.evening.push(task);
-      }
-    });
-    
-    return blocks;
-  };
   
   // Get current time of day for greeting
   const getGreeting = () => {
@@ -106,52 +48,11 @@ export default function HomeScreen() {
     if (hour < 18) return 'Good Afternoon';
     return 'Good Evening';
   };
-  
-  const formatDuration = (minutes?: number) => {
-    if (!minutes) return '';
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
-    if (hours > 0) return `${hours}h`;
-    return `${mins}m`;
-  };
-  
-  const getUrgencyEmoji = (task: Task) => {
-    const now = new Date();
-    const dueDate = new Date(task.due_date);
-    const hoursUntilDue = (dueDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    if (hoursUntilDue <= 2) return '🔥🔥';
-    if (hoursUntilDue <= 24 || task.priority === 'high') return '🔥';
-    return '⚠️';
-  };
-
-  const handleEditTask = (task: Task) => {
-    setEditingTask(task);
-    setShowTaskModal(true);
-  };
 
   const handleCloseTaskModal = () => {
     setShowTaskModal(false);
     setEditingTask(null);
   };
-  
-  const handleQuickAction = (action: string) => {
-    switch (action) {
-      case 'quick_task':
-        setShowTaskModal(true);
-        break;
-      case 'focus_mode':
-        // TODO: Implement focus mode/timer
-        break;
-      case 'templates':
-        // TODO: Implement templates
-        break;
-    }
-  };
-
-  const priorityTasks = getPriorityTasks();
-  const timeBlocks = getTimeBlocks();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]} edges={['top']}>
@@ -193,147 +94,34 @@ export default function HomeScreen() {
             />
           }
         >
-          {/* Daily Summary Card */}
           <DailySummaryCard />
 
-          {/* Simple Todos Card */}
+          {/* To-Dos Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: currentTheme.colors.textSecondary }]}>
+              TO-DOS
+            </Text>
+            <ListTodo size={16} color={currentTheme.colors.textSecondary} />
+          </View>
           <SimpleTodosCard />
 
-          {/* Priority Overview Section */}
-          {priorityTasks.length > 0 && (
-            <View style={[styles.section, { backgroundColor: currentTheme.colors.surface }]}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleContainer}>
-                  <Flame size={18} color="#FF5757" />
-                  <Text style={[styles.sectionTitle, { color: currentTheme.colors.textPrimary }]}>Priority Focus</Text>
-                </View>
-                <View style={styles.sortToggles}>
-                  <TouchableOpacity
-                    style={[styles.sortToggle, sortType === 'due' && styles.sortToggleActive]}
-                    onPress={() => setSortType('due')}
-                  >
-                    <Clock size={12} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.sortToggle, sortType === 'priority' && styles.sortToggleActive]}
-                    onPress={() => setSortType('priority')}
-                  >
-                    <AlertTriangle size={12} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.sortToggle, sortType === 'subject' && styles.sortToggleActive]}
-                    onPress={() => setSortType('subject')}
-                  >
-                    <BookOpen size={12} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              
-              {priorityTasks.map((task, index) => (
-                <View key={task.id} style={styles.priorityItem}>
-                  <Text style={styles.urgencyIndicator}>{getUrgencyEmoji(task)}</Text>
-                  <View style={styles.priorityContent}>
-                    <Text style={[styles.priorityTitle, { color: currentTheme.colors.textPrimary }]} numberOfLines={1}>
-                      {task.title}
-                    </Text>
-                    <Text style={[styles.priorityMeta, { color: currentTheme.colors.textSecondary }]}>
-                      Due {new Date(task.due_date).toDateString() === today ? 'Today' : 'Tomorrow'}
-                      {task.estimated_minutes && ` • ${formatDuration(task.estimated_minutes)}`}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Today's Plan - Time Blocks with Task Cards */}
-          <View style={[styles.section, { backgroundColor: currentTheme.colors.surface }]}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: currentTheme.colors.textPrimary }]}>Today's Plan</Text>
-              <TouchableOpacity 
-                style={styles.addTaskButton}
-                onPress={() => setShowTaskModal(true)}
-              >
-                <Plus size={16} color={currentTheme.colors.primary} />
-                <Text style={[styles.addTaskText, { color: currentTheme.colors.primary }]}>Add Task</Text>
-              </TouchableOpacity>
-            </View>
-
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <Text style={[styles.loadingText, { color: currentTheme.colors.textSecondary }]}>Loading tasks...</Text>
-              </View>
-            ) : todayTasks.length > 0 ? (
-              <>
-                {timeBlocks.morning.length > 0 && (
-                  <View style={styles.timeBlock}>
-                    <View style={styles.timeBlockHeader}>
-                      <Sunrise size={14} color={currentTheme.colors.textSecondary} style={{ opacity: 0.7 }} />
-                      <Text style={[styles.timeBlockTitle, { color: currentTheme.colors.textSecondary }]}>Morning</Text>
-                      <View style={[styles.timeBlockDivider, { backgroundColor: currentTheme.colors.textSecondary }]} />
-                    </View>
-                    {timeBlocks.morning.map((task, index) => (
-                      <View key={task.id} style={styles.timeBlockTaskCard}>
-                        <TaskCard 
-                          task={task} 
-                          isFirst={index === 0}
-                          isLast={index === timeBlocks.morning.length - 1}
-                          onEdit={handleEditTask}
-                        />
-                      </View>
-                    ))}
-                  </View>
-                )}
-                
-                {timeBlocks.afternoon.length > 0 && (
-                  <View style={styles.timeBlock}>
-                    <View style={styles.timeBlockHeader}>
-                      <Sun size={14} color={currentTheme.colors.textSecondary} style={{ opacity: 0.7 }} />
-                      <Text style={[styles.timeBlockTitle, { color: currentTheme.colors.textSecondary }]}>Afternoon</Text>
-                      <View style={[styles.timeBlockDivider, { backgroundColor: currentTheme.colors.textSecondary }]} />
-                    </View>
-                    {timeBlocks.afternoon.map((task, index) => (
-                      <View key={task.id} style={styles.timeBlockTaskCard}>
-                        <TaskCard 
-                          task={task} 
-                          isFirst={index === 0}
-                          isLast={index === timeBlocks.afternoon.length - 1}
-                          onEdit={handleEditTask}
-                        />
-                      </View>
-                    ))}
-                  </View>
-                )}
-                
-                {timeBlocks.evening.length > 0 && (
-                  <View style={styles.timeBlock}>
-                    <View style={styles.timeBlockHeader}>
-                      <Sunset size={14} color={currentTheme.colors.textSecondary} style={{ opacity: 0.7 }} />
-                      <Text style={[styles.timeBlockTitle, { color: currentTheme.colors.textSecondary }]}>Evening</Text>
-                      <View style={[styles.timeBlockDivider, { backgroundColor: currentTheme.colors.textSecondary }]} />
-                    </View>
-                    {timeBlocks.evening.map((task, index) => (
-                      <View key={task.id} style={styles.timeBlockTaskCard}>
-                        <TaskCard 
-                          task={task} 
-                          isFirst={index === 0}
-                          isLast={index === timeBlocks.evening.length - 1}
-                          onEdit={handleEditTask}
-                        />
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </>
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyTitle, { color: currentTheme.colors.textPrimary }]}>No tasks for today</Text>
-                <Text style={[styles.emptyText, { color: currentTheme.colors.textSecondary }]}>
-                  Create your first task to get started!
-                </Text>
-              </View>
-            )}
+          {/* Tasks Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: currentTheme.colors.textSecondary }]}>
+              TASKS
+            </Text>
+            <CheckSquare size={16} color={currentTheme.colors.textSecondary} />
           </View>
+          <TasksCard />
+
+          {/* Events Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: currentTheme.colors.textSecondary }]}>
+              EVENTS
+            </Text>
+            <Calendar size={16} color={currentTheme.colors.textSecondary} />
+          </View>
+          <EventsCard />
         </ScrollView>
       </View>
 
@@ -397,7 +185,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   sectionTitleContainer: {
     flexDirection: 'row',
@@ -412,31 +207,35 @@ const styles = StyleSheet.create({
   // Sort Toggles
   sortToggles: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   sortToggle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     backgroundColor: 'transparent',
   },
   sortToggleActive: {
-    borderColor: '#FFFFFF',
-    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   
   // Priority Items
   priorityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    paddingVertical: 4,
   },
   urgencyIndicator: {
-    fontSize: 16,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
   },
   priorityContent: {
@@ -444,11 +243,12 @@ const styles = StyleSheet.create({
   },
   priorityTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 2,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   priorityMeta: {
-    fontSize: 14,
+    fontSize: 13,
+    opacity: 0.8,
   },
   
   // Time Blocks
@@ -484,9 +284,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addTaskText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    marginLeft: 6,
+    marginLeft: 3,
   },
   
   // Loading & Empty States

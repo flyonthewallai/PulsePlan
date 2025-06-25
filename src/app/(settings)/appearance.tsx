@@ -33,6 +33,14 @@ export default function AppearanceScreen() {
     const isSelected = currentTheme.id === theme.id;
     const isLocked = theme.premium && subscriptionPlan !== 'premium';
 
+    // Special gradient colors for Dark Agent theme icon
+    const getGradientColors = (theme: Theme) => {
+      if (theme.id === 'dark-agent') {
+        return ['#6B7280', '#000000']; // Gray to black for Dark Agent
+      }
+      return [theme.colors.primary, theme.colors.accent];
+    };
+
     return (
       <TouchableOpacity
         key={theme.id}
@@ -44,7 +52,7 @@ export default function AppearanceScreen() {
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={[theme.colors.primary, theme.colors.accent]}
+          colors={getGradientColors(theme)}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.themePreview}

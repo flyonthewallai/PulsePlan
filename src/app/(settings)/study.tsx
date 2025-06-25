@@ -73,8 +73,8 @@ export default function StudyScreen() {
   const router = useRouter();
   const { currentTheme } = useTheme();
   const { workingHours, updateWorkingHours } = useSettings();
-  const [showStartTimePicker, setShowStartTimePicker] = useState(Platform.OS === 'ios');
-  const [showEndTimePicker, setShowEndTimePicker] = useState(Platform.OS === 'ios');
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
   const formatTime = (hour: number) => {
     const date = new Date();
@@ -84,7 +84,12 @@ export default function StudyScreen() {
 
   const onStartTimeChange = async (event: any, selectedDate?: Date) => {
     const currentDate = selectedDate || new Date();
-    setShowStartTimePicker(Platform.OS === 'ios');
+    
+    // Hide picker on Android after selection, keep visible on iOS until manually closed
+    if (Platform.OS === 'android') {
+      setShowStartTimePicker(false);
+    }
+    
     if (currentDate) {
       try {
         await updateWorkingHours({ ...workingHours, startHour: currentDate.getHours() });
@@ -96,7 +101,12 @@ export default function StudyScreen() {
 
   const onEndTimeChange = async (event: any, selectedDate?: Date) => {
     const currentDate = selectedDate || new Date();
-    setShowEndTimePicker(Platform.OS === 'ios');
+    
+    // Hide picker on Android after selection, keep visible on iOS until manually closed
+    if (Platform.OS === 'android') {
+      setShowEndTimePicker(false);
+    }
+    
     if (currentDate) {
       try {
         await updateWorkingHours({ ...workingHours, endHour: currentDate.getHours() });
@@ -132,13 +142,13 @@ export default function StudyScreen() {
             label="Start Time"
             time={formatTime(workingHours.startHour)}
             icon={<Sun size={24} color={currentTheme.colors.primary} />}
-            onPress={() => setShowStartTimePicker(true)}
+            onPress={() => setShowStartTimePicker(!showStartTimePicker)}
           />
           <TimeBlock
             label="End Time"
             time={formatTime(workingHours.endHour)}
             icon={<Moon size={24} color={currentTheme.colors.primary} />}
-            onPress={() => setShowEndTimePicker(true)}
+            onPress={() => setShowEndTimePicker(!showEndTimePicker)}
           />
         </View>
 

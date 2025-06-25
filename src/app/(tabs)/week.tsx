@@ -215,7 +215,6 @@ export default function WeekScreen() {
       <StreakModal
         visible={showStreakModal}
         onClose={() => setShowStreakModal(false)}
-        streakCount={currentStreak}
       />
     </SafeAreaView>
   );

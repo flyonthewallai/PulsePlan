@@ -1,16 +1,34 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { BrainCircuit, CheckCircle2, Clock, CheckCheck, Check } from 'lucide-react-native';
+import { BrainCircuit, CheckCircle2, Clock, CheckCheck, Check, BarChart3 } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import DailyOverviewModal from './DailyOverviewModal';
 
 export default function DailySummaryCard() {
   const { currentTheme } = useTheme();
   const [showMessage, setShowMessage] = useState(true);
+  const [showOverviewModal, setShowOverviewModal] = useState(false);
 
   if (!showMessage) {
     return (
       <View style={styles.container}>
-        <View style={styles.metricsCard}>
+        {/* Overview Section Header */}
+        <TouchableOpacity 
+          style={styles.sectionHeader}
+          onPress={() => setShowOverviewModal(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.sectionLabel, { color: currentTheme.colors.textSecondary }]}>
+            OVERVIEW
+          </Text>
+          <BarChart3 size={16} color={currentTheme.colors.textSecondary} />
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.metricsCard}
+          onPress={() => setShowOverviewModal(true)}
+          activeOpacity={0.8}
+        >
           <View style={styles.metricItem}>
             <View style={styles.metricLeft}>
               <CheckCircle2 color="#FFFFFF" size={20} style={styles.metricIcon} />
@@ -29,7 +47,12 @@ export default function DailySummaryCard() {
               <Text style={styles.metricText}>2 Done</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
+
+        <DailyOverviewModal
+          visible={showOverviewModal}
+          onClose={() => setShowOverviewModal(false)}
+        />
       </View>
     );
   }
@@ -58,7 +81,23 @@ export default function DailySummaryCard() {
         </View>
       </View>
 
-      <View style={styles.metricsCard}>
+      {/* Overview Section Header */}
+      <TouchableOpacity 
+        style={styles.sectionHeader}
+        onPress={() => setShowOverviewModal(true)}
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.sectionLabel, { color: currentTheme.colors.textSecondary }]}>
+          OVERVIEW
+        </Text>
+        <BarChart3 size={16} color={currentTheme.colors.textSecondary} />
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.metricsCard}
+        onPress={() => setShowOverviewModal(true)}
+        activeOpacity={0.8}
+      >
         <View style={styles.metricItem}>
           <View style={styles.metricLeft}>
             <CheckCircle2 color="#FFFFFF" size={20} style={styles.metricIcon} />
@@ -77,15 +116,19 @@ export default function DailySummaryCard() {
             <Text style={styles.metricText}>2 Done</Text>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
+
+      <DailyOverviewModal
+        visible={showOverviewModal}
+        onClose={() => setShowOverviewModal(false)}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 12,
-    marginBottom: 32,
+    marginBottom: 20,
   },
   chatContainer: {
     flexDirection: 'row',
@@ -127,7 +170,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     padding: 16,
-    marginHorizontal: 20,
   },
   metricItem: {
     flexDirection: 'row',
@@ -149,5 +191,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '500',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 }); 

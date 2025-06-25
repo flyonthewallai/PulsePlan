@@ -14,7 +14,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: currentTheme.colors.background,
-          borderTopColor: currentTheme.colors.border,
+          borderTopColor: 'rgba(255, 255, 255, 0.05)',
           borderTopWidth: 1,
           elevation: 0,
           height: 60 + insets.bottom,
