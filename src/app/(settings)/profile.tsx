@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, User, Mail, Phone } from 'lucide-react-native';
+import { ChevronLeft, User, Mail, School, Calendar } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase-rn';
 
 const SettingsSection = ({ title, children }: { title: string; children: React.ReactNode }) => {
   const { currentTheme } = useTheme();
@@ -41,7 +42,7 @@ const ProfileField = ({
       <View style={styles.fieldContainer}>
         <View style={styles.fieldLeft}>
           {icon}
-          <View>
+          <View style={styles.fieldContent}>
             <Text style={[styles.fieldLabel, { color: currentTheme.colors.textSecondary }]}>{label}</Text>
             <TextInput
               value={value}
@@ -52,7 +53,10 @@ const ProfileField = ({
                 !editable && { opacity: 0.5 }
               ]}
               editable={editable}
+              placeholder={editable ? `Enter ${label.toLowerCase()}` : ''}
               placeholderTextColor={currentTheme.colors.textSecondary}
+              multiline={false}
+              returnKeyType="done"
             />
           </View>
         </View>
@@ -68,15 +72,69 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { currentTheme } = useTheme();
   const { user } = useAuth();
-  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
-  const [phone, setPhone] = useState(user?.user_metadata?.phone || '');
+  const [fullName, setFullName] = useState('');
+  const [school, setSchool] = useState('');
+  const [academicYear, setAcademicYear] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Load profile data from database
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('name, school, academic_year')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error loading profile:', error);
+          return;
+        }
+
+        if (data) {
+          setFullName(data.name || '');
+          setSchool(data.school || '');
+          setAcademicYear(data.academic_year || '');
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+    };
+
+    loadProfile();
+  }, [user?.id]);
 
   const handleSave = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'User not found');
+      return;
+    }
+
+    setLoading(true);
     try {
-      // TODO: Implement save functionality
-      Alert.alert('Success', 'Profile updated successfully');
+      const { error } = await supabase
+        .from('users')
+        .update({
+          name: fullName,
+          school: school,
+          academic_year: academicYear,
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Close the page after successful save
+      router.back();
     } catch (error) {
+      console.error('Error updating profile:', error);
       Alert.alert('Error', 'Failed to update profile');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,8 +145,10 @@ export default function ProfileScreen() {
           <ChevronLeft color={currentTheme.colors.textPrimary} size={24} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: currentTheme.colors.textPrimary }]}>Profile</Text>
-        <TouchableOpacity onPress={handleSave}>
-          <Text style={[styles.saveButton, { color: currentTheme.colors.primary }]}>Save</Text>
+        <TouchableOpacity onPress={handleSave} disabled={loading}>
+          <Text style={[styles.saveButton, { color: loading ? currentTheme.colors.textSecondary : currentTheme.colors.primary }]}>
+            {loading ? 'Saving...' : 'Save'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -105,6 +165,23 @@ export default function ProfileScreen() {
             label="Email"
             value={user?.email || ''}
             editable={false}
+            isLastItem
+          />
+        </SettingsSection>
+
+        <SettingsSection title="Academic Information">
+          <ProfileField
+            icon={<School size={24} color={currentTheme.colors.textSecondary} />}
+            label="School"
+            value={school}
+            onChangeText={setSchool}
+          />
+          <ProfileField
+            icon={<Calendar size={24} color={currentTheme.colors.textSecondary} />}
+            label="Academic Year"
+            value={academicYear}
+            onChangeText={setAcademicYear}
+            isLastItem
           />
         </SettingsSection>
       </ScrollView>
@@ -166,6 +243,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+    flex: 1,
+  },
+  fieldContent: {
     flex: 1,
   },
   fieldLabel: {

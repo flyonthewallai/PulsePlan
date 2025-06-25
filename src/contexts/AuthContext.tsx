@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { Session, User } from '@supabase/supabase-js';
 import { useRouter, useSegments } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabaseAuth, onAuthStateChange, getSession } from '@/lib/supabase-rn';
+import { supabase, supabaseAuth, onAuthStateChange, getSession } from '@/lib/supabase-rn';
 
 interface AuthContextType {
   user: User | null;
@@ -91,6 +91,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setSession(null);
         setUser(null);
         setNeedsOnboarding(false);
+        setSubscriptionPlan('free');
         console.log('🚪 AuthContext: Cleared user state due to session error');
       } else if (!session) {
         console.log('🚪 AuthContext: No session found, clearing user state');
@@ -98,12 +99,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setUser(null);
         setError(null);
         setNeedsOnboarding(false);
+        setSubscriptionPlan('free');
       } else if (!session.user) {
         console.log('🚪 AuthContext: Session exists but no user, clearing state');
         setSession(null);
         setUser(null);
         setError(null);
         setNeedsOnboarding(false);
+        setSubscriptionPlan('free');
       } else {
         // Session is valid - we have a session with user data
         console.log('✅ AuthContext: Valid session found, updating user state');
@@ -115,10 +118,27 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const hasCompletedOnboarding = await checkOnboardingStatus(session.user.id);
         setNeedsOnboarding(!hasCompletedOnboarding);
         
+        // Fetch subscription status from users table
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('subscription_status')
+          .eq('id', session.user.id)
+          .single();
+
+        if (userError) {
+          console.error('Error fetching user subscription status:', userError);
+          setSubscriptionPlan('free'); // Default to free on error
+        } else {
+          const subscriptionStatus = userData?.subscription_status || 'free';
+          setSubscriptionPlan(subscriptionStatus === 'premium' ? 'premium' : 'free');
+          console.log('🔍 Subscription status from users table:', subscriptionStatus);
+        }
+        
         console.log('🔍 AuthContext: Auth refresh complete:', {
           userId: session.user.id,
           email: session.user.email,
-          needsOnboarding: !hasCompletedOnboarding
+          needsOnboarding: !hasCompletedOnboarding,
+          subscriptionStatus: userData?.subscription_status || 'free'
         });
       }
     } catch (error) {
@@ -127,6 +147,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setSession(null);
       setUser(null);
       setNeedsOnboarding(false);
+      setSubscriptionPlan('free');
       console.log('🚪 AuthContext: Cleared user state due to unexpected error');
     }
   };

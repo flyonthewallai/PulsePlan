@@ -65,11 +65,14 @@ export class N8nAgentService {
   private readonly baseUrl = n8nAgentConfig.baseUrl;
   private readonly webhookPath = n8nAgentConfig.webhookPath;
   private readonly timeout = n8nAgentConfig.timeout;
+  private readonly databaseTimeout = n8nAgentConfig.databaseTimeout;
+  private readonly databaseQueryTimeout = n8nAgentConfig.databaseQueryTimeout;
+  private readonly databaseBatchTimeout = n8nAgentConfig.databaseBatchTimeout;
 
   /**
    * Get operation-specific timeout values
    */
-  private getTimeout(operation: 'task' | 'natural_language' | 'batch' | 'health'): number {
+  private getTimeout(operation: 'task' | 'natural_language' | 'batch' | 'health' | 'database' | 'database_query' | 'database_batch'): number {
     const baseTimeout = this.timeout;
     
     switch (operation) {
@@ -81,9 +84,40 @@ export class N8nAgentService {
         return baseTimeout; // Standard timeout for simple tasks
       case 'health':
         return 5000; // Short timeout for health checks
+      case 'database':
+        return this.databaseTimeout; // Database operation timeout
+      case 'database_query':
+        return this.databaseQueryTimeout; // Individual query timeout
+      case 'database_batch':
+        return this.databaseBatchTimeout; // Batch database operation timeout
       default:
         return baseTimeout;
     }
+  }
+
+  /**
+   * Execute database query with timeout handling
+   */
+  private async executeWithTimeout<T>(
+    operation: () => Promise<T>,
+    timeoutMs: number,
+    operationName: string
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error(`Database operation '${operationName}' timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      operation()
+        .then((result) => {
+          clearTimeout(timeoutId);
+          resolve(result);
+        })
+        .catch((error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        });
+    });
   }
 
   /**
@@ -96,15 +130,31 @@ export class N8nAgentService {
     }
 
     try {
-      const { data: connections, error } = await supabase
-        .from('calendar_connections')
-        .select('provider, access_token, refresh_token, email, expires_at')
-        .eq('user_id', userId);
+      const queryTimeout = this.getTimeout('database_query');
+      console.log(`Fetching connected accounts for user ${userId} with timeout ${queryTimeout}ms`);
 
-      if (error) {
-        console.error('Error fetching connected accounts:', error);
-        return {};
-      }
+      const result = await this.executeWithTimeout(
+        async () => {
+          if (!supabase) {
+            throw new Error('Supabase client not available');
+          }
+
+          const { data: connections, error } = await supabase
+            .from('calendar_connections')
+            .select('provider, access_token, refresh_token, email, expires_at')
+            .eq('user_id', userId);
+
+          if (error) {
+            throw error;
+          }
+
+          return connections;
+        },
+        queryTimeout,
+        'getUserConnectedAccounts'
+      );
+
+      const connections = result;
 
       if (!connections || connections.length === 0) {
         console.log('No connected accounts found for user:', userId);
@@ -134,6 +184,9 @@ export class N8nAgentService {
       return connectedAccounts;
     } catch (error) {
       console.error('Error getting connected accounts:', error);
+      if (error instanceof Error && error.message.includes('timed out')) {
+        console.error(`Database query timed out when fetching connected accounts for user ${userId}`);
+      }
       return {};
     }
   }

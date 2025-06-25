@@ -1,169 +1,399 @@
-import React from 'react';
-import { Modal, View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
-import { BlurView } from 'expo-blur';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { 
-  FadeIn, 
-  FadeOut, 
-  SlideInDown, 
-  SlideOutDown,
-  withSpring 
-} from 'react-native-reanimated';
-import { useTheme } from '../contexts/ThemeContext';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  SafeAreaView,
+  StatusBar,
+  ScrollView,
+  Dimensions,
+} from 'react-native';
+import { X, Flame, Trophy, Target, Calendar, TrendingUp, Clock, Award } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedProps,
+  withTiming,
+  Easing,
+  withDelay,
+} from 'react-native-reanimated';
+import { Svg, Circle } from 'react-native-svg';
+
+import { useTheme } from '../contexts/ThemeContext';
+import { useStreak } from '../contexts/StreakContext';
+import { useTasks } from '../contexts/TaskContext';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface StreakModalProps {
   visible: boolean;
   onClose: () => void;
-  streakCount: number;
-  isNewRecord?: boolean;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+interface StatCardProps {
+  title: string;
+  value: string;
+  subtitle?: string;
+  icon: React.ReactNode;
+  color: string;
+  delay?: number;
+}
 
-export const StreakModal: React.FC<StreakModalProps> = ({
-  visible,
-  onClose,
-  streakCount,
-  isNewRecord = false,
-}) => {
+const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, color, delay = 0 }) => {
   const { currentTheme } = useTheme();
 
+  return (
+    <View style={[styles.statCard, { backgroundColor: currentTheme.colors.surface }]}>
+      <View style={styles.statCardHeader}>
+        <Text style={[styles.statTitle, { color: currentTheme.colors.textSecondary }]}>{title}</Text>
+      </View>
+      <Text style={[styles.statValue, { color: currentTheme.colors.textPrimary }]}>{value}</Text>
+      {subtitle && (
+        <Text style={[styles.statSubtitle, { color: currentTheme.colors.textSecondary }]}>{subtitle}</Text>
+      )}
+    </View>
+  );
+};
+
+interface StreakRingProps {
+  currentStreak: number;
+  bestStreak: number;
+  size: number;
+}
+
+const StreakRing: React.FC<StreakRingProps> = ({ currentStreak, bestStreak, size }) => {
+  const { currentTheme } = useTheme();
+  const progress = useSharedValue(0);
+  
+  const radius = (size - 12) / 2;
+  const circumference = 2 * Math.PI * radius;
+  
+  useEffect(() => {
+    const percentage = Math.min(currentStreak / Math.max(bestStreak, 30), 1);
+    progress.value = withTiming(percentage, {
+      duration: 1500,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    });
+  }, [currentStreak, bestStreak]);
+  
+  const animatedProps = useAnimatedProps(() => {
+    const strokeDashoffset = circumference * (1 - progress.value);
+    return {
+      strokeDashoffset,
+    };
+  });
+
+  return (
+    <View style={[styles.ringContainer, { width: size, height: size }]}>
+      <Svg width={size} height={size}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgba(255, 255, 255, 0.1)"
+          strokeWidth={12}
+          fill="transparent"
+        />
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={currentTheme.colors.primary}
+          strokeWidth={12}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          animatedProps={animatedProps}
+          fill="transparent"
+          rotation="-90"
+          origin={`${size / 2}, ${size / 2}`}
+        />
+      </Svg>
+      <View style={[styles.ringContent, { width: size, height: size }]}>
+        <Flame size={24} color={currentTheme.colors.primary} />
+        <Text style={[styles.ringValue, { color: currentTheme.colors.textPrimary }]}>
+          {currentStreak}
+        </Text>
+        <Text style={[styles.ringLabel, { color: currentTheme.colors.textSecondary }]}>
+          day{currentStreak !== 1 ? 's' : ''}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+export const StreakModal: React.FC<StreakModalProps> = ({ visible, onClose }) => {
+  const { currentTheme } = useTheme();
+  const { currentStreak } = useStreak();
+  const { tasks } = useTasks();
+
+  // Calculate streak stats (since they're not in context yet)
+  const bestStreak = Math.max(currentStreak, 7); // Placeholder - could be stored in AsyncStorage
+  const totalDays = 30; // Placeholder - could be calculated from first app use date
+
+  // Calculate stats
+  const completedToday = tasks.filter(task => {
+    const today = new Date().toDateString();
+    const taskDate = new Date(task.due_date).toDateString();
+    return taskDate === today && task.status === 'completed';
+  }).length;
+
+  const totalCompleted = tasks.filter(task => task.status === 'completed').length;
+  
+  const thisWeekCompleted = tasks.filter(task => {
+    const now = new Date();
+    const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+    const taskDate = new Date(task.due_date);
+    return taskDate >= weekStart && task.status === 'completed';
+  }).length;
+
+  const averagePerDay = totalDays > 0 ? Math.round(totalCompleted / totalDays * 10) / 10 : 0;
+
   const getStreakMessage = () => {
-    if (isNewRecord) {
-      return "New Personal Record! 🎉";
-    }
-    if (streakCount >= 30) {
-      return "Incredible Dedication! 🌟";
-    }
-    if (streakCount >= 14) {
-      return "You're On Fire! 🔥";
-    }
-    if (streakCount >= 7) {
-      return "Fantastic Progress! ⭐";
-    }
-    return "Keep Going Strong! 💪";
+    if (currentStreak >= 30) return "Incredible dedication!";
+    if (currentStreak >= 14) return "You're on fire!";
+    if (currentStreak >= 7) return "Building momentum!";
+    if (currentStreak >= 3) return "Great start!";
+    return "Every day counts!";
   };
 
-  if (!visible) return null;
+  const getStreakLevel = () => {
+    if (currentStreak >= 30) return "Master";
+    if (currentStreak >= 14) return "Expert";
+    if (currentStreak >= 7) return "Committed";
+    if (currentStreak >= 3) return "Getting Started";
+    return "Beginner";
+  };
 
   return (
     <Modal
       visible={visible}
-      transparent
-      animationType="fade"
+      animationType="slide"
+      presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <Animated.View 
-        entering={FadeIn}
-        exiting={FadeOut}
-        style={styles.overlay}
-      >
-        <BlurView intensity={20} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
+        <StatusBar barStyle="light-content" backgroundColor={currentTheme.colors.background} />
         
-        <Animated.View
-          entering={SlideInDown.springify().damping(15)}
-          exiting={SlideOutDown}
-          style={[styles.modalContainer, { backgroundColor: currentTheme.colors.surface }]}
-        >
-          <LinearGradient
-            colors={[currentTheme.colors.primary + '20', 'transparent']}
-            style={styles.gradientOverlay}
-          />
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: currentTheme.colors.background }]}>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <X color={currentTheme.colors.textPrimary} size={24} />
+          </TouchableOpacity>
           
-          <View style={styles.content}>
-            <MaterialCommunityIcons
-              name="fire"
-              size={64}
-              color={currentTheme.colors.primary}
-              style={styles.icon}
+          <Text style={[styles.headerTitle, { color: currentTheme.colors.textPrimary }]}>
+            Your Streak
+          </Text>
+          
+          <View style={styles.placeholder} />
+        </View>
+
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Hero Section */}
+          <View style={styles.heroSection}>
+            <StreakRing
+              currentStreak={currentStreak}
+              bestStreak={bestStreak}
+              size={120}
             />
             
-            <Text style={[styles.streakCount, { color: currentTheme.colors.textPrimary }]}>
-              {streakCount} Day{streakCount !== 1 ? 's' : ''}
-            </Text>
-            
-            <Text style={[styles.streakMessage, { color: currentTheme.colors.textSecondary }]}>
-              {getStreakMessage()}
-            </Text>
-            
-            <Text style={[styles.description, { color: currentTheme.colors.textSecondary }]}>
-              You've been consistently crushing your goals. Keep up the amazing work!
-            </Text>
+            <View style={styles.heroText}>
+              <Text style={[styles.streakLevel, { color: currentTheme.colors.primary }]}>
+                {getStreakLevel()}
+              </Text>
+              <Text style={[styles.streakMessage, { color: currentTheme.colors.textSecondary }]}>
+                {getStreakMessage()}
+              </Text>
+            </View>
           </View>
 
-          <Pressable
-            style={[styles.button, { backgroundColor: currentTheme.colors.primary }]}
-            onPress={onClose}
-          >
-            <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>
-              Keep Going
+          {/* Stats Grid */}
+          <View style={styles.statsSection}>
+            <Text style={[styles.sectionTitle, { color: currentTheme.colors.textPrimary }]}>
+              Your Analytics
             </Text>
-          </Pressable>
-        </Animated.View>
-      </Animated.View>
+            
+            <View style={styles.statsGrid}>
+                           <StatCard
+               title="Best Streak"
+               value={bestStreak.toString()}
+               subtitle="days in a row"
+               icon={<Trophy size={20} color={currentTheme.colors.accent} />}
+               color={currentTheme.colors.accent}
+             />
+             
+             <StatCard
+               title="Today"
+               value={completedToday.toString()}
+               subtitle="tasks completed"
+               icon={<Target size={20} color="#34D399" />}
+               color="#34D399"
+             />
+             
+             <StatCard
+               title="This Week"
+               value={thisWeekCompleted.toString()}
+               subtitle="tasks completed"
+               icon={<Calendar size={20} color="#60A5FA" />}
+               color="#60A5FA"
+             />
+             
+             <StatCard
+               title="Daily Average"
+               value={averagePerDay.toString()}
+               subtitle="tasks per day"
+               icon={<TrendingUp size={20} color="#F59E0B" />}
+               color="#F59E0B"
+             />
+             
+             <StatCard
+               title="Total Days"
+               value={totalDays.toString()}
+               subtitle="using PulsePlan"
+               icon={<Clock size={20} color="#8B5CF6" />}
+               color="#8B5CF6"
+             />
+             
+             <StatCard
+               title="Total Completed"
+               value={totalCompleted.toString()}
+               subtitle="all time"
+               icon={<Award size={20} color="#EF4444" />}
+               color="#EF4444"
+             />
+            </View>
+          </View>
+
+        </ScrollView>
+      </SafeAreaView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  container: {
     flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  placeholder: {
+    width: 32,
+  },
+  content: {
+    flex: 1,
+  },
+  heroSection: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+  },
+  ringContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    marginBottom: 24,
+    position: 'relative',
   },
-  modalContainer: {
-    width: SCREEN_WIDTH * 0.85,
-    borderRadius: 24,
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-  },
-  gradientOverlay: {
+  ringContent: {
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    height: 200,
-  },
-  content: {
-    padding: 24,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  icon: {
-    marginBottom: 16,
-  },
-  streakCount: {
-    fontSize: 48,
+  ringValue: {
+    fontSize: 28,
     fontWeight: '700',
-    marginBottom: 8,
+    marginTop: 2,
   },
-  streakMessage: {
+  ringLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  heroText: {
+    alignItems: 'center',
+  },
+  streakLevel: {
     fontSize: 20,
     fontWeight: '600',
-    marginBottom: 12,
-    textAlign: 'center',
+    marginBottom: 4,
   },
-  description: {
+  streakMessage: {
     fontSize: 16,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 8,
-    paddingHorizontal: 16,
   },
-  button: {
-    marginHorizontal: 24,
-    marginBottom: 24,
-    paddingVertical: 16,
-    borderRadius: 16,
+  statsSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 20,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  statCard: {
+    width: (SCREEN_WIDTH - 60) / 2,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  statCardHeader: {
+    marginBottom: 8,
+  },
+  statTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  statSubtitle: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  motivationSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+  },
+  motivationCard: {
+    padding: 20,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  buttonText: {
+  motivationTitle: {
     fontSize: 16,
     fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  motivationText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 }); 

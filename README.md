@@ -12,57 +12,68 @@ PulsePlan is a mobile-first academic planning assistant that integrates with Can
 
 ## ✨ Features
 
-* **Canvas Sync** – Browser extension imports assignments
-* **AI Scheduling** – Vector model with GPT-4o insights for smart planning
-* **Real-Time Adjustments** – Reacts to task status changes
-* **Calendar Integration** – Connects with Google, Outlook, and Apple
-* **Task Management** – Tap to complete, skip, or reschedule
-* **Authentication** – Google sign-in via Supabase Auth
-* **Freemium Model** – Free weekly plans; premium unlocks advanced scheduling
+- **Canvas Sync** – Automatically sync assignments, exams, and grades
+- **AI Agent Assistant** – Conversational AI powered by GPT-4o and n8n automation
+- **Natural Language Scheduling** – Create and manage tasks through chat interface
+- **Real-Time Adjustments** – Reacts to task status changes and calendar updates
+- **Calendar Integration** – Connects with Google, Outlook, and Apple with bidirectional sync
+- **Smart Task Management** – Tap to complete, skip, or reschedule with AI recommendations
+- **Connected Account Automation** – Seamless integration with email, calendar, and academic platforms
+- **Authentication** – Google sign-in via Supabase Auth
+- **Freemium Model** – Free weekly plans; premium unlocks advanced scheduling and automation
 
 ---
 
-## 📺️ ML Model: Design & Strategy
+## 🤖 AI Agent: Design & Strategy
 
 ### 🧠 Purpose
 
-* Power adaptive scheduling and prioritization logic
-* Enable offline and fallback suggestions when GPT is unavailable
-* Learn user behavior patterns to enhance suggestions
+- Enable intelligent conversational task management and scheduling
+- Process natural language queries for complex workflow automation
+- Integrate with connected accounts (Google, Microsoft, Canvas) for contextual assistance
+- Provide personalized AI-powered productivity insights
 
-### 📆 Architecture
+### 🏗️ Architecture
 
-* **Framework**: Lightweight PyTorch model
-* **Embedding Memory**: Vectorized task embeddings using transformer encodings or sentence embeddings
-* **Inputs**:
+- **Framework**: n8n-powered agent hosted on Fly.dev (`https://pulseplan-agent.fly.dev/`)
+- **Backend Integration**: Express.js server with dedicated agent service layer
+- **Authentication**: JWT-based with Supabase Auth integration
+- **Inputs**:
 
-  * Task metadata (type, due date, estimated time, course)
-  * User behavior (on-time, skipped, completed, streaks)
-  * Time-of-day performance trends
-* **Outputs**:
+  - Natural language queries and conversational prompts
+  - User context (current page, preferences, recent tasks)
+  - Connected account data (calendars, emails, assignments)
+  - Real-time task status and completion history
 
-  * Suggested task time blocks
-  * Personalized priorities
-  * Recurring task timing insights
+- **Outputs**:
+
+  - Conversational responses with actionable insights
+  - Automated task creation and scheduling
+  - Calendar event management and conflict resolution
+  - Intelligent deadline analysis and priority recommendations
 
 ### ⚙️ Integration with GPT-4o
 
-* GPT-4o handles:
+- GPT-4o handles:
 
-  * Natural language reasoning and user prompts
-  * Generating user-facing plans
-* Internal ML model handles:
+  - Natural language understanding and generation
+  - Contextual conversation management
+  - Complex reasoning for multi-step workflows
 
-  * Rapid, lightweight predictions
-  * Cold start suggestions
-  * Real-time re-ranking of schedule blocks
+- n8n Agent handles:
 
-### 🌟 Future Enhancements
+  - Workflow automation and orchestration
+  - Connected service integrations
+  - Real-time data processing and sync
+  - Background task scheduling and optimization
 
-* Grade-aware prioritization using Canvas data
-* Context tagging with emojis or journaling
-* Reinforcement learning with user feedback
-* Evaluation metrics: completion rates, consistency, satisfaction
+### 🌟 Capabilities
+
+- **Conversational Interface**: Chat-based task management with context awareness
+- **Smart Scheduling**: Intelligent time-blocking with calendar integration
+- **Batch Processing**: Handle multiple tasks with optimized scheduling
+- **Connected Services**: Direct integration with Google, Microsoft, and Canvas APIs
+- **Quick Actions**: Pre-built workflows for common productivity tasks
 
 ---
 
@@ -79,12 +90,6 @@ flyonthewalldev-pulseplan/
 ├── polyfills.js
 ├── tsconfig.json
 ├── assets/
-├── extension/
-│   ├── content.js
-│   ├── manifest.json
-│   ├── popup.html
-│   ├── popup.js
-│   └── upload.js
 ├── server/
 │   ├── package.json
 │   └── src/
@@ -122,7 +127,6 @@ flyonthewalldev-pulseplan/
 | AI Assistant  | OpenAI GPT-4o                     |
 | ML Model      | PyTorch vector-memory model       |
 | Payments      | Apple                             |
-| Browser Sync  | Chrome Extension for Canvas       |
 | Calendar APIs | Google, Microsoft Graph, EventKit |
 
 ---
@@ -138,7 +142,7 @@ cd PulsePlan
 
 ### 2. Configure Environment Variables
 
-Create `.env` files in `/web/`, `/server/`, and `/extension/`:
+Create `.env` files in `/web/`, `/server/`, and :
 
 ```
 SUPABASE_URL=
@@ -176,44 +180,39 @@ npm install
 npm run dev
 ```
 
-### 6. Chrome Extension
-
-1. Go to `chrome://extensions`
-2. Enable Developer Mode
-3. Load `/extension/` folder as unpacked extension
-
 ---
 
 ## 🔐 Authentication
 
-* Apple Sign-in via Supabase
-* JWTs for session management
-* Auto-refresh and secure token storage
+- Apple Sign-in via Supabase
+- JWTs for session management
+- Auto-refresh and secure token storage
 
 ---
 
 ## 💳 Stripe Payments via Website
 
-* Freemium model: basic free, premium unlocks long-term scheduling
-* Webhook events: `checkout.session.completed`, `customer.subscription.deleted`
-* `requirePremium.ts` middleware restricts premium-only routes
+- Freemium model: basic free, premium unlocks long-term scheduling
+- Webhook events: `checkout.session.completed`, `customer.subscription.deleted`
+- `requirePremium.ts` middleware restricts premium-only routes
 
 ---
 
 ## 🧠 AI + Scheduling
 
-* GPT-4o powered endpoint: `POST /generate_schedule`
-* Uses task metadata, availability, and completion history
-* Scheduling logic combined with in-house lightweight ML model
+- **Agent-Powered Scheduling**: `POST /agent/query` and `POST /agent/chat` endpoints for natural language task management
+- **Connected Account Integration**: Leverages real-time data from Google Calendar, Microsoft Outlook, and Canvas
+- **Intelligent Automation**: n8n workflows handle complex scheduling logic and calendar synchronization
+- **Context-Aware Responses**: Uses task metadata, calendar availability, and user behavior patterns for personalized scheduling
 
 ---
 
 ## 🗓 Calendar Integration
 
-* Syncs with Google, Outlook, and Apple
-* Handles bidirectional sync and event conflict resolution
-* Background tasks manage token refresh and error handling
-* Focused on user-friendly connection setup and real-time performance
+- Syncs with Google, Outlook, and Apple
+- Handles bidirectional sync and event conflict resolution
+- Background tasks manage token refresh and error handling
+- Focused on user-friendly connection setup and real-time performance
 
 ---
 

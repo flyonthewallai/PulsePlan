@@ -27,6 +27,7 @@ import { chatAPIService, ChatMessage } from '../services/chatService';
 import { agentAPIService, AgentMessage } from '../services/agentService';
 import { schedulingAPIService } from '../services/schedulingService';
 import { formatAIResponse } from '../utils/markdownParser';
+import AnimatedThinkingText from './AnimatedThinkingText';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -380,7 +381,6 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
           </TouchableOpacity>
           
           <View style={styles.aiInfo}>
-            <BrainCircuit size={20} color={currentTheme.colors.primary} />
             <Text style={[styles.aiName, { color: currentTheme.colors.textPrimary }]}>Pulse</Text>
           </View>
           
@@ -457,11 +457,10 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
                 <Text style={[styles.agentName, { color: currentTheme.colors.textPrimary }]}>
                   Pulse
                 </Text>
-                <View style={styles.typingIndicator}>
-                  <View style={[styles.typingDot, { backgroundColor: currentTheme.colors.textSecondary }]} />
-                  <View style={[styles.typingDot, styles.typingDotMiddle, { backgroundColor: currentTheme.colors.textSecondary }]} />
-                  <View style={[styles.typingDot, { backgroundColor: currentTheme.colors.textSecondary }]} />
-                </View>
+                <AnimatedThinkingText 
+                  text="Pulse is thinking..."
+                  textStyle={[styles.messageText, { color: currentTheme.colors.textPrimary, opacity: 0.7 }]}
+                />
               </View>
             </View>
           )}
@@ -636,20 +635,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  typingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  typingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    opacity: 0.5,
-  },
-  typingDotMiddle: {
-    opacity: 0.7,
-  },
+
   suggestionsWrapper: {
     width: '100%',
     paddingHorizontal: 16,

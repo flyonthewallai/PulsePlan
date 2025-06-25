@@ -10,6 +10,11 @@ export const n8nAgentConfig = {
   retryDelay: parseInt(process.env.N8N_RETRY_DELAY || '1000'),
   healthCheckInterval: parseInt(process.env.N8N_HEALTH_CHECK_INTERVAL || '30000'),
   
+  // Database timeout configurations
+  databaseTimeout: parseInt(process.env.DATABASE_TIMEOUT || '30000'), // 30 seconds for database operations
+  databaseQueryTimeout: parseInt(process.env.DATABASE_QUERY_TIMEOUT || '20000'), // 20 seconds for individual queries
+  databaseBatchTimeout: parseInt(process.env.DATABASE_BATCH_TIMEOUT || '60000'), // 60 seconds for batch operations
+  
   // Feature flags
   enableBatchProcessing: process.env.N8N_ENABLE_BATCH_PROCESSING !== 'false',
   enableIntelligentRescheduling: process.env.N8N_ENABLE_INTELLIGENT_RESCHEDULING !== 'false',

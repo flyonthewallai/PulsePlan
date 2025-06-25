@@ -36,6 +36,7 @@ import SubscriptionModal from '@/components/SubscriptionModal';
 import AgentInstructionsModal from '@/components/AgentInstructionsModal';
 import NotificationModal from '@/components/NotificationModal';
 import { MarkdownText } from '@/components/MarkdownText';
+import AnimatedThinkingText from '@/components/AnimatedThinkingText';
 
 const FIRST_VISIT_KEY = '@pulse_first_visit';
 
@@ -569,7 +570,7 @@ export default function AgentScreen() {
             </View>
           ))}
               
-          {/* Typing indicator */}
+                        {/* Typing indicator */}
               {isTyping && (
             <View style={styles.chatContainer}>
               <View style={styles.logoContainer}>
@@ -577,9 +578,10 @@ export default function AgentScreen() {
               </View>
               <View style={styles.messageContainer}>
                 <Text style={styles.agentName}>Pulse</Text>
-                <Text style={[styles.chatMessage, { opacity: 0.7 }]}>
-                  Pulse is thinking...
-                </Text>
+                <AnimatedThinkingText 
+                  text="Pulse is thinking..."
+                  textStyle={[styles.chatMessage, { opacity: 0.7 }]}
+                />
               </View>
             </View>
           )}
