@@ -190,14 +190,6 @@ npm run dev
 
 ---
 
-## 💳 Stripe Payments via Website
-
-- Freemium model: basic free, premium unlocks long-term scheduling
-- Webhook events: `checkout.session.completed`, `customer.subscription.deleted`
-- `requirePremium.ts` middleware restricts premium-only routes
-
----
-
 ## 🧠 AI + Scheduling
 
 - **Agent-Powered Scheduling**: `POST /agent/query` and `POST /agent/chat` endpoints for natural language task management
