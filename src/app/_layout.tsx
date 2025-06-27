@@ -10,6 +10,7 @@ import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { StreakProvider } from '../contexts/StreakContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ProfileProvider } from '../contexts/ProfileContext';
+import { SubjectsProvider } from '../contexts/SubjectsContext';
 import { navigationAnimations } from '../config/animations';
 
 function AppWithTheme() {
@@ -72,11 +73,13 @@ export default function RootLayout() {
         <ProfileProvider>
           <ThemeWrapper>
             <SettingsProvider>
-              <TaskProvider>
-                <StreakProvider>
-                  <AppWithTheme />
-                </StreakProvider>
-              </TaskProvider>
+              <SubjectsProvider>
+                <TaskProvider>
+                  <StreakProvider>
+                    <AppWithTheme />
+                  </StreakProvider>
+                </TaskProvider>
+              </SubjectsProvider>
             </SettingsProvider>
           </ThemeWrapper>
         </ProfileProvider>

@@ -245,7 +245,12 @@ const EventsCard: React.FC<EventsCardProps> = ({ onPress }) => {
           }}
         >
           <TouchableOpacity
-            style={styles.card}
+            style={[
+              styles.card,
+              {
+                backgroundColor: currentTheme.colors.surface
+              }
+            ]}
             onPress={() => setShowModal(true)}
             activeOpacity={0.8}
           >
@@ -436,10 +441,8 @@ const EventsCard: React.FC<EventsCardProps> = ({ onPress }) => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#000000',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
     padding: 16,
     marginBottom: 24,
   },

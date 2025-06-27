@@ -12,8 +12,10 @@ import {
   RefreshControl,
 } from 'react-native';
 import { GestureHandlerRootView, LongPressGestureHandler, PanGestureHandler, State } from 'react-native-gesture-handler';
+import { Clock } from 'lucide-react-native';
 import { Task, useTasks } from '../contexts/TaskContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSubjects } from '../contexts/SubjectsContext';
 import TaskCreateModal from './TaskCreateModal';
 import TaskDetailsModal from './TaskDetailsModal';
 
@@ -52,6 +54,7 @@ export default function HourlyScheduleView({
 }: HourlyScheduleViewProps) {
   const { updateTask, refreshTasks, loading } = useTasks();
   const { currentTheme } = useTheme();
+  const { getSubjectColor } = useSubjects();
   const instanceId = useRef(Date.now().toString()).current;
   const [draggedTask, setDraggedTask] = useState<DraggedTask | null>(null);
   const [temporaryTask, setTemporaryTask] = useState<TemporaryTask | null>(null);
@@ -63,6 +66,7 @@ export default function HourlyScheduleView({
   const [isScrolling, setIsScrolling] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const panRef = useRef(new Animated.ValueXY()).current;
   const tempPanRef = useRef(new Animated.ValueXY()).current;
   const taskCreationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -100,23 +104,7 @@ export default function HourlyScheduleView({
     return validStartHour + Math.max(0, Math.min(hourIndex, studyHours.length - 1));
   };
 
-  const getSubjectColor = (subject: string) => {
-    const colors = {
-      'Math': '#FF6B6B',
-      'Mathematics': '#FF6B6B',
-      'Science': '#4ECDC4',
-      'Physics': '#4ECDC4',
-      'Chemistry': '#4ECDC4',
-      'Biology': '#4ECDC4',
-      'Computer Science': '#45B7D1',
-      'History': '#FFD93D',
-      'English': '#95E1D3',
-      'Literature': '#95E1D3',
-      'Psychology': '#DDA0DD',
-      'General': '#9B9B9B'
-    };
-    return colors[subject as keyof typeof colors] || '#9B9B9B';
-  };
+
 
   const handleLongPress = (hour: number) => {
     if (isScrolling) {
@@ -296,6 +284,8 @@ export default function HourlyScheduleView({
           styles.draggedTaskBlock,
           {
             backgroundColor: getSubjectColor(draggedTask.subject),
+            borderLeftWidth: 4,
+            borderLeftColor: getSubjectColor(draggedTask.subject),
             transform: panRef.getTranslateTransform(),
             top: draggedTask.startY,
             left: 72,
@@ -309,14 +299,6 @@ export default function HourlyScheduleView({
         <Text style={styles.taskTitle} numberOfLines={1}>
           {draggedTask.title}
         </Text>
-        <Text style={styles.taskSubject} numberOfLines={1}>
-          {draggedTask.subject}
-        </Text>
-        {draggedTask.estimated_minutes && (
-          <Text style={styles.taskDuration}>
-            {draggedTask.estimated_minutes}min
-          </Text>
-        )}
       </Animated.View>
     );
   };
@@ -356,14 +338,6 @@ export default function HourlyScheduleView({
                     <Text style={styles.taskTitle} numberOfLines={1}>
                       {task.title}
                     </Text>
-                    <Text style={styles.taskSubject} numberOfLines={1}>
-                      {task.subject}
-                    </Text>
-                    {task.estimated_minutes && (
-                      <Text style={styles.taskDuration}>
-                        {task.estimated_minutes}min
-                      </Text>
-                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -431,10 +405,10 @@ export default function HourlyScheduleView({
           ]}
         >
           <View style={styles.temporaryTaskContent}>
-            <Text style={[styles.temporaryTaskText, { color: currentTheme.colors.primary }]}>
-              New Task
+            <Text style={[styles.temporaryTaskText, { color: '#FFFFFF' }]}>
+              Create Task
             </Text>
-            <Text style={[styles.temporaryTaskTime, { color: currentTheme.colors.primary }]}>
+            <Text style={[styles.temporaryTaskTime, { color: '#FFFFFF' }]}>
               {formatHour(temporaryTask.hour)}
             </Text>
           </View>
@@ -533,10 +507,17 @@ export default function HourlyScheduleView({
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={refreshTasks}
-            tintColor="#FFFFFF"
-            colors={["#FFFFFF"]}
+            refreshing={isManualRefreshing}
+            onRefresh={async () => {
+              setIsManualRefreshing(true);
+              try {
+                await refreshTasks();
+              } finally {
+                setIsManualRefreshing(false);
+              }
+            }}
+            tintColor={currentTheme.colors.primary}
+            colors={[currentTheme.colors.primary]}
             progressBackgroundColor="transparent"
           />
         }
@@ -632,32 +613,20 @@ const styles = StyleSheet.create({
     right: 0,
     height: HOUR_HEIGHT,
     borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   taskTitle: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '500',
-    marginBottom: 2,
-  },
-  taskSubject: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 2,
-  },
-  taskDuration: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '500',
   },
   draggedTaskBlock: {
     position: 'absolute',
-    borderRadius: 8,
-    padding: 8,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     height: HOUR_HEIGHT,
-    justifyContent: 'center',
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -718,16 +687,16 @@ const styles = StyleSheet.create({
     left: 72,
     right: 8,
     height: HOUR_HEIGHT,
-    borderRadius: 8,
+    borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: '#4F8CFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   temporaryTaskContent: {
     alignItems: 'center',
@@ -736,15 +705,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   temporaryTaskText: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 2,
     textAlign: 'center',
   },
   temporaryTaskTime: {
-    fontSize: 12,
-    opacity: 0.8,
+    fontSize: 11,
+    opacity: 0.9,
     textAlign: 'center',
+    fontWeight: '400',
   },
   hourClickableArea: {
     height: TOTAL_HOUR_HEIGHT,

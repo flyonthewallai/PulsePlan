@@ -470,16 +470,16 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
         >
-          <View style={styles.bottomSection}>
-            <View style={styles.inputContainer}>
+                  <View style={[styles.bottomSection, { backgroundColor: currentTheme.colors.background }]}>
+          <View style={styles.inputContainer}>
               <TextInput
                 ref={inputRef}
                 style={[styles.input, { 
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  color: '#FFFFFF',
+                  backgroundColor: currentTheme.colors.surface,
+                  color: currentTheme.colors.textPrimary,
                 }]}
                 placeholder="Message"
-                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                placeholderTextColor={currentTheme.colors.textSecondary}
                 value={input}
                 onChangeText={(text) => {
                   setInput(text);
@@ -665,7 +665,6 @@ const styles = StyleSheet.create({
   bottomSection: {
     position: 'relative',
     width: '100%',
-    backgroundColor: '#000000',
     paddingTop: 12,
   },
 });

@@ -25,26 +25,31 @@ export default function DailySummaryCard() {
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={styles.metricsCard}
+          style={[
+            styles.metricsCard,
+            { 
+              backgroundColor: currentTheme.colors.surface
+            }
+          ]}
           onPress={() => setShowOverviewModal(true)}
           activeOpacity={0.8}
         >
           <View style={styles.metricItem}>
             <View style={styles.metricLeft}>
-              <CheckCircle2 color="#FFFFFF" size={20} style={styles.metricIcon} />
-              <Text style={styles.metricText}>5 Tasks Today</Text>
+              <CheckCircle2 color={currentTheme.colors.textPrimary} size={20} style={styles.metricIcon} />
+              <Text style={[styles.metricText, { color: currentTheme.colors.textPrimary }]}>5 Tasks Today</Text>
             </View>
           </View>
           <View style={[styles.metricItem, styles.metricSpacing]}>
             <View style={styles.metricLeft}>
-              <Clock color="#FFFFFF" size={20} style={styles.metricIcon} />
-              <Text style={styles.metricText}>3.5h Est. Time</Text>
+              <Clock color={currentTheme.colors.textPrimary} size={20} style={styles.metricIcon} />
+              <Text style={[styles.metricText, { color: currentTheme.colors.textPrimary }]}>3.5h Est. Time</Text>
             </View>
           </View>
           <View style={[styles.metricItem, styles.metricSpacing]}>
             <View style={styles.metricLeft}>
-              <CheckCheck color="#FFFFFF" size={20} style={styles.metricIcon} />
-              <Text style={styles.metricText}>2 Done</Text>
+              <CheckCheck color={currentTheme.colors.textPrimary} size={20} style={styles.metricIcon} />
+              <Text style={[styles.metricText, { color: currentTheme.colors.textPrimary }]}>2 Done</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -94,26 +99,31 @@ export default function DailySummaryCard() {
       </TouchableOpacity>
 
       <TouchableOpacity 
-        style={styles.metricsCard}
+        style={[
+          styles.metricsCard,
+          { 
+            backgroundColor: currentTheme.colors.surface
+          }
+        ]}
         onPress={() => setShowOverviewModal(true)}
         activeOpacity={0.8}
       >
         <View style={styles.metricItem}>
           <View style={styles.metricLeft}>
-            <CheckCircle2 color="#FFFFFF" size={20} style={styles.metricIcon} />
-            <Text style={styles.metricText}>5 Tasks Today</Text>
+            <CheckCircle2 color={currentTheme.colors.textPrimary} size={20} style={styles.metricIcon} />
+            <Text style={[styles.metricText, { color: currentTheme.colors.textPrimary }]}>5 Tasks Today</Text>
           </View>
         </View>
         <View style={[styles.metricItem, styles.metricSpacing]}>
           <View style={styles.metricLeft}>
-            <Clock color="#FFFFFF" size={20} style={styles.metricIcon} />
-            <Text style={styles.metricText}>3.5h Est. Time</Text>
+            <Clock color={currentTheme.colors.textPrimary} size={20} style={styles.metricIcon} />
+            <Text style={[styles.metricText, { color: currentTheme.colors.textPrimary }]}>3.5h Est. Time</Text>
           </View>
         </View>
         <View style={[styles.metricItem, styles.metricSpacing]}>
           <View style={styles.metricLeft}>
-            <CheckCheck color="#FFFFFF" size={20} style={styles.metricIcon} />
-            <Text style={styles.metricText}>2 Done</Text>
+            <CheckCheck color={currentTheme.colors.textPrimary} size={20} style={styles.metricIcon} />
+            <Text style={[styles.metricText, { color: currentTheme.colors.textPrimary }]}>2 Done</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -165,10 +175,8 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   metricsCard: {
-    backgroundColor: '#000000',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
     padding: 16,
   },
   metricItem: {
@@ -188,7 +196,6 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   metricText: {
-    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '500',
   },

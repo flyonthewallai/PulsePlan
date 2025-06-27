@@ -8,10 +8,12 @@ import {
   ScrollView,
   Animated,
 } from 'react-native';
-import { X, Calendar, Clock } from 'lucide-react-native';
+import { X, Calendar, Clock, Plus } from 'lucide-react-native';
 import { GestureHandlerRootView, PanGestureHandler as RNGHPanGestureHandler, State as GestureState } from 'react-native-gesture-handler';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTasks } from '@/contexts/TaskContext';
+import TaskCreateModal from './TaskCreateModal';
+import TaskDetailsModal from './TaskDetailsModal';
 
 interface TasksCardProps {
   onPress?: () => void;
@@ -19,8 +21,11 @@ interface TasksCardProps {
 
 const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
   const { currentTheme } = useTheme();
-  const { tasks, toggleTask } = useTasks();
+  const { tasks, updateTask } = useTasks();
   const [showModal, setShowModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const cardTranslateX = React.useRef(new Animated.Value(0)).current;
 
@@ -97,7 +102,22 @@ const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
   const currentTask = currentTasks[currentTaskIndex] || currentTasks[0];
 
   const handleToggleTask = (taskId: string) => {
-    toggleTask(taskId);
+    const task = currentTasks.find(t => t.id === taskId);
+    if (task) {
+      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+      updateTask(taskId, { status: newStatus });
+    }
+  };
+
+  const handleTaskPress = (task: any) => {
+    setSelectedTask(task);
+    setShowModal(false); // Close the tasks modal first
+    setShowDetailsModal(true);
+  };
+
+  const handleDetailsModalClose = () => {
+    setShowDetailsModal(false);
+    setSelectedTask(null);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -152,7 +172,12 @@ const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
           }}
         >
           <TouchableOpacity
-            style={styles.card}
+            style={[
+              styles.card,
+              {
+                backgroundColor: currentTheme.colors.surface
+              }
+            ]}
             onPress={() => setShowModal(true)}
             activeOpacity={0.8}
           >
@@ -234,7 +259,15 @@ const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
             <Text style={[styles.modalTitle, { color: currentTheme.colors.textPrimary }]}>
               Tasks
             </Text>
-            <View style={{ width: 24 }} />
+            <TouchableOpacity 
+              onPress={() => {
+                setShowModal(false); // Close the tasks modal first
+                setShowCreateModal(true);
+              }}
+              style={styles.addButton}
+            >
+              <Plus size={24} color={currentTheme.colors.primary} />
+            </TouchableOpacity>
           </View>
 
           {/* Tasks list */}
@@ -243,7 +276,8 @@ const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
               <TouchableOpacity
                 key={task.id}
                 style={[styles.modalTaskItem, { backgroundColor: currentTheme.colors.surface }]}
-                onPress={() => handleToggleTask(task.id)}
+                onPress={() => handleTaskPress(task)}
+                activeOpacity={0.7}
               >
                 <TouchableOpacity
                   style={[
@@ -251,7 +285,10 @@ const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
                     { borderColor: currentTheme.colors.border },
                     task.status === 'completed' && { backgroundColor: getPriorityColor(task.priority), borderColor: getPriorityColor(task.priority) }
                   ]}
-                  onPress={() => handleToggleTask(task.id)}
+                  onPress={(e) => {
+                    e.stopPropagation(); // Prevent task press when clicking checkbox
+                    handleToggleTask(task.id);
+                  }}
                 >
                   {task.status === 'completed' && (
                     <Text style={styles.modalCheckmark}>✓</Text>
@@ -305,16 +342,25 @@ const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
         </View>
         </GestureHandlerRootView>
       </Modal>
+
+      <TaskCreateModal 
+        visible={showCreateModal} 
+        onClose={() => setShowCreateModal(false)}
+      />
+
+      <TaskDetailsModal
+        visible={showDetailsModal}
+        task={selectedTask}
+        onClose={handleDetailsModalClose}
+      />
     </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#000000',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
     padding: 16,
     marginBottom: 24,
   },
@@ -389,7 +435,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 24,
+    paddingTop: 32,
+  },
+  addButton: {
+    padding: 4,
   },
   modalTitle: {
     fontSize: 18,

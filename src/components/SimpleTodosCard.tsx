@@ -264,7 +264,12 @@ const SimpleTodosCard: React.FC<SimpleTodosCardProps> = ({ onPress }) => {
           }}
         >
           <TouchableOpacity
-            style={styles.card}
+            style={[
+              styles.card,
+              {
+                backgroundColor: currentTheme.colors.surface
+              }
+            ]}
             onPress={() => setShowModal(true)}
             activeOpacity={0.8}
           >
@@ -345,9 +350,15 @@ const SimpleTodosCard: React.FC<SimpleTodosCardProps> = ({ onPress }) => {
           {/* Add new todo */}
           <View style={styles.addTodoContainer}>
             <TextInput
-              style={[styles.addTodoInput]}
+              style={[
+                styles.addTodoInput,
+                {
+                  backgroundColor: currentTheme.colors.background,
+                  color: currentTheme.colors.textPrimary
+                }
+              ]}
               placeholder="Add a new todo..."
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              placeholderTextColor={currentTheme.colors.textSecondary}
               value={newTodoText}
               onChangeText={setNewTodoText}
               onSubmitEditing={addTodo}
@@ -410,10 +421,8 @@ const SimpleTodosCard: React.FC<SimpleTodosCardProps> = ({ onPress }) => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#000000',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
     padding: 16,
     marginBottom: 24,
   },
@@ -493,13 +502,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   addTodoInput: {
-    backgroundColor: '#000000',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 16,
     width: '100%',
-    color: '#FFFFFF',
   },
   todosList: {
     flex: 1,

@@ -16,6 +16,7 @@ export interface Task {
   estimated_minutes?: number;
   status: 'pending' | 'in_progress' | 'completed';
   priority: 'low' | 'medium' | 'high';
+  scheduling_rationale?: string;
   created_at: string;
 }
 

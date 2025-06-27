@@ -8,6 +8,7 @@ export interface Task {
   estimatedDuration: number;
   scheduledHour?: number;
   tags?: string[];
+  scheduling_rationale?: string;
   createdAt: string;
   updatedAt: string;
 } 
