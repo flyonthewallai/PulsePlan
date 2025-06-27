@@ -75,7 +75,7 @@
         }
       ],
       [
-        "@stripe/stripe-react-native",
+        "@react-native-async-storage/async-storage",
         {
           "merchantIdentifier": "merchant.com.pulseplan.app",
           "enableGooglePay": true
@@ -94,7 +94,7 @@
     "extra": {
       "apiUrl": "http://10.0.0.4:5000",
       "apiPort": "5000",
-      "stripePublishableKey": "pk_test_51RPGvL4cCEE1fltDtwqgVQIxe7rCsReNaQhzka3UGxvZcjkEveCiYTUjfA2KgzTPPAB7vq3WvaC0b2AmK59c87ak00q8wxgUAz",
+
       "supabaseUrl": "https://jwvohxsgokfcysfqhtzo.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3dm9oeHNnb2tmY3lzZnFodHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNjQwNjYsImV4cCI6MjA2Mjk0MDA2Nn0.76EqvgoCCoOwxc5KTrSqX5PLeHtB6YD2GbEjSpeOvaU"
     }

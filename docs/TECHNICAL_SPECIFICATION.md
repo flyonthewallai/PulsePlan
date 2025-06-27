@@ -1,6 +1,7 @@
 # PulsePlan - Complete Technical Specification
 
 ## Table of Contents
+
 1. [Project Overview](#project-overview)
 2. [Architecture Overview](#architecture-overview)
 3. [Technology Stack](#technology-stack)
@@ -28,7 +29,7 @@
 - **Calendar Sync**: Google Calendar, Outlook, and Apple Calendar integration
 - **Task Management**: Comprehensive task creation, editing, and tracking
 - **Authentication**: Supabase Auth with Google OAuth
-- **Freemium Model**: Stripe integration for premium features
+- **Freemium Model**: Apple Pay integration for premium features
 - **Real-time Updates**: Live task synchronization across devices
 
 ---
@@ -61,7 +62,7 @@ PulsePlan follows a **microservice-like architecture** with clear separation of 
 ┌─────────────────────────────────────────────────────────────┐
 │                 SERVICES LAYER                              │
 ├─────────────────────────────────────────────────────────────┤
-│ Supabase │ OpenAI │ Google │ Microsoft │ Stripe │ Canvas  │
+│ Supabase │ OpenAI │ Google │ Microsoft │ Apple Pay │ Canvas  │
 │(Database)│ (AI)   │Calendar│  Graph   │(Payment)│  (LMS)  │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -71,6 +72,7 @@ PulsePlan follows a **microservice-like architecture** with clear separation of 
 ## Technology Stack
 
 ### Frontend
+
 - **React Native 0.79.2**: Cross-platform mobile development
 - **Expo SDK 53**: Development platform and deployment tools
 - **Expo Router 5.0.7**: File-based routing system
@@ -80,6 +82,7 @@ PulsePlan follows a **microservice-like architecture** with clear separation of 
 - **React Native Reanimated**: Smooth animations
 
 ### Backend
+
 - **Node.js**: Runtime environment
 - **Express.js**: Web application framework
 - **TypeScript**: Backend type safety
@@ -87,18 +90,21 @@ PulsePlan follows a **microservice-like architecture** with clear separation of 
 - **ts-node**: TypeScript execution for development
 
 ### Database & Authentication
+
 - **Supabase**: Backend-as-a-Service (PostgreSQL)
 - **Supabase Auth**: Authentication service
 - **AsyncStorage**: Local data persistence
 
 ### External Integrations
+
 - **OpenAI GPT-4o**: AI assistant and scheduling
 - **Google Calendar API**: Calendar integration
 - **Microsoft Graph API**: Outlook integration
-- **Stripe**: Payment processing
+- **Apple Pay**: Payment processing
 - **Canvas LMS**: Academic data integration
 
 ### Development Tools
+
 - **Metro**: React Native bundler
 - **Babel**: JavaScript transpiler
 - **ESLint/Prettier**: Code formatting and linting
@@ -178,7 +184,7 @@ PulsePlan/
 │       │   ├── tasksRoutes.ts    # Task CRUD operations
 │       │   ├── calendarRoutes.ts # Calendar sync endpoints
 │       │   ├── schedulingRoutes.ts # AI scheduling endpoints
-│       │   ├── stripeRoutes.ts   # Payment processing
+│       │   ├── applePayRoutes.ts # Payment processing
 │       │   ├── scheduleBlocks.ts # Time block management
 │       │   └── chat.ts       # AI assistant endpoints
 │       ├── 📁 controllers/   # Business logic controllers
@@ -201,11 +207,13 @@ PulsePlan/
 ## Application Flow
 
 ### 1. **App Initialization**
+
 ```typescript
 index.ts → App Registration → Root Layout → Provider Stack
 ```
 
 ### 2. **Authentication Flow**
+
 ```typescript
 1. User opens app → index.tsx (loading screen)
 2. AuthContext checks session status
@@ -215,18 +223,20 @@ index.ts → App Registration → Root Layout → Provider Stack
 ```
 
 ### 3. **Main Application Navigation**
+
 ```typescript
 Tab Navigation Structure:
 ├── home.tsx        # Today's tasks and schedule
-├── week.tsx        # Weekly calendar view  
+├── week.tsx        # Weekly calendar view
 ├── progress.tsx    # Analytics and streaks
 └── settings.tsx    # User preferences and profile
 ```
 
 ### 4. **Task Management Flow**
+
 ```typescript
 1. Task Creation: TaskCreateModal → TaskContext → API → Database
-2. Task Updates: TaskDetailsModal → TaskContext → API → Database  
+2. Task Updates: TaskDetailsModal → TaskContext → API → Database
 3. Task Completion: TaskCard interaction → Context update → Sync
 4. AI Scheduling: schedulingService → OpenAI API → Schedule generation
 ```
@@ -236,28 +246,32 @@ Tab Navigation Structure:
 ## Frontend Architecture
 
 ### **Entry Point Chain**
+
 1. **`index.ts`**: Registers the root component with Expo
 2. **`src/app/_layout.tsx`**: Root layout with all context providers
 3. **`src/app/index.tsx`**: Initial loading screen with navigation logic
 4. **Authentication routing**: Handled by `AuthContext`
 
 ### **Context Provider Hierarchy**
+
 ```typescript
 SafeAreaProvider
 └── AuthProvider           # Authentication state
     └── ThemeProvider       # Theme and styling
-        └── SettingsProvider # App preferences  
+        └── SettingsProvider # App preferences
             └── TaskProvider # Task management
                 └── AppWithTheme # Main app component
 ```
 
 ### **Routing System (Expo Router)**
+
 - **File-based routing**: Each file in `src/app/` becomes a route
 - **Group routing**: `(tabs)` creates tab navigation group
 - **Layout files**: `_layout.tsx` defines layout for route groups
 - **Dynamic routing**: Navigation handled via `useRouter()` hook
 
 ### **State Management Architecture**
+
 - **React Context API**: Primary state management
 - **AsyncStorage**: Local persistence for offline capability
 - **Supabase realtime**: Live data synchronization (disabled in current config)
@@ -268,23 +282,25 @@ SafeAreaProvider
 ## Backend Architecture
 
 ### **Server Entry Point (`server/src/index.ts`)**
+
 ```typescript
 Express App Initialization:
 1. Environment configuration loading
 2. CORS setup for cross-origin requests
-3. Middleware configuration (JSON parsing, raw body for Stripe)
+3. Middleware configuration (JSON parsing, CORS setup)
 4. Route registration for all API endpoints
 5. Port discovery and server startup
 6. Health check endpoint for monitoring
 ```
 
 ### **API Route Structure**
+
 ```typescript
 Base URL: http://localhost:5000 (or dynamic port)
 
 Authentication Routes (/auth):
 ├── POST /auth/login          # User login
-├── POST /auth/register       # User registration  
+├── POST /auth/register       # User registration
 ├── POST /auth/logout         # User logout
 └── GET  /auth/profile        # Get user profile
 
@@ -303,10 +319,11 @@ Scheduling Routes (/scheduling):
 ├── POST /scheduling/generate # AI schedule generation
 └── GET  /scheduling/blocks   # Get schedule blocks
 
-Payment Routes (/stripe):
-├── POST /stripe/create-session    # Create payment session
-├── POST /stripe/webhook          # Stripe webhook handler
-└── GET  /stripe/subscription     # Get subscription status
+Payment Routes (/apple-pay):
+├── POST /apple-pay/verify-receipt      # Verify Apple Pay receipt
+├── GET  /apple-pay/subscription-status # Get subscription status
+├── POST /apple-pay/update-subscription # Update subscription
+└── POST /apple-pay/cancel-subscription # Cancel subscription
 
 AI Assistant Routes (/chat):
 ├── POST /chat/message        # Send message to AI
@@ -314,8 +331,9 @@ AI Assistant Routes (/chat):
 ```
 
 ### **Middleware Stack**
-1. **CORS**: Configured for development (*) and production (specific origins)
-2. **Body Parsing**: JSON for most routes, raw for Stripe webhooks
+
+1. **CORS**: Configured for development (\*) and production (specific origins)
+2. **Body Parsing**: JSON for most routes, specialized parsing for webhooks
 3. **Authentication**: JWT token validation (implied in routes)
 4. **Error Handling**: Centralized error responses
 5. **Port Management**: Dynamic port allocation with collision detection
@@ -325,12 +343,14 @@ AI Assistant Routes (/chat):
 ## Database & Authentication
 
 ### **Supabase Configuration**
+
 - **Database**: PostgreSQL hosted by Supabase
 - **Authentication**: Supabase Auth with Google OAuth
 - **Storage**: User profile data and task information
 - **Real-time**: Disabled for React Native compatibility
 
 ### **Authentication Flow**
+
 ```typescript
 1. User Login/Signup → Supabase Auth
 2. JWT Token generation → Stored in AsyncStorage
@@ -340,6 +360,7 @@ AI Assistant Routes (/chat):
 ```
 
 ### **Data Models**
+
 ```typescript
 User: {
   id: string
@@ -363,6 +384,7 @@ Task: {
 ```
 
 ### **Offline Capability**
+
 - **Local Caching**: Tasks cached in AsyncStorage
 - **Sync Strategy**: Background sync when online
 - **Conflict Resolution**: Last-write-wins approach
@@ -373,19 +395,23 @@ Task: {
 ## Browser Extension
 
 ### **Chrome Extension Architecture**
+
 The Canvas sync extension consists of:
 
 1. **`manifest.json`**: Extension configuration
+
    - **Permissions**: activeTab, scripting, storage
    - **Host permissions**: Canvas LMS domains
    - **Content scripts**: Auto-injection on Canvas pages
 
 2. **`content.js`**: Canvas page interaction
+
    - **DOM scanning**: Extracts assignment data
    - **Event listeners**: Detects page changes
    - **Data collection**: Assignment titles, due dates, descriptions
 
 3. **`popup.html/js`**: Extension popup interface
+
    - **User controls**: Sync triggers and settings
    - **Status display**: Last sync time and results
    - **Authentication**: Extension-to-app linking
@@ -396,6 +422,7 @@ The Canvas sync extension consists of:
    - **Error handling**: Retry logic and user notifications
 
 ### **Canvas Integration Flow**
+
 ```typescript
 1. User navigates to Canvas assignments page
 2. Content script detects assignment data
@@ -410,6 +437,7 @@ The Canvas sync extension consists of:
 ## Configuration & Build System
 
 ### **Metro Configuration (`metro.config.js`)**
+
 - **Node.js Polyfills**: Adds browser-compatible versions of Node modules
 - **Module Resolution**: Custom alias configuration (@/ for src/)
 - **Platform Support**: iOS, Android, web platforms
@@ -417,17 +445,20 @@ The Canvas sync extension consists of:
 - **WebSocket Mocking**: Custom WebSocket implementation for React Native
 
 ### **Babel Configuration (`babel.config.js`)**
+
 - **Preset**: babel-preset-expo for React Native compatibility
 - **Module Resolver**: Path aliasing for cleaner imports
 - **Environment Variables**: react-native-dotenv for .env support
 - **Reanimated Plugin**: Enables advanced animations
 
 ### **TypeScript Configuration (`tsconfig.json`)**
+
 - **Strict Mode**: Enabled for type safety
-- **Path Mapping**: @/* aliases to src/* for clean imports
+- **Path Mapping**: @/_ aliases to src/_ for clean imports
 - **Expo Base**: Extends Expo's recommended TypeScript settings
 
 ### **Polyfills System**
+
 - **`polyfills.js`**: Root-level polyfills for Node.js compatibility
 - **`src/lib/polyfills.ts`**: React Native specific polyfills
 - **WebSocket Mock**: Custom implementation for Supabase realtime compatibility
@@ -437,9 +468,11 @@ The Canvas sync extension consists of:
 ## Key Components Detailed Analysis
 
 ### **1. AuthContext (`src/contexts/AuthContext.tsx`)**
+
 **Purpose**: Manages authentication state and navigation logic
 
 **Key Features**:
+
 - Session management with automatic refresh
 - Onboarding state tracking per user
 - Navigation logic based on auth status
@@ -447,6 +480,7 @@ The Canvas sync extension consists of:
 - AsyncStorage integration for session persistence
 
 **State Management**:
+
 ```typescript
 interface AuthContextType {
   user: User | null                    # Current authenticated user
@@ -461,14 +495,17 @@ interface AuthContextType {
 ```
 
 **Navigation Logic**:
+
 - Unauthenticated users → `/auth`
 - Authenticated users needing onboarding → `/onboarding`
 - Fully authenticated users → `/(tabs)/home`
 
 ### **2. TaskContext (`src/contexts/TaskContext.tsx`)**
+
 **Purpose**: Manages task state, CRUD operations, and offline synchronization
 
 **Key Features**:
+
 - Task CRUD operations with API integration
 - Offline caching with AsyncStorage
 - Network status monitoring
@@ -476,6 +513,7 @@ interface AuthContextType {
 - Error handling and retry logic
 
 **State Management**:
+
 ```typescript
 interface TaskContextType {
   tasks: Task[]                        # All user tasks
@@ -490,15 +528,18 @@ interface TaskContextType {
 ```
 
 **Caching Strategy**:
+
 - Tasks cached locally for offline access
 - Background sync when network available
 - Last sync timestamp tracking
 - Graceful degradation when offline
 
 ### **3. ThemeContext (`src/contexts/ThemeContext.tsx`)**
+
 **Purpose**: Manages application theming and visual customization
 
 **Features**:
+
 - Multiple theme variants (standard, vibrant, minimal, etc.)
 - Premium theme unlocking
 - Dynamic theme switching
@@ -508,21 +549,25 @@ interface TaskContextType {
 ### **4. Main Screens Analysis**
 
 #### **Home Screen (`src/app/(tabs)/home.tsx`)**
+
 - **Purpose**: Today's schedule and immediate tasks
 - **Features**: Current task display, quick actions, schedule timeline
 - **Components**: TaskCard, HourlyScheduleView, CompletionRing
 
 #### **Week Screen (`src/app/(tabs)/week.tsx`)**
+
 - **Purpose**: Weekly calendar view and planning
 - **Features**: Week navigation, task distribution, schedule overview
 - **Components**: Calendar grid, task summaries
 
 #### **Progress Screen (`src/app/(tabs)/progress.tsx`)**
+
 - **Purpose**: Analytics, streaks, and performance metrics
 - **Features**: Completion statistics, streak tracking, progress charts
 - **Components**: BarChart, CompletionRing, StreakModal
 
 #### **Settings Screen (`src/app/(tabs)/settings.tsx`)**
+
 - **Purpose**: User preferences, profile management, app configuration
 - **Features**: Theme selection, account settings, subscription management
 - **Components**: ThemeSelector, profile forms, premium upgrade options
@@ -532,6 +577,7 @@ interface TaskContextType {
 ## Data Flow & State Management
 
 ### **State Flow Architecture**
+
 ```typescript
 User Action → Component → Context → Service Layer → API → Database
                 ↓           ↓          ↓           ↓       ↓
@@ -539,6 +585,7 @@ User Action → Component → Context → Service Layer → API → Database
 ```
 
 ### **Task Management Flow**
+
 ```typescript
 1. Task Creation:
    TaskCreateModal → TaskContext.createTask() → API POST /tasks → Supabase Insert
@@ -554,6 +601,7 @@ User Action → Component → Context → Service Layer → API → Database
 ```
 
 ### **Authentication Flow**
+
 ```typescript
 1. Login Attempt:
    AuthScreen → supabase.auth.signInWithPassword() → JWT Token → AsyncStorage
@@ -572,26 +620,31 @@ User Action → Component → Context → Service Layer → API → Database
 ### **External Service Integrations**
 
 #### **OpenAI GPT-4o Integration**
+
 - **Purpose**: AI-powered scheduling and task assistance
 - **Endpoint**: `/chat` routes in backend
 - **Features**: Natural language task creation, schedule optimization, study tips
 
 #### **Google Calendar API**
+
 - **Purpose**: Calendar synchronization and availability checking
 - **Authentication**: OAuth 2.0 flow
 - **Features**: Event creation, availability queries, calendar sync
 
 #### **Microsoft Graph API**
+
 - **Purpose**: Outlook calendar integration
 - **Authentication**: Microsoft OAuth
 - **Features**: Similar to Google Calendar functionality
 
-#### **Stripe API**
+#### **Apple Pay API**
+
 - **Purpose**: Payment processing for premium features
-- **Features**: Subscription management, webhook handling, payment sessions
-- **Security**: Webhook signature verification, secure token handling
+- **Features**: Receipt verification, subscription management, secure transactions
+- **Security**: Server-side receipt validation, secure transaction handling
 
 #### **Canvas LMS Integration**
+
 - **Purpose**: Academic assignment import
 - **Method**: Browser extension data scraping
 - **Data Flow**: Extension → PulsePlan API → Task creation
@@ -601,11 +654,12 @@ User Action → Component → Context → Service Layer → API → Database
 ## Development Workflow
 
 ### **Development Scripts**
+
 ```bash
 # Frontend Development
 npm run start          # Start Expo development server
 npm run android        # Run on Android emulator/device
-npm run ios           # Run on iOS simulator/device  
+npm run ios           # Run on iOS simulator/device
 npm run web           # Run in web browser
 
 # Backend Development
@@ -619,6 +673,7 @@ npm run verify-supabase # Validate Supabase configuration
 ```
 
 ### **Environment Configuration**
+
 ```typescript
 Required Environment Variables:
 - EXPO_PUBLIC_SUPABASE_URL      # Supabase project URL
@@ -626,11 +681,13 @@ Required Environment Variables:
 - OPENAI_API_KEY                # OpenAI API access
 - GOOGLE_CLIENT_ID              # Google OAuth credentials
 - GOOGLE_CLIENT_SECRET          # Google OAuth secret
-- STRIPE_SECRET_KEY             # Stripe payment processing
-- STRIPE_WEBHOOK_SECRET         # Stripe webhook verification
+- APPLE_SHARED_SECRET           # Apple receipt verification
+- UPSTASH_REDIS_REST_URL        # Upstash Redis cache URL
+- UPSTASH_REDIS_REST_TOKEN      # Upstash Redis cache token
 ```
 
 ### **Build Process**
+
 1. **Development**: Expo CLI with hot reloading
 2. **Production**: EAS Build for app store deployment
 3. **Web**: Expo web build for browser deployment
@@ -641,21 +698,25 @@ Required Environment Variables:
 ## Deployment Architecture
 
 ### **Frontend Deployment**
+
 - **Mobile Apps**: EAS Build → App Stores (iOS App Store, Google Play)
 - **Web App**: Expo web build → Static hosting (Vercel, Netlify)
 - **Browser Extension**: Chrome Web Store publication
 
 ### **Backend Deployment**
+
 - **API Server**: Node.js deployment (Heroku, Railway, VPS)
 - **Database**: Supabase hosted PostgreSQL
 - **File Storage**: Supabase storage for user assets
 
 ### **Environment Separation**
+
 - **Development**: Local servers, test databases
 - **Staging**: Deployed servers, staging databases
 - **Production**: Production servers, live databases with backups
 
 ### **Monitoring & Observability**
+
 - **Health Checks**: `/health` endpoint for service monitoring
 - **Error Logging**: Console logging with structured data
 - **Performance**: Expo performance monitoring
@@ -666,18 +727,21 @@ Required Environment Variables:
 ## Security Considerations
 
 ### **Authentication Security**
+
 - **JWT Tokens**: Secure token storage in AsyncStorage
 - **Token Refresh**: Automatic token refresh to prevent expiration
 - **Session Management**: Proper session cleanup on logout
 - **OAuth Flow**: Secure third-party authentication
 
 ### **API Security**
+
 - **CORS Configuration**: Restricted origins in production
 - **Input Validation**: Server-side validation of all inputs
 - **Rate Limiting**: Can be implemented for API protection
-- **Webhook Security**: Stripe webhook signature verification
+- **Receipt Security**: Apple Pay receipt validation and verification
 
 ### **Data Protection**
+
 - **Local Storage**: Encrypted sensitive data in AsyncStorage
 - **Network Communication**: HTTPS for all API communications
 - **Database Security**: Supabase Row Level Security (RLS) policies
@@ -688,18 +752,21 @@ Required Environment Variables:
 ## Performance Optimizations
 
 ### **Frontend Performance**
+
 - **Lazy Loading**: Components loaded as needed
 - **Image Optimization**: Proper image sizing and caching
 - **List Virtualization**: For large task lists
 - **State Optimization**: Minimal re-renders through proper state design
 
 ### **Backend Performance**
+
 - **Connection Pooling**: Database connection optimization
 - **Caching**: Response caching for frequently accessed data
 - **Async Operations**: Non-blocking API operations
 - **Error Recovery**: Graceful error handling and retry logic
 
 ### **Offline Performance**
+
 - **Local Caching**: AsyncStorage for offline task access
 - **Background Sync**: Automatic sync when connectivity restored
 - **Optimistic Updates**: Immediate UI feedback for user actions
@@ -712,18 +779,19 @@ Required Environment Variables:
 PulsePlan is a sophisticated, full-stack academic planning application with a well-architected separation of concerns. The combination of React Native for cross-platform mobile development, Node.js for the backend API, Supabase for managed database and authentication, and strategic integrations with academic and productivity services creates a comprehensive solution for student task management and scheduling.
 
 The application demonstrates modern mobile development best practices including:
+
 - Context-based state management
 - Offline-first design
-- Cross-platform compatibility  
+- Cross-platform compatibility
 - Secure authentication flows
 - AI integration for enhanced user experience
 - Extensible architecture for future feature additions
 
-This specification provides the foundation for any new developer to understand, modify, and extend the PulsePlan application effectively. 
+This specification provides the foundation for any new developer to understand, modify, and extend the PulsePlan application effectively.
 
 server/src/services/
-├── geminiService.ts          # AI integration for data extraction & optimization
-├── universalScraper.ts       # Multi-website data extraction 
-├── scheduleOptimizer.ts      # AI-powered schedule generation
-├── dataProcessor.ts          # Unified data processing pipeline
-└── websiteAnalyzer.ts        # Website structure analysis 
+├── geminiService.ts # AI integration for data extraction & optimization
+├── universalScraper.ts # Multi-website data extraction
+├── scheduleOptimizer.ts # AI-powered schedule generation
+├── dataProcessor.ts # Unified data processing pipeline
+└── websiteAnalyzer.ts # Website structure analysis

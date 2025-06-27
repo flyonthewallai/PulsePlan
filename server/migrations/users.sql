@@ -15,7 +15,6 @@ create table public.users (
   working_hours jsonb null default '{"endHour": 17, "startHour": 9}'::jsonb,
   onboarding_step integer null default 0,
   school text null,
-  text smallint null,
   memories jsonb null default '{}'::jsonb,
   academic_year text null,
   user_type character varying(20) null,
@@ -24,9 +23,9 @@ create table public.users (
   integration_preferences jsonb null,
   notification_preferences jsonb null,
   onboarding_completed_at timestamp with time zone null,
+  city text null,
   constraint users_pkey primary key (id),
   constraint users_email_key unique (email),
-  constraint users_academic_year_check check ((text > 2025)),
   constraint users_user_type_check check (
     (
       (user_type)::text = any (
@@ -47,6 +46,8 @@ create index IF not exists idx_users_user_type on public.users using btree (user
 create index IF not exists idx_users_onboarding_completed on public.users using btree (onboarding_completed_at) TABLESPACE pg_default;
 
 create index IF not exists idx_users_subscription_status on public.users using btree (subscription_status) TABLESPACE pg_default;
+
+create index IF not exists idx_users_city on public.users using btree (city) TABLESPACE pg_default;
 
 create trigger update_users_subscription_updated_at BEFORE
 update OF subscription_status,

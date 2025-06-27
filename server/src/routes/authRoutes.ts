@@ -10,7 +10,7 @@ import {
   handleMicrosoftCallback,
   disconnectMicrosoft
 } from '../controllers/microsoftAuthController';
-import { createUserRecord } from '../controllers/authController';
+import { createUserRecord, updateUserProfile, getUserProfile } from '../controllers/authController';
 
 const router = express.Router();
 
@@ -64,7 +64,30 @@ router.get('/microsoft/callback', handleMicrosoftCallback);
  */
 router.delete('/microsoft/:userId', disconnectMicrosoft);
 
+/**
+ * User Management Routes
+ */
+
+/**
+ * @route   POST /auth/create-user
+ * @desc    Create new user record
+ * @access  Public
+ */
 router.post('/create-user', createUserRecord);
+
+/**
+ * @route   GET /auth/user/:userId/profile
+ * @desc    Get user profile with comprehensive data
+ * @access  Private
+ */
+router.get('/user/:userId/profile', getUserProfile);
+
+/**
+ * @route   PUT /auth/user/:userId/profile
+ * @desc    Update user profile (name, city, timezone, preferences, etc.)
+ * @access  Private
+ */
+router.put('/user/:userId/profile', updateUserProfile);
 
 /**
  * QR Code Authentication Routes for Canvas Extension

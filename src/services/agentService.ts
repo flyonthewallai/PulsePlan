@@ -1,6 +1,7 @@
 import { getApiUrl } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabaseAuth } from '@/lib/supabase-rn';
+import { userService } from './userService';
 
 export interface AgentMessage {
   role: 'user' | 'assistant' | 'system';
@@ -35,6 +36,26 @@ export interface AgentQueryPayload {
 class AgentAPIService {
   private async getLocationData(): Promise<{ city?: string; timezone?: string }> {
     try {
+      // Get userId from auth session
+      const { data: { session } } = await supabaseAuth.auth.getSession();
+      const userId = session?.user?.id;
+      
+      if (userId) {
+        try {
+          // Try to get location data from server first
+          const serverProfile = await userService.getUserProfile(userId);
+          if (serverProfile) {
+            return {
+              city: serverProfile.city,
+              timezone: serverProfile.timezone
+            };
+          }
+        } catch (error) {
+          console.error('Error getting server location data:', error);
+        }
+      }
+      
+      // Fallback to local data from AsyncStorage
       const profileData = await AsyncStorage.getItem('profileData');
       if (profileData) {
         const parsed = JSON.parse(profileData);
