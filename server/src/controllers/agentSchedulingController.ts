@@ -252,7 +252,7 @@ export const optimizeStudySession = async (req: AuthenticatedRequest, res: Respo
   }
 
   try {
-    const agentResponse = await n8nAgentService.postToAgent({
+    const completePayload = await n8nAgentService.createCompletePayload({
       userId,
       userEmail,
       taskTitle: `Study Session Optimization - ${sessionType}`,
@@ -269,6 +269,8 @@ export const optimizeStudySession = async (req: AuthenticatedRequest, res: Respo
         sessionType,
       },
     });
+    
+    const agentResponse = await n8nAgentService.postToAgent(completePayload);
 
     res.json({
       message: 'Study session optimization triggered',
@@ -347,7 +349,7 @@ export const analyzeUpcomingDeadlines = async (req: AuthenticatedRequest, res: R
     }
 
     // Send to n8n agent for deadline analysis
-    const agentResponse = await n8nAgentService.postToAgent({
+    const completePayload = await n8nAgentService.createCompletePayload({
       userId,
       userEmail,
       taskTitle: `Deadline Analysis - Next ${daysAhead} days`,
@@ -371,6 +373,8 @@ export const analyzeUpcomingDeadlines = async (req: AuthenticatedRequest, res: R
         analysisDate: now.toISOString(),
       },
     });
+    
+    const agentResponse = await n8nAgentService.postToAgent(completePayload);
 
     res.json({
       message: 'Deadline analysis triggered',

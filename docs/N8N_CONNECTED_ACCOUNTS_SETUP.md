@@ -20,6 +20,11 @@ The enhanced payload sent to n8n now includes:
 ```json
 {
   "userId": "user-uuid",
+  "userEmail": "user@example.com",
+  "userName": "John Doe",
+  "isPremium": true,
+  "city": "San Francisco",
+  "timezone": "America/Los_Angeles",
   "query": "Check my emails from today",
   "date": "2024-01-15T10:30:00Z",
   "source": "app",
@@ -45,6 +50,15 @@ The enhanced payload sent to n8n now includes:
   }
 }
 ```
+
+### User Information Fields
+
+The payload now includes comprehensive user information for better context-aware responses:
+
+- **`userName`**: User's display name for personalized interactions
+- **`isPremium`**: Subscription status for feature access control
+- **`city`**: User's city for location-aware features and local time context
+- **`timezone`**: User's timezone (e.g., "America/Los_Angeles", "Europe/London") for accurate time calculations
 
 ## N8N Workflow Setup
 

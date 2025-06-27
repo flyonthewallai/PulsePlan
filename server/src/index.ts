@@ -6,12 +6,13 @@ import calendarRoutes from './routes/calendarRoutes';
 import gmailRoutes from './routes/gmailRoutes';
 import contactsRoutes from './routes/contactsRoutes';
 import schedulingRoutes from './routes/schedulingRoutes';
-import stripeRoutes from './routes/stripeRoutes';
+import applePayRoutes from './routes/applePayRoutes';
 import tasksRoutes from './routes/tasksRoutes';
 import scheduleBlocksRouter from './routes/scheduleBlocks';
 import chatRoutes from './routes/chat';
 import canvasRoutes from './routes/canvasRoutes';
 import scrapingRoutes from './routes/scrapingRoutes';
+import cacheRoutes from './routes/cacheRoutes';
 
 // Try to import agent routes with error handling
 let agentRoutes;
@@ -90,8 +91,8 @@ const corsOptions = {
 // Middleware
 app.use(cors(corsOptions));
 
-// Special handling for Stripe webhook route that needs raw body
-app.use('/stripe/webhook', express.raw({ type: 'application/json' }));
+// Parse JSON for all routes (no special handling needed for Apple Pay)
+// Apple Pay receipt verification uses JSON
 
 // Parse JSON for all other routes
 app.use(express.json());
@@ -102,13 +103,14 @@ app.use('/calendar', calendarRoutes);
 app.use('/gmail', gmailRoutes);
 app.use('/contacts', contactsRoutes);
 app.use('/scheduling', schedulingRoutes);
-app.use('/stripe', stripeRoutes);
+app.use('/apple-pay', applePayRoutes);
 app.use('/tasks', tasksRoutes);
 app.use('/schedule-blocks', scheduleBlocksRouter);
 app.use('/chat', chatRoutes);
 app.use('/canvas', canvasRoutes);
 app.use('/scraping', scrapingRoutes);
 app.use('/agent', agentRoutes);
+app.use('/cache', cacheRoutes);
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {

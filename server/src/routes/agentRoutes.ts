@@ -107,13 +107,14 @@ router.post('/custom', authenticate, async (req: AuthenticatedRequest, res: Resp
   }
 
   // Ensure userId is included in the payload
-  const fullPayload = {
+  const basePayload = {
     ...payload,
     userId: userId,
   };
 
   try {
-    const agentResponse = await n8nAgentService.postToAgent(fullPayload);
+    const completePayload = await n8nAgentService.createCompletePayload(basePayload);
+    const agentResponse = await n8nAgentService.postToAgent(completePayload);
     res.json(agentResponse);
   } catch (error) {
     console.error('Error in custom agent request:', error);
@@ -138,7 +139,7 @@ router.post('/query', authenticate, async (req: AuthenticatedRequest, res: Respo
   }
 
   try {
-    const payload = {
+    const basePayload = {
       userId,
       userEmail,
       query: query.trim(),
@@ -148,11 +149,11 @@ router.post('/query', authenticate, async (req: AuthenticatedRequest, res: Respo
       context: {
         currentPage: context?.currentPage || 'unknown',
         userPreferences: context?.userPreferences,
-        recentTasks: context?.recentTasks,
       },
     };
 
-    const agentResponse = await n8nAgentService.processNaturalLanguage(payload);
+    const completePayload = await n8nAgentService.createCompleteNaturalLanguagePayload(basePayload);
+    const agentResponse = await n8nAgentService.processNaturalLanguage(completePayload);
     res.json(agentResponse);
   } catch (error) {
     console.error('Error in processing query:', error);
@@ -177,7 +178,7 @@ router.post('/chat', authenticate, async (req: AuthenticatedRequest, res: Respon
   }
 
   try {
-    const payload = {
+    const basePayload = {
       userId,
       userEmail,
       query: message.trim(),
@@ -187,12 +188,12 @@ router.post('/chat', authenticate, async (req: AuthenticatedRequest, res: Respon
         conversationId,
         currentPage: context?.currentPage || 'chat',
         userPreferences: context?.userPreferences,
-        recentTasks: context?.recentTasks,
         chatHistory: context?.chatHistory,
       },
     };
 
-    const agentResponse = await n8nAgentService.processNaturalLanguage(payload);
+    const completePayload = await n8nAgentService.createCompleteNaturalLanguagePayload(basePayload);
+    const agentResponse = await n8nAgentService.processNaturalLanguage(completePayload);
     
     res.json({
       ...agentResponse,

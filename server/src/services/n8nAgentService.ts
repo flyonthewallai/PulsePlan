@@ -1,11 +1,14 @@
 import n8nAgentConfig from '../config/n8nAgent';
 import supabase from '../config/supabase';
+import { cacheService, CACHE_CONFIG } from './cacheService';
 
 export interface N8nAgentPayload {
   userId: string;
   userEmail?: string;
   userName?: string;
   isPremium?: boolean;
+  city?: string;
+  timezone?: string;
   source: 'agent' | 'user';
   tool?: string; // Optional for master agent
   [key: string]: any; // Allow arbitrary additional properties
@@ -16,6 +19,8 @@ export interface N8nNaturalLanguagePayload {
   userEmail?: string;
   userName?: string;
   isPremium?: boolean;
+  city?: string;
+  timezone?: string;
   query: string;
   date: string; // ISO 8601 timestamp (current date/time)
   duration?: number; // Optional duration in minutes
@@ -121,9 +126,175 @@ export class N8nAgentService {
   }
 
   /**
-   * Get user's connected account tokens from the database
+   * Get comprehensive user information with caching
+   */
+  private async getUserInfo(userId: string): Promise<{ 
+    userName?: string; 
+    isPremium?: boolean; 
+    timezone?: string; 
+    city?: string;
+    school?: string;
+    academicYear?: string;
+    userType?: string;
+    preferences?: any;
+    workingHours?: any;
+    studyPreferences?: any;
+    workPreferences?: any;
+    integrationPreferences?: any;
+    notificationPreferences?: any;
+    onboardingComplete?: boolean;
+    onboardingStep?: number;
+    avatarUrl?: string;
+    lastLoginAt?: string;
+  }> {
+    // Try cache first
+    const cachedUserInfo = await cacheService.get<{
+      userName?: string; 
+      isPremium?: boolean; 
+      timezone?: string; 
+      city?: string;
+      school?: string;
+      academicYear?: string;
+      userType?: string;
+      preferences?: any;
+      workingHours?: any;
+      studyPreferences?: any;
+      workPreferences?: any;
+      integrationPreferences?: any;
+      notificationPreferences?: any;
+      onboardingComplete?: boolean;
+      onboardingStep?: number;
+      avatarUrl?: string;
+      lastLoginAt?: string;
+    }>(
+      CACHE_CONFIG.KEYS.USER_INFO, 
+      userId
+    );
+    
+    if (cachedUserInfo) {
+      console.log(`📝 User info cache hit for user ${userId}`);
+      return cachedUserInfo;
+    }
+
+    // Cache miss - fetch from database
+    if (!supabase) {
+      console.warn('Supabase not configured, skipping user info');
+      return {};
+    }
+
+    try {
+      const queryTimeout = this.getTimeout('database_query');
+      console.log(`📊 Fetching comprehensive user info from DB for user ${userId} with timeout ${queryTimeout}ms`);
+
+      const result = await this.executeWithTimeout(
+        async () => {
+          if (!supabase) {
+            throw new Error('Supabase client not available');
+          }
+
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select(`
+              name, 
+              subscription_status, 
+              timezone, 
+              city,
+              school,
+              academic_year,
+              user_type,
+              preferences,
+              working_hours,
+              study_preferences,
+              work_preferences,
+              integration_preferences,
+              notification_preferences,
+              onboarding_complete,
+              onboarding_step,
+              avatar_url,
+              last_login_at
+            `)
+            .eq('id', userId)
+            .single();
+
+          if (error) {
+            throw error;
+          }
+
+          return userData;
+        },
+        queryTimeout,
+        'getUserInfo'
+      );
+
+      if (!result) {
+        console.log('No user info found for user:', userId);
+        return {};
+      }
+
+      const userInfo = {
+        userName: result.name || undefined,
+        isPremium: result.subscription_status === 'premium',
+        timezone: result.timezone || 'UTC',
+        city: result.city || undefined,
+        school: result.school || undefined,
+        academicYear: result.academic_year || undefined,
+        userType: result.user_type || undefined,
+        preferences: result.preferences || {},
+        workingHours: result.working_hours || { endHour: 17, startHour: 9 },
+        studyPreferences: result.study_preferences || {},
+        workPreferences: result.work_preferences || {},
+        integrationPreferences: result.integration_preferences || {},
+        notificationPreferences: result.notification_preferences || {},
+        onboardingComplete: result.onboarding_complete || false,
+        onboardingStep: result.onboarding_step || 0,
+        avatarUrl: result.avatar_url || undefined,
+        lastLoginAt: result.last_login_at || undefined
+      };
+
+      // Cache the result
+      await cacheService.set(
+        CACHE_CONFIG.KEYS.USER_INFO,
+        userId,
+        userInfo,
+        CACHE_CONFIG.TTL.USER_INFO
+      );
+
+      console.log(`📊 Found and cached comprehensive user info for user ${userId}:`, { 
+        hasName: !!userInfo.userName, 
+        isPremium: userInfo.isPremium,
+        timezone: userInfo.timezone,
+        hasCity: !!userInfo.city,
+        hasSchool: !!userInfo.school,
+        userType: userInfo.userType,
+        onboardingComplete: userInfo.onboardingComplete
+      });
+      
+      return userInfo;
+    } catch (error) {
+      console.error('Error getting user info:', error);
+      if (error instanceof Error && error.message.includes('timed out')) {
+        console.error(`Database query timed out when fetching user info for user ${userId}`);
+      }
+      return {};
+    }
+  }
+
+  /**
+   * Get user's connected account tokens with caching
    */
   private async getUserConnectedAccounts(userId: string): Promise<any> {
+    // Try cache first
+    const cachedAccounts = await cacheService.get<any>(
+      CACHE_CONFIG.KEYS.USER_CONNECTED_ACCOUNTS, 
+      userId
+    );
+    
+    if (cachedAccounts) {
+      console.log(`📝 Connected accounts cache hit for user ${userId}`);
+      return cachedAccounts;
+    }
+
+    // Cache miss - fetch from database
     if (!supabase) {
       console.warn('Supabase not configured, skipping connected accounts');
       return {};
@@ -131,7 +302,7 @@ export class N8nAgentService {
 
     try {
       const queryTimeout = this.getTimeout('database_query');
-      console.log(`Fetching connected accounts for user ${userId} with timeout ${queryTimeout}ms`);
+      console.log(`📊 Fetching connected accounts from DB for user ${userId} with timeout ${queryTimeout}ms`);
 
       const result = await this.executeWithTimeout(
         async () => {
@@ -158,7 +329,17 @@ export class N8nAgentService {
 
       if (!connections || connections.length === 0) {
         console.log('No connected accounts found for user:', userId);
-        return {};
+        const emptyResult = {};
+        
+        // Cache empty result with shorter TTL
+        await cacheService.set(
+          CACHE_CONFIG.KEYS.USER_CONNECTED_ACCOUNTS,
+          userId,
+          emptyResult,
+          60 // 1 minute TTL for empty results
+        );
+        
+        return emptyResult;
       }
 
       const connectedAccounts: any = {};
@@ -180,7 +361,15 @@ export class N8nAgentService {
         }
       }
 
-      console.log(`Found ${Object.keys(connectedAccounts).length} valid connected accounts for user ${userId}`);
+      // Cache the result
+      await cacheService.set(
+        CACHE_CONFIG.KEYS.USER_CONNECTED_ACCOUNTS,
+        userId,
+        connectedAccounts,
+        CACHE_CONFIG.TTL.USER_CONNECTED_ACCOUNTS
+      );
+
+      console.log(`📊 Found and cached ${Object.keys(connectedAccounts).length} valid connected accounts for user ${userId}`);
       return connectedAccounts;
     } catch (error) {
       console.error('Error getting connected accounts:', error);
@@ -189,6 +378,29 @@ export class N8nAgentService {
       }
       return {};
     }
+  }
+
+  /**
+   * Create a complete N8nAgentPayload with user information
+   * This is a helper method for controllers that need to create custom payloads
+   */
+  async createCompletePayload(
+    basePayload: Omit<N8nAgentPayload, 'userName' | 'isPremium' | 'city' | 'timezone'>
+  ): Promise<N8nAgentPayload> {
+    const userInfo = await this.getUserInfo(basePayload.userId);
+    
+    // Destructure basePayload to maintain proper field order
+    const { userId, userEmail, ...rest } = basePayload;
+    
+    return {
+      userId,
+      userEmail,
+      userName: userInfo.userName,
+      isPremium: userInfo.isPremium,
+      city: userInfo.city,
+      timezone: userInfo.timezone,
+      ...rest,
+    } as N8nAgentPayload;
   }
 
   /**
@@ -263,9 +475,16 @@ export class N8nAgentService {
     tool?: string,
     userEmail?: string
   ): Promise<N8nAgentResponse> {
+    // Get user information to include in payload
+    const userInfo = await this.getUserInfo(userId);
+    
     const payload: N8nAgentPayload = {
       userId,
       userEmail,
+      userName: userInfo.userName,
+      isPremium: userInfo.isPremium,
+      city: userInfo.city,
+      timezone: userInfo.timezone,
       taskTitle,
       dueDate,
       duration,
@@ -290,9 +509,16 @@ export class N8nAgentService {
     subject: string,
     userEmail?: string
   ): Promise<N8nAgentResponse> {
+    // Get user information to include in payload
+    const userInfo = await this.getUserInfo(userId);
+    
     const payload: N8nAgentPayload = {
       userId,
       userEmail,
+      userName: userInfo.userName,
+      isPremium: userInfo.isPremium,
+      city: userInfo.city,
+      timezone: userInfo.timezone,
       taskTitle,
       dueDate,
       duration,
@@ -402,6 +628,29 @@ export class N8nAgentService {
       console.error('n8n agent health check failed:', error);
       return false;
     }
+  }
+
+  /**
+   * Create a complete N8nNaturalLanguagePayload with user information
+   * This is a helper method for controllers that need to create natural language payloads
+   */
+  async createCompleteNaturalLanguagePayload(
+    basePayload: Omit<N8nNaturalLanguagePayload, 'userName' | 'isPremium' | 'city' | 'timezone'>
+  ): Promise<N8nNaturalLanguagePayload> {
+    const userInfo = await this.getUserInfo(basePayload.userId);
+    
+    // Destructure basePayload to maintain proper field order
+    const { userId, userEmail, ...rest } = basePayload;
+    
+    return {
+      userId,
+      userEmail,
+      userName: userInfo.userName,
+      isPremium: userInfo.isPremium,
+      city: userInfo.city,
+      timezone: userInfo.timezone,
+      ...rest,
+    } as N8nNaturalLanguagePayload;
   }
 }
 
