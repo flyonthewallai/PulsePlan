@@ -10,13 +10,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, ChevronRight, Sparkles, Sprout } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Sparkles, Sprout, Calendar } from 'lucide-react-native';
 
 import TaskCard from '../../components/TaskCard';
 import HourlyScheduleView from '../../components/HourlyScheduleView';
 import AIAssistantButton from '../../components/AgentButton';
 import AIAssistantModal from '../../components/AgentModal';
 import { StreakModal } from '../../components/StreakModal';
+import MonthViewModal from '../../components/MonthViewModal';
 import { useTasks } from '../../contexts/TaskContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -33,6 +34,8 @@ export default function WeekScreen() {
   const [currentWeek, setCurrentWeek] = useState(0); // 0 = current week
   const [showAIModal, setShowAIModal] = useState(false);
   const [showStreakModal, setShowStreakModal] = useState(false);
+  const [showMonthView, setShowMonthView] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   // Get tasks for the selected day
   const getTasksForDay = (dayIndex: number) => {
@@ -83,12 +86,26 @@ export default function WeekScreen() {
     return currentWeek === 0 && dayIndex === new Date().getDay();
   };
 
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await refreshTasks();
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]} edges={['top']}>
       <StatusBar barStyle="light-content" />
       <View style={{ flex: 1 }}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: currentTheme.colors.textPrimary }]}>Week View</Text>
+          <TouchableOpacity 
+            style={styles.titleContainer}
+            onPress={() => setShowMonthView(true)}
+          >
+            <Calendar size={28} color={currentTheme.colors.textPrimary} />
+          </TouchableOpacity>
           
           <View style={styles.weekSelector}>
             <TouchableOpacity onPress={() => changeWeek(-1)} style={styles.weekButton}>
@@ -169,14 +186,14 @@ export default function WeekScreen() {
               date={getDateForDay(selectedDay)}
             />
           ) : (
-            <ScrollView 
+                          <ScrollView 
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
-                  refreshing={loading}
-                  onRefresh={refreshTasks}
-                  tintColor="#FFFFFF"
-                  colors={["#FFFFFF"]}
+                  refreshing={isManualRefreshing || loading}
+                  onRefresh={handleManualRefresh}
+                  tintColor={currentTheme.colors.primary}
+                  colors={[currentTheme.colors.primary]}
                   progressBackgroundColor="transparent"
                 />
               }
@@ -216,6 +233,11 @@ export default function WeekScreen() {
         visible={showStreakModal}
         onClose={() => setShowStreakModal(false)}
       />
+
+      <MonthViewModal
+        visible={showMonthView}
+        onClose={() => setShowMonthView(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -233,6 +255,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     marginBottom: 16,
+  },
+  titleContainer: {
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    padding: 4,
   },
   weekSelector: {
     flexDirection: 'row',

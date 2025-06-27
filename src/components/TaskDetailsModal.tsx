@@ -23,6 +23,7 @@ import {
   Sparkles,
   BarChart3,
   Target,
+  BrainCircuit,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,6 +32,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useTasks, Task } from '../contexts/TaskContext';
 import { chatAPIService } from '../services/chatService';
 import { formatAIResponse, cleanMarkdownText } from '../utils/markdownParser';
+import PomodoroModal from './PomodoroModal';
 
 type TaskDetailsModalProps = {
   visible: boolean;
@@ -60,6 +62,7 @@ export default function TaskDetailsModal({ visible, task, onClose, onEdit }: Tas
   const { updateTask, deleteTask } = useTasks();
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+  const [showPomodoro, setShowPomodoro] = useState(false);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -179,15 +182,15 @@ export default function TaskDetailsModal({ visible, task, onClose, onEdit }: Tas
   const getInsightIcon = (type: string): React.ReactNode => {
     switch (type) {
       case 'difficulty':
-        return <BarChart3 size={16} color={currentTheme.colors.primary} />;
+        return <BarChart3 size={16} color={currentTheme.colors.textSecondary} />;
       case 'time':
-        return <Clock size={16} color={currentTheme.colors.primary} />;
+        return <Clock size={16} color={currentTheme.colors.textSecondary} />;
       case 'priority':
-        return <Flag size={16} color={currentTheme.colors.primary} />;
+        return <Flag size={16} color={currentTheme.colors.textSecondary} />;
       case 'suggestion':
-        return <Sparkles size={16} color={currentTheme.colors.primary} />;
+        return <Target size={16} color={currentTheme.colors.textSecondary} />;
       default:
-        return <Target size={16} color={currentTheme.colors.primary} />;
+        return <Target size={16} color={currentTheme.colors.textSecondary} />;
     }
   };
 
@@ -261,7 +264,7 @@ export default function TaskDetailsModal({ visible, task, onClose, onEdit }: Tas
   const generateInsightTitle = (type: AIInsight['type'], index: number): string => {
     const titles = {
       difficulty: ['Complexity Analysis', 'Task Difficulty', 'Challenge Level'],
-      time: ['Time Management', 'Scheduling Tip', 'Time Strategy'],
+      time: ['Time Management', 'Duration Planning', 'Pacing Strategy'],
       priority: ['Priority Assessment', 'Urgency Level', 'Priority Insight'],
       suggestion: ['Smart Tip', 'Study Strategy', 'Productivity Tip', 'Recommendation']
     };
@@ -322,19 +325,19 @@ Format each insight clearly with practical, actionable advice.`;
             type: 'difficulty',
             title: 'Complexity Analysis',
             content: 'This task appears to be moderately complex based on the subject and estimated time.',
-            icon: <BarChart3 size={16} color={currentTheme.colors.primary} />
+            icon: <BarChart3 size={16} color={currentTheme.colors.textSecondary} />
           },
           {
             type: 'time',
             title: 'Time Management',
             content: 'Consider breaking this into smaller chunks if it takes longer than 2 hours.',
-            icon: <Clock size={16} color={currentTheme.colors.primary} />
+            icon: <Clock size={16} color={currentTheme.colors.textSecondary} />
           },
           {
             type: 'suggestion',
             title: 'Smart Tip',
             content: 'Work on this during your peak productivity hours for best results.',
-            icon: <Sparkles size={16} color={currentTheme.colors.primary} />
+            icon: <Target size={16} color={currentTheme.colors.textSecondary} />
           }
         ];
       }
@@ -352,7 +355,7 @@ Format each insight clearly with practical, actionable advice.`;
           type: 'suggestion',
           title: 'Quick Tip',
           content: 'Break larger tasks into smaller, manageable chunks for better focus.',
-          icon: <Target size={16} color={currentTheme.colors.primary} />
+          icon: <Target size={16} color={currentTheme.colors.textSecondary} />
         }
       ];
       setAiInsights(fallbackInsights);
@@ -415,19 +418,41 @@ Format each insight clearly with practical, actionable advice.`;
 
   const isOverdue = new Date(task.due_date) < new Date() && task.status !== 'completed';
 
+  // Generate hardcoded scheduling rationale for now
+  const getSchedulingRationale = (task: Task): string => {
+    if (task.scheduling_rationale) {
+      return task.scheduling_rationale;
+    }
+    
+    // Hardcoded examples based on task properties
+    const rationales = [
+      "Scheduled during your peak focus hours (2-4 PM) when you typically perform best on analytical tasks.",
+      "Placed after your morning classes to maintain subject momentum and build on fresh concepts.",
+      "Early morning slot chosen to avoid afternoon meeting conflicts and ensure dedicated focus time.",
+      "Positioned before lunch when your energy is high, perfect for tackling challenging material.",
+      "Scheduled during your preferred study window, accounting for your productivity patterns.",
+      "Timed to complement your existing study schedule and minimize context switching between subjects.",
+      "Placed in a focused 2-hour block to allow deep work without interruptions.",
+      "Scheduled with buffer time after for review and processing of complex concepts."
+    ];
+    
+    // Simple hash to consistently pick the same rationale for the same task
+    const hash = task.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return rationales[hash % rationales.length];
+  };
+
   return (
     <Modal
       visible={visible}
-      transparent
       animationType="slide"
+      presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <BlurView intensity={20} style={styles.overlay}>
         <View style={[styles.modalContainer, { backgroundColor: currentTheme.colors.background }]}>
           {/* Header */}
-          <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
+          <View style={styles.header}>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <X color={currentTheme.colors.textSecondary} size={24} />
+              <X color={currentTheme.colors.textPrimary} size={24} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: currentTheme.colors.textPrimary }]}>
               Task Details
@@ -443,102 +468,83 @@ Format each insight clearly with practical, actionable advice.`;
               <Text style={[styles.taskTitle, { color: currentTheme.colors.textPrimary }]}>
                 {task.title}
               </Text>
-              
-              <View style={styles.statusContainer}>
-                <View style={[styles.statusBadge, { 
-                  backgroundColor: currentTheme.colors.surface,
-                  borderColor: currentTheme.colors.border 
-                }]}>
-                  <View 
-                    style={[
-                      styles.statusDot,
-                      { backgroundColor: getStatusColor(task.status) },
-                    ]} 
-                  />
-                  <Text style={[styles.statusText, { color: currentTheme.colors.textPrimary }]}>
-                    {task.status.replace('_', ' ').charAt(0).toUpperCase() + task.status.replace('_', ' ').slice(1)}
-                  </Text>
-                </View>
-                
-                <View style={[styles.priorityBadge, { 
-                  backgroundColor: currentTheme.colors.surface,
-                  borderColor: currentTheme.colors.border 
-                }]}>
-                  <View 
-                    style={[
-                      styles.priorityDot,
-                      { backgroundColor: getPriorityColor(task.priority) },
-                    ]} 
-                  />
-                  <Text style={[styles.priorityText, { color: currentTheme.colors.textPrimary }]}>
-                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                  </Text>
-                </View>
-              </View>
+              <Text style={[styles.taskSubject, { color: currentTheme.colors.textSecondary }]}>
+                {task.subject}
+              </Text>
             </View>
 
             {/* Task Details */}
             <View style={[styles.detailsCard, { backgroundColor: currentTheme.colors.surface }]}>
-              <View style={styles.detailRow}>
-                <BookOpen size={20} color={currentTheme.colors.textSecondary} />
-                <View style={styles.detailContent}>
-                  <Text style={[styles.detailLabel, { color: currentTheme.colors.textSecondary }]}>Subject</Text>
-                  <Text style={[styles.detailValue, { color: currentTheme.colors.textPrimary }]}>{task.subject}</Text>
-                </View>
-              </View>
-
-              <View style={styles.detailRow}>
-                <Calendar size={20} color={isOverdue ? '#FF5757' : currentTheme.colors.textSecondary} />
-                <View style={styles.detailContent}>
-                  <Text style={[styles.detailLabel, { color: currentTheme.colors.textSecondary }]}>Due Date</Text>
+              <View style={styles.detailGrid}>
+                <View style={styles.detailItem}>
+                  <Text style={[styles.detailLabel, { color: currentTheme.colors.textSecondary }]}>DUE</Text>
                   <Text style={[styles.detailValue, { color: isOverdue ? '#FF5757' : currentTheme.colors.textPrimary }]}>
                     {formatDate(task.due_date)}
-                    {isOverdue && ' (Overdue)'}
                   </Text>
                 </View>
-              </View>
-
-              <View style={styles.detailRow}>
-                <Clock size={20} color={currentTheme.colors.textSecondary} />
-                <View style={styles.detailContent}>
-                  <Text style={[styles.detailLabel, { color: currentTheme.colors.textSecondary }]}>Estimated Time</Text>
+                
+                <View style={styles.detailItem}>
+                  <Text style={[styles.detailLabel, { color: currentTheme.colors.textSecondary }]}>TIME</Text>
                   <Text style={[styles.detailValue, { color: currentTheme.colors.textPrimary }]}>
                     {formatDuration(task.estimated_minutes)}
                   </Text>
                 </View>
-              </View>
-
-              {task.description && (
-                <View style={styles.detailRow}>
-                  <Flag size={20} color={currentTheme.colors.textSecondary} />
-                  <View style={styles.detailContent}>
-                    <Text style={[styles.detailLabel, { color: currentTheme.colors.textSecondary }]}>Description</Text>
+                
+                <View style={styles.detailItem}>
+                  <Text style={[styles.detailLabel, { color: currentTheme.colors.textSecondary }]}>PRIORITY</Text>
+                  <View style={styles.priorityContainer}>
+                    <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(task.priority) }]} />
                     <Text style={[styles.detailValue, { color: currentTheme.colors.textPrimary }]}>
-                      {task.description}
+                      {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                     </Text>
                   </View>
+                </View>
+                
+                <View style={styles.detailItem}>
+                  <Text style={[styles.detailLabel, { color: currentTheme.colors.textSecondary }]}>STATUS</Text>
+                  <View style={styles.statusContainer}>
+                    <View style={[styles.statusDot, { backgroundColor: getStatusColor(task.status) }]} />
+                    <Text style={[styles.detailValue, { color: currentTheme.colors.textPrimary }]}>
+                      {task.status.replace('_', ' ').charAt(0).toUpperCase() + task.status.replace('_', ' ').slice(1)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              
+              {task.description && (
+                <View style={styles.descriptionSection}>
+                  <Text style={[styles.detailLabel, { color: currentTheme.colors.textSecondary }]}>DESCRIPTION</Text>
+                  <Text style={[styles.descriptionText, { color: currentTheme.colors.textPrimary }]}>
+                    {task.description}
+                  </Text>
                 </View>
               )}
             </View>
 
-            {/* AI Insights */}
-            <View style={[styles.insightsCard, { backgroundColor: currentTheme.colors.surface }]}>
-              <View style={styles.insightsHeader}>
-                <Sparkles size={20} color={currentTheme.colors.primary} />
-                <Text style={[styles.insightsTitle, { color: currentTheme.colors.textPrimary }]}>
-                  AI Insights
+            {/* Scheduling Rationale */}
+            <View style={[styles.rationaleCard, { backgroundColor: currentTheme.colors.surface }]}>
+              <View style={styles.rationaleHeader}>
+                <BrainCircuit size={18} color="white" />
+                <Text style={[styles.rationaleTitle, { color: currentTheme.colors.textPrimary }]}>
+                  Agent Scheduling Logic
                 </Text>
-                {loadingInsights && <ActivityIndicator size="small" color={currentTheme.colors.primary} />}
               </View>
+              <Text style={[styles.rationaleContent, { color: currentTheme.colors.textSecondary }]}>
+                {getSchedulingRationale(task)}
+              </Text>
+            </View>
 
-              {loadingInsights ? (
-                <View style={styles.loadingContainer}>
-                  <Text style={[styles.loadingText, { color: currentTheme.colors.textSecondary }]}>
-                    Analyzing task...
+            {/* AI Insights */}
+            {!loadingInsights && aiInsights.length > 0 && (
+              <View style={[styles.insightsCard, { backgroundColor: currentTheme.colors.surface }]}>
+                <View style={styles.insightsHeader}>
+                  <Sparkles size={18} color="white" />
+                  <Text style={[styles.insightsTitle, { color: currentTheme.colors.textPrimary }]}>
+                    AI Insights
                   </Text>
                 </View>
-              ) : (
-                aiInsights.map((insight, index) => (
+
+                {aiInsights.map((insight, index) => (
                   <View key={index} style={[
                     styles.insightItem,
                     index === aiInsights.length - 1 && styles.insightItemLast
@@ -553,81 +559,75 @@ Format each insight clearly with practical, actionable advice.`;
                       {insight.content}
                     </Text>
                   </View>
-                ))
-              )}
-            </View>
+                ))}
+              </View>
+            )}
 
             {/* Quick Actions */}
             <View style={styles.actionsContainer}>
-              <Text style={[styles.actionsTitle, { color: currentTheme.colors.textPrimary }]}>
-                Quick Actions
-              </Text>
-              
-              <View style={styles.actionButtons}>
-                <View style={styles.primaryActions}>
-                  {task.status === 'pending' && (
-                    <TouchableOpacity
-                      style={[styles.actionButton, { 
-                        backgroundColor: currentTheme.colors.surface,
-                        borderColor: currentTheme.colors.border
-                      }]}
-                      onPress={() => handleStatusChange('in_progress')}
-                    >
-                      <PlayCircle size={18} color={currentTheme.colors.primary} />
-                      <Text style={[styles.actionButtonText, { color: currentTheme.colors.textPrimary }]}>Start Task</Text>
-                    </TouchableOpacity>
-                  )}
-                  
+              <View style={styles.actionButtonsRow}>
+                {task.status === 'pending' && (
+                  <TouchableOpacity
+                    style={[styles.primaryActionButton, { 
+                      backgroundColor: currentTheme.colors.surface
+                    }]}
+                    onPress={() => setShowPomodoro(true)}
+                  >
+                    <PlayCircle size={16} color={currentTheme.colors.primary} />
+                    <Text style={[styles.actionButtonText, { color: currentTheme.colors.textPrimary }]}>Start Task</Text>
+                  </TouchableOpacity>
+                )}
+                
+                <View style={styles.iconButtonsContainer}>
                   {task.status !== 'completed' && (
                     <TouchableOpacity
-                      style={[styles.actionButton, { 
-                        backgroundColor: currentTheme.colors.surface,
-                        borderColor: currentTheme.colors.border
+                      style={[styles.iconButton, { 
+                        backgroundColor: currentTheme.colors.surface
                       }]}
                       onPress={() => handleStatusChange('completed')}
                     >
-                      <CheckCircle2 size={18} color="#30D158" />
-                      <Text style={[styles.actionButtonText, { color: currentTheme.colors.textPrimary }]}>Complete</Text>
+                      <CheckCircle2 size={18} color="white" />
                     </TouchableOpacity>
                   )}
+                  
+                  <TouchableOpacity
+                    style={[styles.iconButton, { 
+                      backgroundColor: currentTheme.colors.surface
+                    }]}
+                    onPress={handleDelete}
+                  >
+                    <Trash2 size={18} color="#FF5757" />
+                  </TouchableOpacity>
                 </View>
-                
-                <TouchableOpacity
-                  style={[styles.deleteButton, { 
-                    backgroundColor: currentTheme.colors.surface,
-                    borderColor: currentTheme.colors.border
-                  }]}
-                  onPress={handleDelete}
-                >
-                  <Trash2 size={18} color="#FF5757" />
-                  <Text style={[styles.deleteButtonText, { color: currentTheme.colors.textPrimary }]}>Delete</Text>
-                </TouchableOpacity>
               </View>
             </View>
           </ScrollView>
         </View>
-      </BlurView>
+        
+        {/* Pomodoro Timer Modal */}
+        {task && (
+          <PomodoroModal
+            visible={showPomodoro}
+            onClose={() => setShowPomodoro(false)}
+            taskTitle={task.title}
+            estimatedMinutes={task.estimated_minutes}
+          />
+        )}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
   modalContainer: {
     flex: 1,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: 60,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    paddingTop: 32,
   },
   closeButton: {
     padding: 4,
@@ -639,66 +639,89 @@ const styles = StyleSheet.create({
   editButton: {
     padding: 8,
     borderRadius: 12,
-    backgroundColor: 'rgba(79, 140, 255, 0.15)',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
   },
   taskHeader: {
-    paddingTop: 24,
-    paddingBottom: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
+    alignItems: 'flex-start',
   },
   taskTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 16,
+    fontSize: 22,
+    fontWeight: '600',
+    marginBottom: 4,
     lineHeight: 28,
+    textAlign: 'left',
+  },
+  taskSubject: {
+    fontSize: 16,
+    fontWeight: '500',
+    opacity: 0.8,
+    textAlign: 'left',
   },
   statusContainer: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    gap: 6,
   },
-  statusBadge: {
+  priorityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  priorityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  priorityText: {
-    fontSize: 14,
-    fontWeight: '500',
+    gap: 6,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   priorityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   detailsCard: {
     borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  detailGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 20,
+  },
+  detailItem: {
+    flex: 1,
+    minWidth: '45%',
+  },
+  rationaleCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+  },
+  rationaleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  rationaleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  agentIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rationaleContent: {
+    fontSize: 15,
+    lineHeight: 22,
+    opacity: 0.9,
   },
   detailRow: {
     flexDirection: 'row',
@@ -710,19 +733,32 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   detailLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    textTransform: 'uppercase',
   },
   detailValue: {
     fontSize: 16,
     fontWeight: '500',
     lineHeight: 20,
   },
+  descriptionSection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  descriptionText: {
+    fontSize: 15,
+    lineHeight: 22,
+    opacity: 0.9,
+  },
   insightsCard: {
     borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   insightsHeader: {
     flexDirection: 'row',
@@ -731,7 +767,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   insightsTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     flex: 1,
   },
@@ -780,13 +816,31 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     opacity: 0.7,
   },
-  actionButtons: {
-    gap: 8,
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  primaryActions: {
+  primaryActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    justifyContent: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  iconButtonsContainer: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 8,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionButton: {
     flexDirection: 'row',
@@ -794,14 +848,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    borderWidth: 1,
-    gap: 8,
     flex: 1,
-    minWidth: 100,
     justifyContent: 'center',
+    gap: 6,
   },
   actionButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
   },
   deleteButton: {
@@ -810,12 +862,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    borderWidth: 1,
-    gap: 8,
+    flex: 1,
     justifyContent: 'center',
+    gap: 6,
   },
   deleteButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
   },
 }); 

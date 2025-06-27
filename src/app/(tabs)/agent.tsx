@@ -302,7 +302,6 @@ export default function AgentScreen() {
     bottomSection: {
       position: 'relative',
       width: '100%',
-      backgroundColor: '#000000',
       paddingTop: 12,
     },
     suggestionsWrapper: {
@@ -326,11 +325,9 @@ export default function AgentScreen() {
       paddingVertical: 8,
       paddingHorizontal: 14,
       borderRadius: 16,
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
       height: 36,
     },
     suggestionButtonText: {
-      color: '#FFFFFF',
       fontSize: 14,
       fontWeight: '500',
     },
@@ -415,9 +412,15 @@ export default function AgentScreen() {
   ];
 
   const SuggestionButton = ({ icon, text, onPress }: { icon: React.ReactNode; text: string; onPress: () => void; }) => (
-    <TouchableOpacity style={styles.suggestionButton} onPress={onPress}>
+    <TouchableOpacity 
+      style={[
+        styles.suggestionButton,
+        { backgroundColor: currentTheme.colors.surface }
+      ]} 
+      onPress={onPress}
+    >
       {icon}
-      <Text style={styles.suggestionButtonText}>{text}</Text>
+      <Text style={[styles.suggestionButtonText, { color: currentTheme.colors.textPrimary }]}>{text}</Text>
     </TouchableOpacity>
   );
 
@@ -614,7 +617,7 @@ export default function AgentScreen() {
           )}
         </ScrollView>
 
-        <View style={styles.bottomSection}>
+        <View style={[styles.bottomSection, { backgroundColor: currentTheme.colors.background }]}>
           {showQuickActions && (
           <Animated.View style={[
             styles.suggestionsWrapper,
@@ -640,16 +643,16 @@ export default function AgentScreen() {
           )}
           
           <View style={styles.inputContainer}>
-            <TouchableOpacity style={[styles.plusButton, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]}>
-              <Plus color="#FFFFFF" size={24} />
+            <TouchableOpacity style={[styles.plusButton, { backgroundColor: currentTheme.colors.surface }]}>
+              <Plus color={currentTheme.colors.textPrimary} size={24} />
             </TouchableOpacity>
             <TextInput
               style={[styles.input, { 
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                color: '#FFFFFF',
+                backgroundColor: currentTheme.colors.surface,
+                color: currentTheme.colors.textPrimary,
               }]}
               placeholder="Message"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              placeholderTextColor={currentTheme.colors.textSecondary}
               keyboardAppearance="default"
               returnKeyType="send"
               enablesReturnKeyAutomatically={true}

@@ -15,6 +15,7 @@ import { Book, Calendar, Clock, Flag, X, Check } from 'lucide-react-native';
 
 import { useTasks, CreateTaskData, Task } from '../contexts/TaskContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSubjects } from '../contexts/SubjectsContext';
 
 type TaskCreateModalProps = {
   visible: boolean;
@@ -29,6 +30,7 @@ type TaskCreateModalProps = {
 export default function TaskCreateModal({ visible, onClose, initialDate, initialTime, initialTimeEstimate, editingTask, onTaskCreated }: TaskCreateModalProps) {
   const { createTask, updateTask, loading } = useTasks();
   const { currentTheme } = useTheme();
+  const { subjects, getSubjectColor } = useSubjects();
   const [isCreating, setIsCreating] = useState(false);
   
   const [title, setTitle] = useState('');
@@ -48,17 +50,7 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
   const [currentFocusedInput, setCurrentFocusedInput] = useState<string | null>(null);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   
-  // Local subjects - later we can sync these with Supabase
-  const [localSubjects] = useState([
-    { id: '1', name: 'Mathematics', color: '#FF6B6B' },
-    { id: '2', name: 'Computer Science', color: '#4ECDC4' },
-    { id: '3', name: 'Physics', color: '#45B7D1' },
-    { id: '4', name: 'Chemistry', color: '#96CEB4' },
-    { id: '5', name: 'Biology', color: '#FFEAA7' },
-    { id: '6', name: 'History', color: '#DDA0DD' },
-    { id: '7', name: 'English', color: '#98D8C8' },
-    { id: '8', name: 'Psychology', color: '#F7DC6F' },
-  ]);
+
   
   const scrollViewRef = useRef<ScrollView>(null);
   const titleInputRef = useRef<TextInput>(null);
@@ -147,7 +139,7 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
   };
   
   const getSelectedSubject = () => {
-    return localSubjects.find(s => s.name === subject);
+    return subjects.find(s => s.name === subject);
   };
   
   const handleSave = async () => {
@@ -516,7 +508,7 @@ export default function TaskCreateModal({ visible, onClose, initialDate, initial
               )}
             </TouchableOpacity>
             
-            {localSubjects.map((subjectItem) => (
+            {subjects.map((subjectItem) => (
               <TouchableOpacity
                 key={subjectItem.id}
                 style={[

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface PulseLoadingScreenProps {
   visible?: boolean;
@@ -9,10 +10,12 @@ interface PulseLoadingScreenProps {
 export default function PulseLoadingScreen({ 
   visible = true, 
 }: PulseLoadingScreenProps) {
+  const { currentTheme } = useTheme();
+  
   if (!visible) return null;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
       <Image 
         source={require('@/assets/images/icon.png')} 
         style={styles.icon}
@@ -25,7 +28,6 @@ export default function PulseLoadingScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Dimensions } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -8,6 +9,7 @@ interface LoadingScreenProps {
 }
 
 export default function LoadingScreen({ visible = true }: LoadingScreenProps) {
+  const { currentTheme } = useTheme();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const translateAnim = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
 
@@ -100,17 +102,19 @@ export default function LoadingScreen({ visible = true }: LoadingScreenProps) {
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
       {/* Heartbeat line container */}
       <View style={styles.heartbeatContainer}>
         {/* Base line */}
-        <View style={styles.baseLine} />
+        <View style={[styles.baseLine, { backgroundColor: currentTheme.colors.border }]} />
         
         {/* Pulsing heartbeat */}
         <Animated.View
           style={[
             styles.heartbeatLine,
             {
+              backgroundColor: currentTheme.colors.textPrimary,
+              shadowColor: currentTheme.colors.textPrimary,
               height: pulseHeight,
               opacity: pulseOpacity,
             },
@@ -122,6 +126,8 @@ export default function LoadingScreen({ visible = true }: LoadingScreenProps) {
           style={[
             styles.sweepLine,
             {
+              backgroundColor: currentTheme.colors.textPrimary,
+              shadowColor: currentTheme.colors.textPrimary,
               transform: [{ translateX: translateAnim }],
             },
           ]}
@@ -134,7 +140,6 @@ export default function LoadingScreen({ visible = true }: LoadingScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -149,14 +154,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: SCREEN_WIDTH * 0.8,
     height: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   heartbeatLine: {
     position: 'absolute',
     width: 4,
-    backgroundColor: '#FFFFFF',
     borderRadius: 2,
-    shadowColor: '#FFFFFF',
     shadowOffset: {
       width: 0,
       height: 0,
@@ -169,9 +171,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 100,
     height: 2,
-    backgroundColor: '#FFFFFF',
     opacity: 0.6,
-    shadowColor: '#FFFFFF',
     shadowOffset: {
       width: 0,
       height: 0,

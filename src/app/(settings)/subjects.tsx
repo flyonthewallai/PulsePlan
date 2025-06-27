@@ -1,30 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Plus, RefreshCw } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
+import SubjectColorPicker from '@/components/SubjectColorPicker';
+import { Subject } from '@/services/subjectsService';
+import { useSubjects } from '@/contexts/SubjectsContext';
 
-interface Subject {
-  id: string;
-  name: string;
-  color: string;
-}
-
-const initialSubjects: Subject[] = [
-    { id: '1', name: 'Mathematics', color: '#FF6B6B' },
-    { id: '2', name: 'Science', color: '#4ECDC4' },
-    { id: '3', name: 'History', color: '#FFD93D' },
-    { id: '4', name: 'Literature', color: '#95E1D3' },
-];
-
-const SubjectCard = ({ subject }: { subject: Subject }) => {
+const SubjectCard = ({ subject, onPress }: { subject: Subject; onPress: () => void }) => {
     const { currentTheme } = useTheme();
     return (
         <TouchableOpacity 
-            style={[styles.subjectCard, { backgroundColor: currentTheme.colors.surface }]}
-            onPress={() => Alert.alert('Coming Soon', 'Subject color editing will be available soon!')}
+            style={[
+                styles.subjectCard, 
+                { 
+                    backgroundColor: currentTheme.colors.surface,
+                    borderColor: currentTheme.colors.border
+                }
+            ]}
+            onPress={onPress}
             activeOpacity={0.7}
         >
             <View style={styles.subjectCardContent}>
@@ -43,14 +39,42 @@ const SubjectCard = ({ subject }: { subject: Subject }) => {
 export default function SubjectsScreen() {
     const router = useRouter();
     const { currentTheme } = useTheme();
-    const [subjects, setSubjects] = useState(initialSubjects);
+    const { subjects, loading, refreshSubjects, updateSubjectColor } = useSubjects();
+    const [showColorPicker, setShowColorPicker] = useState(false);
+    const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
 
     const handleAddSubject = () => {
         Alert.alert('Coming Soon', 'Adding new subjects will be available in a future update!');
     };
 
-    const handleSyncSubjects = () => {
-        Alert.alert('Canvas Sync', 'Canvas integration will sync your subjects automatically in a future update!');
+    const handleSyncSubjects = async () => {
+        try {
+            await refreshSubjects();
+            Alert.alert('Success', 'Subjects synced successfully!');
+        } catch (error) {
+            Alert.alert('Error', 'Failed to sync subjects. Please try again.');
+        }
+    };
+
+    const handleSubjectPress = (subject: Subject) => {
+        setSelectedSubject(subject);
+        setShowColorPicker(true);
+    };
+
+    const handleColorSelect = async (color: string) => {
+        if (!selectedSubject) return;
+
+        try {
+            await updateSubjectColor(selectedSubject.id, color);
+        } catch (error) {
+            console.error('Error updating subject color:', error);
+            Alert.alert('Error', 'Failed to update subject color. Please try again.');
+        }
+    };
+
+    const handleCloseColorPicker = () => {
+        setShowColorPicker(false);
+        setSelectedSubject(null);
     };
 
     return (
@@ -74,10 +98,32 @@ export default function SubjectsScreen() {
                     Manage your subjects and customize their colors. These will be used to organize your assignments and schedule.
                 </Text>
 
-                <View style={styles.subjectsContainer}>
-                    {subjects.map(subject => <SubjectCard key={subject.id} subject={subject} />)}
-                </View>
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <Text style={[styles.loadingText, { color: currentTheme.colors.textSecondary }]}>
+                            Loading subjects...
+                        </Text>
+                    </View>
+                ) : (
+                    <View style={styles.subjectsContainer}>
+                        {subjects.map(subject => (
+                            <SubjectCard 
+                                key={subject.id} 
+                                subject={subject} 
+                                onPress={() => handleSubjectPress(subject)}
+                            />
+                        ))}
+                    </View>
+                )}
             </ScrollView>
+
+            <SubjectColorPicker
+                visible={showColorPicker}
+                onClose={handleCloseColorPicker}
+                onSelectColor={handleColorSelect}
+                currentColor={selectedSubject?.color || '#6366F1'}
+                subjectName={selectedSubject?.name || ''}
+            />
         </SafeAreaView>
     );
 }
@@ -139,6 +185,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        borderWidth: 1,
     },
     subjectCardContent: {
         flex: 1,
@@ -163,6 +210,15 @@ const styles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
+    },
+    loadingContainer: {
+        padding: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        fontSize: 16,
+        fontWeight: '500',
     },
 }); 
  
