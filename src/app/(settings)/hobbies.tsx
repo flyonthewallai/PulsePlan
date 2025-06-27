@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert, ScrollView, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Plus, Clock, Info, Calendar, Music, Palette, Camera, Gamepad2, Book, Target, X } from 'lucide-react-native';
+import { ChevronLeft, Plus, Clock, Info, Calendar, Music, Palette, Camera, Gamepad2, Book, Target, X, Sun, CloudSun, Sunset, Moon } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { useTheme } from '@/contexts/ThemeContext';
@@ -46,13 +46,6 @@ const HobbyCard = ({
   onPress: () => void;
 }) => {
   const { currentTheme } = useTheme();
-  
-  const formatDuration = (minutes: number) => {
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
-  };
 
   return (
     <TouchableOpacity 
@@ -66,14 +59,6 @@ const HobbyCard = ({
         </View>
         <View style={styles.hobbyInfo}>
           <Text style={[styles.hobbyName, { color: currentTheme.colors.textPrimary }]}>{hobby.name}</Text>
-          <Text style={[styles.hobbyMeta, { color: currentTheme.colors.textSecondary }]}>
-            {hobby.preferredTime} • {formatDuration(hobby.duration)}
-          </Text>
-          {hobby.info && (
-            <Text style={[styles.hobbyDescription, { color: currentTheme.colors.textSecondary }]} numberOfLines={2}>
-              {hobby.info}
-            </Text>
-          )}
         </View>
       </View>
       <ChevronLeft size={20} color={currentTheme.colors.textSecondary} style={{ transform: [{ rotate: '180deg' }] }} />
@@ -132,10 +117,10 @@ const HobbyEditModal = ({
   };
 
   const timeOptions = [
-    { label: 'Morning', value: 'morning' },
-    { label: 'Afternoon', value: 'afternoon' },
-    { label: 'Evening', value: 'evening' },
-    { label: 'Night', value: 'night' },
+    { label: 'Morning', value: 'morning', icon: Sun },
+    { label: 'Afternoon', value: 'afternoon', icon: CloudSun },
+    { label: 'Evening', value: 'evening', icon: Sunset },
+    { label: 'Night', value: 'night', icon: Moon },
   ];
 
   return (
@@ -187,26 +172,33 @@ const HobbyEditModal = ({
           <View style={styles.formSection}>
             <Text style={[styles.formLabel, { color: currentTheme.colors.textSecondary }]}>PREFERRED TIME</Text>
             <View style={styles.timeOptionsContainer}>
-              {timeOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.timeOption,
-                    { 
-                      backgroundColor: preferredTime === option.value ? currentTheme.colors.primary : currentTheme.colors.surface,
-                      borderColor: preferredTime === option.value ? currentTheme.colors.primary : 'transparent'
-                    }
-                  ]}
-                  onPress={() => setPreferredTime(option.value)}
-                >
-                  <Text style={[
-                    styles.timeOptionText,
-                    { color: preferredTime === option.value ? '#FFFFFF' : currentTheme.colors.textPrimary }
-                  ]}>
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {timeOptions.map((option) => {
+                const IconComponent = option.icon;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.timeOption,
+                      { 
+                        backgroundColor: preferredTime === option.value ? currentTheme.colors.primary : currentTheme.colors.surface,
+                        borderColor: preferredTime === option.value ? currentTheme.colors.primary : 'transparent'
+                      }
+                    ]}
+                    onPress={() => setPreferredTime(option.value)}
+                  >
+                    <IconComponent 
+                      size={18} 
+                      color={preferredTime === option.value ? '#FFFFFF' : currentTheme.colors.textSecondary} 
+                    />
+                    <Text style={[
+                      styles.timeOptionText,
+                      { color: preferredTime === option.value ? '#FFFFFF' : currentTheme.colors.textPrimary }
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
@@ -413,7 +405,6 @@ const styles = StyleSheet.create({
   hobbyName: {
     fontSize: 17,
     fontWeight: '600',
-    marginBottom: 4,
   },
   hobbyMeta: {
     fontSize: 13,
@@ -485,14 +476,20 @@ const styles = StyleSheet.create({
   timeOptionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 8,
     marginBottom: 16,
   },
   timeOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '48%',
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
     borderWidth: 1,
+    gap: 8,
   },
   timeOptionText: {
     fontSize: 15,

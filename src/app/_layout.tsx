@@ -8,8 +8,9 @@ import { TaskProvider } from '../contexts/TaskContext';
 import { SettingsProvider } from '../contexts/SettingsContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { StreakProvider } from '../contexts/StreakContext';
-import { PremiumProvider, usePremium } from '../contexts/PremiumContext';
+import { useAuth } from '../contexts/AuthContext';
 import { ProfileProvider } from '../contexts/ProfileContext';
+import { navigationAnimations } from '../config/animations';
 
 function AppWithTheme() {
   const { currentTheme } = useTheme();
@@ -18,14 +19,35 @@ function AppWithTheme() {
     <>
       <Stack screenOptions={{ 
         headerShown: false,
-        contentStyle: { backgroundColor: currentTheme.colors.background }
+        contentStyle: { backgroundColor: currentTheme.colors.background },
+        animation: 'slide_from_right',
+        animationDuration: 300,
+        animationTypeForReplace: 'push',
       }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="auth" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="(settings)" />
-        <Stack.Screen name="+not-found" />
+        <Stack.Screen 
+          name="index" 
+          options={navigationAnimations.fade} 
+        />
+        <Stack.Screen 
+          name="onboarding" 
+          options={navigationAnimations.elegantSlide} 
+        />
+        <Stack.Screen 
+          name="auth" 
+          options={navigationAnimations.fastFade} 
+        />
+        <Stack.Screen 
+          name="(tabs)" 
+          options={navigationAnimations.fade} 
+        />
+        <Stack.Screen 
+          name="(settings)" 
+          options={navigationAnimations.slideFromRight} 
+        />
+        <Stack.Screen 
+          name="+not-found" 
+          options={navigationAnimations.slideFromBottom} 
+        />
       </Stack>
       <StatusBar style="light" backgroundColor={currentTheme.colors.background} />
     </>
@@ -33,7 +55,8 @@ function AppWithTheme() {
 }
 
 function ThemeWrapper({ children }: { children: React.ReactNode }) {
-  const { isPremium } = usePremium();
+  const { subscriptionPlan } = useAuth();
+  const isPremium = subscriptionPlan === 'premium';
   
   return (
     <ThemeProvider isPremium={isPremium}>
@@ -46,19 +69,17 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <PremiumProvider>
-          <ProfileProvider>
-            <ThemeWrapper>
-              <SettingsProvider>
-                <TaskProvider>
-                  <StreakProvider>
-                    <AppWithTheme />
-                  </StreakProvider>
-                </TaskProvider>
-              </SettingsProvider>
-            </ThemeWrapper>
-          </ProfileProvider>
-        </PremiumProvider>
+        <ProfileProvider>
+          <ThemeWrapper>
+            <SettingsProvider>
+              <TaskProvider>
+                <StreakProvider>
+                  <AppWithTheme />
+                </StreakProvider>
+              </TaskProvider>
+            </SettingsProvider>
+          </ThemeWrapper>
+        </ProfileProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

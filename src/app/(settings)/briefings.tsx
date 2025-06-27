@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     marginLeft: 48,
-    marginRight: 16,
+    marginRight: 0, // Extend to the end of the card
   },
   pickerTitle: {
     fontSize: 13,

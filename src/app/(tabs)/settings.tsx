@@ -31,7 +31,7 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/contexts/ProfileContext';
-import { signOut } from '@/lib/supabase-rn';
+import { signOut, supabase } from '@/lib/supabase-rn';
 import SubscriptionModal from '@/components/SubscriptionModal';
 import PremiumMemberModal from '@/components/PremiumMemberModal';
 
@@ -103,6 +103,35 @@ export default function SettingsScreen() {
   const [isSubscriptionModalVisible, setIsSubscriptionModalVisible] = useState(false);
   const [isPremiumMemberModalVisible, setIsPremiumMemberModalVisible] = useState(false);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
+  const [userName, setUserName] = useState('');
+
+  // Load user name from Supabase
+  useEffect(() => {
+    const loadUserName = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error loading user name:', error);
+          return;
+        }
+
+        if (data?.name) {
+          setUserName(data.name);
+        }
+      } catch (error) {
+        console.error('Error loading user name:', error);
+      }
+    };
+
+    loadUserName();
+  }, [user?.id]);
 
   // Get current timezone
   const getCurrentTimezone = () => {
@@ -217,7 +246,7 @@ export default function SettingsScreen() {
           <SettingsRow 
             icon={<User color={currentTheme.colors.textSecondary} size={20} />} 
             title="Profile" 
-            value={user?.user_metadata?.full_name || user?.email}
+            value={userName || user?.email}
             onPress={() => router.push('/(settings)/profile')} 
           />
           <SettingsRow 
@@ -415,7 +444,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     marginLeft: 56, // This aligns with the text (icon width + gap)
-    marginRight: 16,
+    marginRight: 0, // Extend to the end of the card
     opacity: 1,
   },
 });

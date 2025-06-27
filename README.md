@@ -118,16 +118,19 @@ flyonthewalldev-pulseplan/
 
 ## 🔠 Tech Stack
 
-| Layer         | Technology                        |
-| ------------- | --------------------------------- |
-| Frontend      | React Native (Expo)               |
-| Backend       | FastAPI or Node.js API            |
-| Auth          | Supabase Auth                     |
-| Database      | Supabase (PostgreSQL)             |
-| AI Assistant  | OpenAI GPT-4o                     |
-| ML Model      | PyTorch vector-memory model       |
-| Payments      | Apple                             |
-| Calendar APIs | Google, Microsoft Graph, EventKit |
+| Layer         | Technology                              |
+| ------------- | --------------------------------------- |
+| Frontend      | React Native (Expo 53) + TypeScript     |
+| Backend       | Node.js + Express.js + TypeScript       |
+| Auth          | Supabase Auth                           |
+| Database      | Supabase (PostgreSQL)                   |
+| AI Assistant  | OpenAI GPT-4o + Google Gemini 1.5 Flash |
+| AI Automation | n8n (hosted on Fly.dev)                 |
+| Real-time     | Socket.IO                               |
+| Payments      | Apple Pay                               |
+| Calendar APIs | Google Calendar + Microsoft Graph       |
+| Web Scraping  | Puppeteer + Cheerio                     |
+| Development   | Concurrent dev setup + ts-node          |
 
 ---
 

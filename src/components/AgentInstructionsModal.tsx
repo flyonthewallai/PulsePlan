@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { X, Lock } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
-import { usePremium } from '@/contexts/PremiumContext';
+import { useAuth } from '@/contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const INSTRUCTIONS_KEY = '@pulse_agent_instructions';
@@ -24,7 +24,8 @@ interface AgentInstructionsModalProps {
 
 export default function AgentInstructionsModal({ visible, onClose }: AgentInstructionsModalProps) {
   const { currentTheme } = useTheme();
-  const { isPremium } = usePremium();
+  const { subscriptionPlan } = useAuth();
+  const isPremium = subscriptionPlan === 'premium';
   const [instructions, setInstructions] = useState('');
   const [memories, setMemories] = useState('');
   const [hasChanges, setHasChanges] = useState(false);

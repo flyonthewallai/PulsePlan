@@ -9,19 +9,43 @@ import {
   ScrollView,
   TextInput,
   Alert,
-  Switch,
   Animated,
-  Dimensions
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+
 import { useAuth } from '@/contexts/AuthContext';
-
+import { useTheme } from '@/contexts/ThemeContext';
 import { colors } from '@/constants/theme';
+import { GlowingOrb } from '@/components/GlowingOrb';
+import { supabase } from '@/lib/supabase';
 
-const { width: screenWidth } = Dimensions.get('window');
+// University suggestions - expandable for future additions
+const UNIVERSITY_SUGGESTIONS = [
+  'University of Colorado Boulder',
+  'University of Colorado Denver',
+  'University of Colorado Colorado Springs',
+  'University of California Berkeley',
+  'University of California Los Angeles',
+  'University of California San Diego',
+  'University of California Santa Barbara',
+  'University of Southern California',
+  'University of Texas Austin',
+  'University of Texas Dallas',
+  'University of Michigan',
+  'University of Washington',
+  'University of Florida',
+  'University of Georgia',
+  'University of Illinois',
+  'University of Wisconsin Madison',
+  'University of North Carolina Chapel Hill',
+  'University of Virginia',
+  'University of Pennsylvania',
+  'University of Miami',
+];
 
 interface UserPreferences {
   userType: 'student' | 'professional' | 'educator' | '';
@@ -30,73 +54,45 @@ interface UserPreferences {
     sessionDuration: number;
     breakDuration: number;
   };
+  workPreferences: {
+    preferredWorkTimes: string[];
+    focusSessionDuration: number;
+    meetingPreference: string;
+  };
   integrations: {
     canvas: boolean;
-    googleCalendar: boolean;
+    gmail: boolean;
+    appleCalendar: boolean;
     outlook: boolean;
   };
   notifications: {
-    deadlineReminders: boolean;
-    studyReminders: boolean;
-    weeklyReports: boolean;
+    taskReminders: boolean;
+    missedTaskSummary: boolean;
+    emailDelivery: boolean;
+    inAppDelivery: boolean;
+    pushDelivery: boolean;
   };
 }
 
-const STEPS = [
-  {
-    title: 'Welcome to PulsePlan',
-    description: 'The AI-powered academic planner that helps you achieve your educational goals.',
-    image: 'https://images.pexels.com/photos/4145153/pexels-photo-4145153.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-  },
-  {
-    title: 'What type of student are you?',
-    description: 'Tell us a bit about yourself so we can personalize your experience.',
-    options: ['Undergraduate', 'Graduate', 'High School', 'Self-Learner'],
-  },
-  {
-    title: 'Your School & Major',
-    description: 'Help us tailor your experience to your specific academic needs.',
-    fields: ['School/Institution', 'Major/Field of Study'],
-  },
-  {
-    title: 'Study Preferences',
-    description: 'When are you most productive? We\'ll optimize your schedule accordingly.',
-    preferences: [
-      { title: 'Focus Hours', options: ['Morning', 'Afternoon', 'Evening', 'Night'] },
-      { title: 'Break Habits', options: ['Short Frequent', 'Long Infrequent'] },
-    ],
-  },
-  {
-    title: 'Connect Your Tools',
-    description: 'Integrate with your existing academic tools for a seamless experience.',
-    integrations: ['Canvas', 'Google Calendar', 'Microsoft Outlook'],
-  },
-  {
-    title: 'Notification Settings',
-    description: 'How would you like to be reminded about your tasks and deadlines?',
-    notifications: ['Task Reminders', 'Study Session Alerts', 'AI Suggestions'],
-  },
-  {
-    title: 'All Set!',
-    description: 'Your personalized academic planner is ready to help you succeed.',
-    image: 'https://images.pexels.com/photos/3184639/pexels-photo-3184639.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-  },
-];
-
 export default function OnboardingScreen() {
-  const router = useRouter();
-  const { markOnboardingComplete } = useAuth();
+  const { markOnboardingComplete, user } = useAuth();
+  const { currentTheme } = useTheme();
   const [step, setStep] = useState(0);
+  const [isLoadingStep, setIsLoadingStep] = useState(true);
   
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   
+  // ScrollView ref for resetting scroll position
+  const scrollViewRef = useRef<ScrollView>(null);
+  
   // User data collection
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [school, setSchool] = useState('');
+  const [graduationYear, setGraduationYear] = useState('');
+  const [schoolSuggestions, setSchoolSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>({
     userType: '',
     studyPreferences: {
@@ -104,62 +100,135 @@ export default function OnboardingScreen() {
       sessionDuration: 25,
       breakDuration: 5,
     },
+    workPreferences: {
+      preferredWorkTimes: [],
+      focusSessionDuration: 45,
+      meetingPreference: 'morning',
+    },
     integrations: {
       canvas: false,
-      googleCalendar: false,
+      gmail: false,
+      appleCalendar: false,
       outlook: false,
     },
     notifications: {
-      deadlineReminders: true,
-      studyReminders: true,
-      weeklyReports: false,
+      taskReminders: true,
+      missedTaskSummary: true,
+      emailDelivery: false,
+      inAppDelivery: true,
+      pushDelivery: false,
     },
   });
 
-  const steps = [
+  const getSteps = () => {
+    const baseSteps = [
     {
       id: 'welcome',
       title: 'Welcome to PulsePlan',
-      description: 'Your AI-powered academic scheduling assistant that adapts to your learning style',
+        description: 'The AI planner that adapts to you.',
       component: 'welcome'
     },
     {
       id: 'profile',
-      title: 'Tell us about yourself',
-      description: 'Help us personalize your experience',
+      title: 'Your Background',
+      description: 'Tell us about your organization (optional)',
       component: 'profile'
     },
     {
       id: 'userType',
       title: 'What describes you best?',
-      description: 'We\'ll customize PulsePlan based on your role',
+        description: 'We\'ll personalize your experience',
       component: 'userType'
-    },
-    {
+      }
+    ];
+
+    // Add preferences step based on user type
+    if (preferences.userType === 'student') {
+      baseSteps.push({
       id: 'studyPreferences',
       title: 'Study Preferences',
-      description: 'When and how do you prefer to study?',
+        description: 'Your ideal study setup',
       component: 'studyPreferences'
-    },
-    {
-      id: 'integrations',
-      title: 'Connect Your Tools',
-      description: 'Sync with your existing platforms for a seamless experience',
-      component: 'integrations'
-    },
-    {
-      id: 'notifications',
-      title: 'Stay on Track',
-      description: 'Choose how you\'d like to be reminded',
-      component: 'notifications'
-    },
-    {
-      id: 'complete',
-      title: 'You\'re All Set!',
-      description: 'PulsePlan is ready to help you achieve your goals',
-      component: 'complete'
+      });
+    } else if (preferences.userType === 'professional' || preferences.userType === 'educator') {
+      baseSteps.push({
+        id: 'workPreferences',
+        title: preferences.userType === 'professional' ? 'Work Preferences' : 'Teaching Preferences',
+        description: preferences.userType === 'professional' ? 'Your ideal work environment' : 'Your teaching and planning style',
+        component: 'workPreferences'
+      });
     }
-  ];
+
+        // Add remaining steps
+    baseSteps.push(
+      {
+        id: 'integrations',
+        title: 'Connect Your Tools',
+        description: 'Sync with your existing platforms for a seamless experience',
+        component: 'integrations'
+      },
+      {
+        id: 'premium',
+        title: 'Unlock Your Full Potential',
+        description: 'Get the most out of PulsePlan with Premium features',
+        component: 'premium'
+      },
+      {
+        id: 'complete',
+        title: 'You\'re All Set!',
+        description: 'PulsePlan is ready to help you achieve your goals',
+        component: 'complete'
+      }
+    );
+
+    return baseSteps;
+  };
+
+  const steps = getSteps();
+
+  // Load saved onboarding step on mount
+  useEffect(() => {
+    const loadSavedStep = async () => {
+      try {
+        if (user?.id) {
+          const { data, error } = await supabase
+            .from('users')
+            .select('onboarding_step, name, school, academic_year, user_type, study_preferences, work_preferences, integration_preferences, notification_preferences')
+            .eq('id', user.id)
+            .single();
+
+          if (data && !error) {
+            // Load saved step
+            if (data.onboarding_step && data.onboarding_step > 0) {
+              setStep(data.onboarding_step);
+            }
+            
+            // Load saved user data
+            if (data.school) setSchool(data.school);
+            if (data.academic_year) setGraduationYear(data.academic_year);
+            
+            // Load saved preferences
+            if (data.user_type || data.study_preferences || data.work_preferences || data.integration_preferences || data.notification_preferences) {
+              setPreferences(prev => ({
+                ...prev,
+                userType: data.user_type || '',
+                studyPreferences: data.study_preferences || prev.studyPreferences,
+                workPreferences: data.work_preferences || prev.workPreferences,
+                integrations: data.integration_preferences || prev.integrations,
+                notifications: data.notification_preferences || prev.notifications,
+              }));
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading saved onboarding step:', error);
+      } finally {
+        setIsLoadingStep(false);
+      }
+    };
+
+    loadSavedStep();
+  }, [user?.id]);
 
   // Animation effect for step changes
   useEffect(() => {
@@ -185,6 +254,55 @@ export default function OnboardingScreen() {
     ]).start();
   }, [step]);
 
+  // Save current step and all onboarding data to database
+  const saveStep = async (stepNumber: number) => {
+    try {
+      if (user?.id) {
+        // Prepare the data to save
+        const updateData: any = {
+          onboarding_step: stepNumber,
+        };
+
+        // Add user profile data if available
+        if (school.trim() !== '') {
+          updateData.school = school;
+        }
+        if (graduationYear.trim() !== '') {
+          updateData.academic_year = graduationYear;
+        }
+
+        // Add user type if selected
+        if (preferences.userType !== '') {
+          updateData.user_type = preferences.userType;
+        }
+
+        // Add preferences based on user type
+        if (preferences.userType === 'student') {
+          updateData.study_preferences = preferences.studyPreferences;
+        } else if (preferences.userType === 'professional' || preferences.userType === 'educator') {
+          updateData.work_preferences = preferences.workPreferences;
+        }
+
+        // Add integration preferences
+        updateData.integration_preferences = preferences.integrations;
+
+        // Add notification preferences
+        updateData.notification_preferences = preferences.notifications;
+
+        const { error } = await supabase
+          .from('users')
+          .update(updateData)
+          .eq('id', user.id);
+
+        if (error) {
+          console.error('Error saving onboarding data:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving onboarding data:', error);
+    }
+  };
+
   const animateStepChange = (callback: () => void) => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -204,6 +322,8 @@ export default function OnboardingScreen() {
       }),
     ]).start(() => {
       callback();
+      // Reset scroll position to top
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       // Reset animation values for next step
       slideAnim.setValue(50);
       fadeAnim.setValue(0);
@@ -213,21 +333,46 @@ export default function OnboardingScreen() {
 
   const nextStep = async () => {
     if (step < steps.length - 1) {
-      animateStepChange(() => setStep(step + 1));
+      const newStep = step + 1;
+      animateStepChange(() => {
+        setStep(newStep);
+        saveStep(newStep);
+      });
     } else {
       // Complete onboarding
       try {
-        // Save user preferences
+        // Save user preferences to AsyncStorage
         const onboardingData = {
-          name,
-          email,
           school,
+          graduationYear,
           userType: preferences.userType,
           preferences: preferences,
           completedAt: new Date().toISOString()
         };
         
         await AsyncStorage.setItem('user_preferences', JSON.stringify(onboardingData));
+
+        // Save user type and preferences to Supabase
+        if (user?.id) {
+          const { error } = await supabase
+            .from('users')
+            .update({
+              school: school,
+              academic_year: graduationYear,
+              user_type: preferences.userType,
+              study_preferences: preferences.userType === 'student' ? preferences.studyPreferences : null,
+              work_preferences: (preferences.userType === 'professional' || preferences.userType === 'educator') ? preferences.workPreferences : null,
+              integration_preferences: preferences.integrations,
+              notification_preferences: preferences.notifications,
+              onboarding_step: 0 // Reset step when onboarding is completed
+            })
+            .eq('id', user.id);
+
+          if (error) {
+            console.error('Error saving to database:', error);
+            // Don't block onboarding completion for database errors
+          }
+        }
         
         // Mark onboarding as complete using AuthContext
         await markOnboardingComplete();
@@ -245,19 +390,62 @@ export default function OnboardingScreen() {
 
   const prevStep = () => {
     if (step > 0) {
-      animateStepChange(() => setStep(step - 1));
+      const newStep = step - 1;
+      animateStepChange(() => {
+        setStep(newStep);
+        saveStep(newStep);
+      });
     }
+  };
+
+  // Utility functions
+  const isEducationalInstitution = (schoolName: string) => {
+    const educationKeywords = [
+      'university', 'college', 'school', 'academy', 'institute', 'institution',
+      'high school', 'elementary', 'middle school', 'prep', 'preparatory',
+      'campus', 'education', 'learning', 'study', 'academic'
+    ];
+    
+    const lowerCaseName = schoolName.toLowerCase();
+    return educationKeywords.some(keyword => lowerCaseName.includes(keyword));
   };
 
   const canProceed = () => {
     switch (steps[step].component) {
-      case 'profile':
-        return name.trim() !== '' && email.trim() !== '';
       case 'userType':
         return preferences.userType !== '';
       default:
         return true;
     }
+  };
+
+  // Handler functions for user input
+  const handleSchoolChange = (text: string) => {
+    setSchool(text);
+    
+    if (text.length >= 3) {
+      const filtered = UNIVERSITY_SUGGESTIONS.filter(university =>
+        university.toLowerCase().includes(text.toLowerCase())
+      ).slice(0, 5);
+      
+      setSchoolSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setShowSuggestions(false);
+      setSchoolSuggestions([]);
+    }
+  };
+
+  const selectSuggestion = (suggestion: string) => {
+    setSchool(suggestion);
+    setShowSuggestions(false);
+    setSchoolSuggestions([]);
+  };
+
+  // Preference handlers with auto-save
+  const selectUserType = (userType: string) => {
+    setPreferences(prev => ({ ...prev, userType: userType as any }));
+    setTimeout(() => saveStep(step), 100);
   };
 
   const toggleStudyTime = (timeId: string) => {
@@ -270,6 +458,95 @@ export default function OnboardingScreen() {
           : [...prev.studyPreferences.preferredStudyTimes, timeId]
       }
     }));
+    setTimeout(() => saveStep(step), 100);
+  };
+
+  const selectStudyDuration = (duration: number) => {
+    setPreferences(prev => ({
+      ...prev,
+      studyPreferences: { ...prev.studyPreferences, sessionDuration: duration }
+    }));
+    setTimeout(() => saveStep(step), 100);
+  };
+
+  const toggleWorkTime = (timeId: string) => {
+    setPreferences(prev => ({
+      ...prev,
+      workPreferences: {
+        ...prev.workPreferences,
+        preferredWorkTimes: prev.workPreferences.preferredWorkTimes.includes(timeId)
+          ? prev.workPreferences.preferredWorkTimes.filter(t => t !== timeId)
+          : [...prev.workPreferences.preferredWorkTimes, timeId]
+      }
+    }));
+    setTimeout(() => saveStep(step), 100);
+  };
+
+  const selectWorkDuration = (duration: number) => {
+    setPreferences(prev => ({
+      ...prev,
+      workPreferences: { ...prev.workPreferences, focusSessionDuration: duration }
+    }));
+    setTimeout(() => saveStep(step), 100);
+  };
+
+  const selectMeetingPreference = (preference: string) => {
+    setPreferences(prev => ({
+      ...prev,
+      workPreferences: { ...prev.workPreferences, meetingPreference: preference }
+    }));
+    setTimeout(() => saveStep(step), 100);
+  };
+
+  const toggleIntegration = (integrationKey: string) => {
+    setPreferences(prev => ({
+      ...prev,
+      integrations: {
+        ...prev.integrations,
+        [integrationKey]: !prev.integrations[integrationKey as keyof typeof prev.integrations]
+      }
+    }));
+    setTimeout(() => saveStep(step), 100);
+  };
+
+  const getIntegrationsForUserType = () => {
+    const baseIntegrations = [
+      { 
+        key: 'appleCalendar', 
+        title: 'Apple Calendar', 
+        description: 'Sync your calendar events',
+        icon: 'calendar-outline',
+        iconSource: require('@/assets/images/applecalendar.png')
+      },
+      { 
+        key: 'outlook', 
+        title: 'Microsoft Outlook', 
+        description: 'Sync calendar and tasks',
+        icon: 'mail-outline',
+        iconSource: require('@/assets/images/applecalendar.png')
+      }
+    ];
+
+    // Add user-type specific integrations
+    if (preferences.userType === 'student' || preferences.userType === 'educator') {
+      baseIntegrations.unshift({
+        key: 'canvas', 
+        title: 'Canvas LMS', 
+        description: preferences.userType === 'student' ? 'Sync assignments and due dates' : 'Manage course content and assignments',
+        icon: 'school-outline',
+        iconSource: require('@/assets/images/canvas.png')
+      });
+    } else if (preferences.userType === 'professional') {
+      baseIntegrations.unshift({
+        key: 'gmail', 
+        title: 'Gmail', 
+        description: 'Sync emails and manage communication',
+        icon: 'mail-outline',
+        iconSource: require('@/assets/images/gmail.png')
+      });
+    }
+
+    return baseIntegrations;
   };
 
   const renderStepContent = () => {
@@ -278,16 +555,12 @@ export default function OnboardingScreen() {
     switch (currentStep.component) {
       case 'welcome':
         return (
-          <View style={styles.stepContent}>
-            <View style={styles.logoContainer}>
-              <View style={styles.logoOuter}>
-                <View style={styles.logoInner}>
-                  <Text style={styles.logoText}>P</Text>
-                </View>
-              </View>
+          <View style={styles.welcomeStepContent}>
+            <View style={styles.welcomeOrbContainer}>
+              <GlowingOrb size="lg" color="blue" glowIntensity={0.8} glowOpacity={1.2} />
             </View>
             <Text style={styles.welcomeText}>
-              Let's get you set up with a personalized learning experience that adapts to your schedule and goals.
+            Just answer a few quick questions — we'll handle the rest.
             </Text>
           </View>
         );
@@ -296,38 +569,76 @@ export default function OnboardingScreen() {
         return (
           <View style={styles.stepContent}>
             <View style={styles.formContainer}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Full Name</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your full name"
-                  value={name}
-                  onChangeText={setName}
-                  placeholderTextColor="#9CA3AF"
-                />
+              <View style={school.trim() !== '' && isEducationalInstitution(school) ? styles.inputContainer : styles.inputContainerLast}>
+                <Text style={[styles.inputLabel, { color: currentTheme.colors.textSecondary }]}>School/Organization (Optional)</Text>
+                <View style={styles.autocompleteContainer}>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: currentTheme.colors.surface,
+                        borderColor: currentTheme.colors.border,
+                        color: currentTheme.colors.textPrimary
+                      }
+                    ]}
+                    placeholder="Enter your school or organization"
+                    value={school}
+                    onChangeText={handleSchoolChange}
+                    placeholderTextColor={currentTheme.colors.textSecondary}
+                    onFocus={() => {
+                      if (school.length >= 3 && schoolSuggestions.length > 0) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                  />
+                  {showSuggestions && schoolSuggestions.length > 0 && (
+                    <View style={[styles.suggestionsContainer, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+                      <ScrollView 
+                        style={styles.suggestionsScrollView}
+                        nestedScrollEnabled={true}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                      >
+                        {schoolSuggestions.map((suggestion, index) => (
+                          <TouchableOpacity
+                            key={index}
+                            style={[
+                              styles.suggestionItem,
+                              index < schoolSuggestions.length - 1 && { borderBottomColor: currentTheme.colors.border, borderBottomWidth: 1 }
+                            ]}
+                            onPress={() => selectSuggestion(suggestion)}
+                          >
+                            <Text style={[styles.suggestionText, { color: currentTheme.colors.textPrimary }]}>
+                              {suggestion}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
               </View>
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Email</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your email"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>School/Organization (Optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your school or organization"
-                  value={school}
-                  onChangeText={setSchool}
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
+              {school.trim() !== '' && isEducationalInstitution(school) && (
+                <View style={styles.inputContainerLast}>
+                  <Text style={[styles.inputLabel, { color: currentTheme.colors.textSecondary }]}>Graduation Year</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: currentTheme.colors.surface,
+                        borderColor: currentTheme.colors.border,
+                        color: currentTheme.colors.textPrimary
+                      }
+                    ]}
+                    placeholder="Enter your expected graduation year"
+                    value={graduationYear}
+                    onChangeText={setGraduationYear}
+                    placeholderTextColor={currentTheme.colors.textSecondary}
+                    keyboardType="numeric"
+                    maxLength={4}
+                  />
+                </View>
+              )}
             </View>
           </View>
         );
@@ -338,29 +649,41 @@ export default function OnboardingScreen() {
             <View style={styles.optionsContainer}>
               {[
                 { id: 'student', title: 'Student', description: 'High school, college, or university student', icon: 'school-outline' },
-                { id: 'professional', title: 'Professional', description: 'Working professional seeking skill development', icon: 'briefcase-outline' },
+                { id: 'professional', title: 'Professional', description: 'Working professional or career-focused', icon: 'briefcase-outline' },
                 { id: 'educator', title: 'Educator', description: 'Teacher, professor, or educational professional', icon: 'library-outline' }
               ].map((option) => (
                 <TouchableOpacity
                   key={option.id}
                   style={[
                     styles.optionCard,
-                    preferences.userType === option.id && styles.optionCardSelected
+                    {
+                      backgroundColor: preferences.userType === option.id ? currentTheme.colors.primary : currentTheme.colors.surface,
+                      borderColor: preferences.userType === option.id ? currentTheme.colors.primary : currentTheme.colors.border
+                    }
                   ]}
-                  onPress={() => setPreferences(prev => ({ ...prev, userType: option.id as any }))}
+                  onPress={() => selectUserType(option.id)}
                 >
                   <Ionicons 
                     name={option.icon as any} 
                     size={32} 
-                    color={preferences.userType === option.id ? '#4F8CFF' : '#6B7280'} 
+                    color={preferences.userType === option.id ? '#FFFFFF' : currentTheme.colors.textSecondary} 
                   />
                   <Text style={[
                     styles.optionTitle,
-                    preferences.userType === option.id && styles.optionTitleSelected
+                    { 
+                      color: preferences.userType === option.id ? '#FFFFFF' : currentTheme.colors.textPrimary 
+                    }
                   ]}>
                     {option.title}
                   </Text>
-                  <Text style={styles.optionDescription}>{option.description}</Text>
+                  <Text style={[
+                    styles.optionDescription,
+                    { 
+                      color: preferences.userType === option.id ? 'rgba(255, 255, 255, 0.8)' : currentTheme.colors.textSecondary 
+                    }
+                  ]}>
+                    {option.description}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -372,7 +695,7 @@ export default function OnboardingScreen() {
           <View style={styles.stepContent}>
             <View style={styles.preferencesContainer}>
               <View style={styles.preferenceSection}>
-                <Text style={styles.sectionTitle}>When do you prefer to study?</Text>
+                <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>When do you prefer to study?</Text>
                 <View style={styles.timeOptionsContainer}>
                   {[
                     { id: 'morning', label: 'Morning (6-12 PM)' },
@@ -384,18 +707,23 @@ export default function OnboardingScreen() {
                       key={timeOption.id}
                       style={[
                         styles.timeOption,
-                        preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) && styles.timeOptionSelected
+                        {
+                          backgroundColor: preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) ? currentTheme.colors.primary : currentTheme.colors.surface,
+                          borderColor: preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) ? currentTheme.colors.primary : currentTheme.colors.border
+                        }
                       ]}
                       onPress={() => toggleStudyTime(timeOption.id)}
                     >
                       <Ionicons 
                         name={preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) ? 'checkmark-circle' : 'ellipse-outline'} 
                         size={20} 
-                        color={preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) ? '#4F8CFF' : '#6B7280'} 
+                        color={preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) ? '#FFFFFF' : currentTheme.colors.textSecondary} 
                       />
                       <Text style={[
                         styles.timeOptionText,
-                        preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) && styles.timeOptionTextSelected
+                        { 
+                          color: preferences.studyPreferences.preferredStudyTimes.includes(timeOption.id) ? '#FFFFFF' : currentTheme.colors.textPrimary 
+                        }
                       ]}>
                         {timeOption.label}
                       </Text>
@@ -404,26 +732,144 @@ export default function OnboardingScreen() {
                 </View>
               </View>
               
-              <View style={styles.preferenceSection}>
-                <Text style={styles.sectionTitle}>Study Session Duration</Text>
+              <View style={styles.preferenceSectionLast}>
+                <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>Study Session Duration</Text>
                 <View style={styles.sliderContainer}>
                   {[25, 45, 60, 90].map((duration) => (
                     <TouchableOpacity
                       key={duration}
                       style={[
                         styles.durationOption,
-                        preferences.studyPreferences.sessionDuration === duration && styles.durationOptionSelected
+                        {
+                          backgroundColor: preferences.studyPreferences.sessionDuration === duration ? currentTheme.colors.primary : currentTheme.colors.surface,
+                          borderColor: preferences.studyPreferences.sessionDuration === duration ? currentTheme.colors.primary : currentTheme.colors.border
+                        }
                       ]}
-                      onPress={() => setPreferences(prev => ({
-                        ...prev,
-                        studyPreferences: { ...prev.studyPreferences, sessionDuration: duration }
-                      }))}
+                      onPress={() => selectStudyDuration(duration)}
                     >
                       <Text style={[
                         styles.durationText,
-                        preferences.studyPreferences.sessionDuration === duration && styles.durationTextSelected
+                        { 
+                          color: preferences.studyPreferences.sessionDuration === duration ? '#FFFFFF' : currentTheme.colors.textPrimary 
+                        }
                       ]}>
                         {duration}m
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </View>
+        );
+        
+      case 'workPreferences':
+        return (
+          <View style={styles.stepContent}>
+            <View style={styles.preferencesContainer}>
+              <View style={styles.preferenceSection}>
+                <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>
+                  {preferences.userType === 'professional' ? 'When do you prefer to focus?' : 'When do you prefer to plan and teach?'}
+              </Text>
+                <View style={styles.timeOptionsContainer}>
+                {[
+                    { id: 'morning', label: 'Morning (6-12 PM)' },
+                    { id: 'afternoon', label: 'Afternoon (12-6 PM)' },
+                    { id: 'evening', label: 'Evening (6-10 PM)' },
+                    { id: 'night', label: 'Night (10 PM+)' }
+                  ].map((timeOption) => (
+                    <TouchableOpacity
+                      key={timeOption.id}
+                      style={[
+                        styles.timeOption,
+                  { 
+                          backgroundColor: preferences.workPreferences.preferredWorkTimes.includes(timeOption.id) ? currentTheme.colors.primary : currentTheme.colors.surface,
+                          borderColor: preferences.workPreferences.preferredWorkTimes.includes(timeOption.id) ? currentTheme.colors.primary : currentTheme.colors.border
+                        }
+                      ]}
+                      onPress={() => toggleWorkTime(timeOption.id)}
+                    >
+                      <Ionicons 
+                        name={preferences.workPreferences.preferredWorkTimes.includes(timeOption.id) ? 'checkmark-circle' : 'ellipse-outline'} 
+                        size={20} 
+                        color={preferences.workPreferences.preferredWorkTimes.includes(timeOption.id) ? '#FFFFFF' : currentTheme.colors.textSecondary} 
+                      />
+                      <Text style={[
+                        styles.timeOptionText,
+                        { 
+                          color: preferences.workPreferences.preferredWorkTimes.includes(timeOption.id) ? '#FFFFFF' : currentTheme.colors.textPrimary 
+                        }
+                      ]}>
+                        {timeOption.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                      </View>
+                    </View>
+              
+              <View style={styles.preferenceSection}>
+                <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>
+                  {preferences.userType === 'professional' ? 'Focus Session Duration' : 'Planning Session Duration'}
+                </Text>
+                <View style={styles.sliderContainer}>
+                  {[30, 45, 60, 90].map((duration) => (
+                    <TouchableOpacity
+                      key={duration}
+                      style={[
+                        styles.durationOption,
+                        {
+                          backgroundColor: preferences.workPreferences.focusSessionDuration === duration ? currentTheme.colors.primary : currentTheme.colors.surface,
+                          borderColor: preferences.workPreferences.focusSessionDuration === duration ? currentTheme.colors.primary : currentTheme.colors.border
+                        }
+                      ]}
+                      onPress={() => selectWorkDuration(duration)}
+                    >
+                      <Text style={[
+                        styles.durationText,
+                        { 
+                          color: preferences.workPreferences.focusSessionDuration === duration ? '#FFFFFF' : currentTheme.colors.textPrimary 
+                        }
+                      ]}>
+                        {duration}m
+                      </Text>
+                    </TouchableOpacity>
+                ))}
+                </View>
+              </View>
+              
+              <View style={styles.preferenceSection}>
+                <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>
+                  {preferences.userType === 'professional' ? 'Meeting Preference' : 'Collaboration Preference'}
+              </Text>
+                <View style={styles.timeOptionsContainer}>
+                  {[
+                    { id: 'morning', label: preferences.userType === 'professional' ? 'Morning meetings' : 'Morning collaboration' },
+                    { id: 'afternoon', label: preferences.userType === 'professional' ? 'Afternoon meetings' : 'Afternoon planning' },
+                    { id: 'minimal', label: preferences.userType === 'professional' ? 'Minimal meetings' : 'Independent work' }
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.id}
+                      style={[
+                        styles.timeOption,
+                        {
+                          backgroundColor: preferences.workPreferences.meetingPreference === option.id ? currentTheme.colors.primary : currentTheme.colors.surface,
+                          borderColor: preferences.workPreferences.meetingPreference === option.id ? currentTheme.colors.primary : currentTheme.colors.border
+                        }
+                      ]}
+                      onPress={() => selectMeetingPreference(option.id)}
+                    >
+                      <Ionicons 
+                        name={preferences.workPreferences.meetingPreference === option.id ? 'checkmark-circle' : 'ellipse-outline'} 
+                        size={20} 
+                        color={preferences.workPreferences.meetingPreference === option.id ? '#FFFFFF' : currentTheme.colors.textSecondary} 
+                      />
+                      <Text style={[
+                        styles.timeOptionText,
+                        { 
+                          color: preferences.workPreferences.meetingPreference === option.id ? '#FFFFFF' : currentTheme.colors.textPrimary 
+                        }
+                      ]}>
+                        {option.label}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -437,107 +883,133 @@ export default function OnboardingScreen() {
         return (
           <View style={styles.stepContent}>
             <View style={styles.integrationsContainer}>
-              <Text style={styles.integrationNote}>
-                Connect your existing tools to automatically sync assignments and calendar events.
+              <Text style={[styles.integrationNote, { color: currentTheme.colors.textSecondary }]}>
+                Which tools would you like to connect? We'll help you set them up after onboarding.
               </Text>
               
               <View style={styles.integrationsList}>
-                {[
-                  { 
-                    key: 'canvas', 
-                    title: 'Canvas LMS', 
-                    description: 'Sync assignments and due dates',
-                    icon: 'school-outline'
-                  },
-                  { 
-                    key: 'googleCalendar', 
-                    title: 'Google Calendar', 
-                    description: 'Sync your calendar events',
-                    icon: 'calendar-outline'
-                  },
-                  { 
-                    key: 'outlook', 
-                    title: 'Microsoft Outlook', 
-                    description: 'Sync calendar and tasks',
-                    icon: 'mail-outline'
+                {getIntegrationsForUserType().map((integration) => (
+                  <TouchableOpacity
+                    key={integration.key}
+                    style={[
+                      styles.integrationItem,
+                      {
+                        backgroundColor: preferences.integrations[integration.key as keyof typeof preferences.integrations] ? currentTheme.colors.primary : currentTheme.colors.surface,
+                        borderColor: preferences.integrations[integration.key as keyof typeof preferences.integrations] ? currentTheme.colors.primary : currentTheme.colors.border
                   }
-                ].map((integration) => (
-                  <View key={integration.key} style={styles.integrationItem}>
+                    ]}
+                                      onPress={() => toggleIntegration(integration.key)}
+                  >
                     <View style={styles.integrationInfo}>
-                      <Ionicons name={integration.icon as any} size={24} color="#4F8CFF" />
+                      <Image 
+                        source={integration.iconSource} 
+                        style={[
+                          styles.integrationIcon,
+                          preferences.integrations[integration.key as keyof typeof preferences.integrations] && { opacity: 0.9 }
+                        ]} 
+                      />
                       <View style={styles.integrationText}>
-                        <Text style={styles.integrationTitle}>{integration.title}</Text>
-                        <Text style={styles.integrationDescription}>{integration.description}</Text>
+                        <Text style={[
+                          styles.integrationTitle,
+                          { color: preferences.integrations[integration.key as keyof typeof preferences.integrations] ? '#FFFFFF' : currentTheme.colors.textPrimary }
+                        ]}>
+                          {integration.title}
+                        </Text>
+                        <Text style={[
+                          styles.integrationDescription,
+                          { color: preferences.integrations[integration.key as keyof typeof preferences.integrations] ? 'rgba(255, 255, 255, 0.9)' : currentTheme.colors.textSecondary }
+                        ]}>
+                          {integration.description}
+                        </Text>
                       </View>
                     </View>
-                    <Switch
-                      value={preferences.integrations[integration.key as keyof typeof preferences.integrations]}
-                      onValueChange={(value) => setPreferences(prev => ({
-                        ...prev,
-                        integrations: { ...prev.integrations, [integration.key]: value }
-                      }))}
-                      trackColor={{ false: '#E5E7EB', true: '#4F8CFF' }}
-                      thumbColor="#FFFFFF"
+                    <Ionicons 
+                      name={preferences.integrations[integration.key as keyof typeof preferences.integrations] ? 'checkmark-circle' : 'ellipse-outline'} 
+                      size={24} 
+                      color={preferences.integrations[integration.key as keyof typeof preferences.integrations] ? '#FFFFFF' : currentTheme.colors.textSecondary} 
                     />
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
               
-              <Text style={styles.integrationFooter}>
-                You can always connect these later in Settings.
+              <Text style={[styles.integrationFooter, { color: currentTheme.colors.textSecondary }]}>
+                Don't worry - we'll guide you through the setup process in Settings after you complete onboarding.
               </Text>
             </View>
           </View>
         );
         
-      case 'notifications':
+      case 'premium':
         return (
           <View style={styles.stepContent}>
-            <View style={styles.notificationsContainer}>
-              <Text style={styles.notificationNote}>
-                Choose how you'd like PulsePlan to keep you on track.
-              </Text>
-              
-              <View style={styles.notificationsList}>
+            <View style={styles.premiumContainer}>
+              <View style={styles.premiumBrandingSection}>
+                <View style={[styles.premiumLogoContainer, { borderColor: currentTheme.colors.primary }]}>
+                  <Ionicons name="shield-checkmark" size={32} color={currentTheme.colors.primary} />
+                </View>
+                <Text style={[styles.premiumMainTitle, { color: currentTheme.colors.textPrimary }]}>
+                  Get unlimited usage with
+                </Text>
+                <Text style={[styles.premiumAppName, { color: currentTheme.colors.textPrimary }]}>
+                  PulsePlan <Text style={{ color: currentTheme.colors.primary }}>Premium</Text>
+                </Text>
+              </View>
+
+              <View style={styles.premiumFeaturesSection}>
                 {[
-                  { 
-                    key: 'deadlineReminders', 
-                    title: 'Deadline Reminders', 
-                    description: 'Get notified about upcoming due dates',
-                    icon: 'alarm-outline'
-                  },
-                  { 
-                    key: 'studyReminders', 
-                    title: 'Study Session Reminders', 
-                    description: 'Reminders for your scheduled study time',
-                    icon: 'time-outline'
-                  },
-                  { 
-                    key: 'weeklyReports', 
-                    title: 'Weekly Progress Reports', 
-                    description: 'Summary of your weekly achievements',
-                    icon: 'stats-chart-outline'
-                  }
-                ].map((notification) => (
-                  <View key={notification.key} style={styles.notificationItem}>
-                    <View style={styles.notificationInfo}>
-                      <Ionicons name={notification.icon as any} size={24} color="#4F8CFF" />
-                      <View style={styles.notificationText}>
-                        <Text style={styles.notificationTitle}>{notification.title}</Text>
-                        <Text style={styles.notificationDescription}>{notification.description}</Text>
-                      </View>
-                    </View>
-                    <Switch
-                      value={preferences.notifications[notification.key as keyof typeof preferences.notifications]}
-                      onValueChange={(value) => setPreferences(prev => ({
-                        ...prev,
-                        notifications: { ...prev.notifications, [notification.key]: value }
-                      }))}
-                      trackColor={{ false: '#E5E7EB', true: '#4F8CFF' }}
-                      thumbColor="#FFFFFF"
-                    />
+                  'Unlimited AI assistant messages',
+                  'Intelligent schedule optimization',
+                  'Long-term memory & personalization',
+                  'Proactive task suggestions',
+                  'Advanced progress tracking & insights',
+                  'Early access to new features',
+                ].map((feature, index) => (
+                  <View key={index} style={styles.premiumFeatureItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={currentTheme.colors.primary} />
+                    <Text style={[styles.premiumFeatureText, { color: currentTheme.colors.textPrimary }]}>{feature}</Text>
                   </View>
                 ))}
+              </View>
+              
+              <View style={styles.premiumPlanSection}>
+                <Text style={[styles.premiumPlanTitle, { color: currentTheme.colors.textPrimary }]}>Unlock Your Potential</Text>
+                <Text style={[styles.premiumPlanSubtitle, { color: currentTheme.colors.textSecondary }]}>
+                  Cancel anytime. 7 day free-trial.
+                </Text>
+              </View>
+
+              <View style={[styles.premiumPriceCard, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.primary }]}>
+                <View>
+                  <Text style={[styles.premiumPlanName, { color: currentTheme.colors.textPrimary }]}>Premium</Text>
+                  <Text style={[styles.premiumPrice, { color: currentTheme.colors.textPrimary }]}>$6.99</Text>
+                  <Text style={[styles.premiumBillingCycle, { color: currentTheme.colors.textSecondary }]}>Billed Monthly</Text>
+                </View>
+                <View style={[styles.premiumRadioSelected, { borderColor: currentTheme.colors.primary }]}>
+                  <View style={[styles.premiumRadioInner, { backgroundColor: currentTheme.colors.primary }]} />
+                </View>
+              </View>
+
+              <View style={styles.premiumButtonsContainer}>
+                <TouchableOpacity 
+                  style={[styles.premiumCtaButton, { backgroundColor: currentTheme.colors.primary }]}
+                  onPress={() => {
+                    // TODO: Handle premium upgrade
+                    console.log('Premium upgrade pressed');
+                    nextStep();
+                  }}
+                >
+                  <Text style={[styles.premiumCtaButtonText, { color: '#FFFFFF' }]}>
+                    Start 7-day free trial
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.premiumSkipButton}
+                  onPress={nextStep}
+                >
+                  <Text style={[styles.premiumSkipButtonText, { color: currentTheme.colors.textSecondary }]}>
+                    Continue as Free
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -545,17 +1017,33 @@ export default function OnboardingScreen() {
         
       case 'complete':
         return (
-          <View style={styles.stepContent}>
+          <View style={styles.completeStepContent}>
             <View style={styles.completionContainer}>
               <View style={styles.checkmarkContainer}>
-                <Ionicons name="checkmark-circle" size={80} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={64} color={currentTheme.colors.primary} />
               </View>
-              <Text style={styles.completionText}>
-                Perfect! PulsePlan is now customized for your learning style and preferences.
+              <Text style={[styles.completionText, { color: currentTheme.colors.textPrimary }]}>
+                You're all set!
               </Text>
-              <Text style={styles.completionSubtext}>
-                You can always adjust these settings later in your profile.
+              <Text style={[styles.completionSubtext, { color: currentTheme.colors.textSecondary }]}>
+                PulsePlan is ready to help you achieve your goals.
               </Text>
+              
+              {/* Button inside content for proper centering */}
+              <View style={styles.completeButtonContainer}>
+                <TouchableOpacity 
+                  onPress={nextStep}
+                  style={[
+                    styles.firstPageButton,
+                    {
+                      backgroundColor: currentTheme.colors.primary,
+                    }
+                  ]}
+                >
+                  <Text style={styles.firstPageButtonText}>Get Started</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         );
@@ -565,11 +1053,28 @@ export default function OnboardingScreen() {
     }
   };
 
+  // Show loading while we load the saved step
+  if (isLoadingStep) {
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" />
+      <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]} edges={['top']}>
+        <StatusBar barStyle="light-content" backgroundColor={currentTheme.colors.background} />
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: currentTheme.colors.textPrimary }]}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.background }]} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={currentTheme.colors.background} />
       
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
       <ScrollView 
+          ref={scrollViewRef}
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -577,6 +1082,12 @@ export default function OnboardingScreen() {
         <Animated.View 
           style={[
             styles.content, 
+            steps[step].component === 'complete' && {
+              flex: 1,
+              justifyContent: 'center',
+              paddingTop: 0,
+              paddingBottom: 0,
+            },
             {
               opacity: fadeAnim,
               transform: [
@@ -586,54 +1097,91 @@ export default function OnboardingScreen() {
             }
           ]}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>{steps[step].title}</Text>
-            <Text style={styles.description}>{steps[step].description}</Text>
-          </View>
-          
-          {/* Progress indicator */}
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressFill, 
-                  { width: `${((step + 1) / steps.length) * 100}%` }
-                ]} 
-              />
+          {/* Header - Hide for premium and complete pages */}
+          {steps[step].component !== 'premium' && steps[step].component !== 'complete' && (
+            <View style={styles.header}>
+              <Text style={styles.title}>{steps[step].title}</Text>
+              <Text style={styles.description}>{steps[step].description}</Text>
             </View>
-            <Text style={styles.progressText}>{step + 1} of {steps.length}</Text>
-          </View>
+          )}
+          
+          {/* Progress indicator - Hide for premium and complete pages */}
+          {steps[step].component !== 'premium' && steps[step].component !== 'complete' && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View 
+                  style={[
+                    styles.progressFill, 
+                    { width: `${((step + 1) / steps.length) * 100}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.progressText}>{step + 1} of {steps.length}</Text>
+            </View>
+          )}
           
           {/* Step content */}
           {renderStepContent()}
           
-          {/* Navigation buttons */}
-          <View style={styles.navigationContainer}>
-            {step > 0 && (
-              <TouchableOpacity style={styles.backButton} onPress={prevStep}>
-                <Ionicons name="arrow-back" size={20} color="#6B7280" />
-                <Text style={styles.backButtonText}>Back</Text>
-              </TouchableOpacity>
-            )}
-            
-            <TouchableOpacity 
-              style={[
-                styles.nextButton, 
-                !canProceed() && styles.nextButtonDisabled,
-                step === 0 && styles.nextButtonFull
-              ]} 
-              onPress={nextStep}
-              disabled={!canProceed()}
-            >
-              <Text style={styles.nextButtonText}>
-                {step === steps.length - 1 ? 'Get Started' : 'Continue'}
-              </Text>
-              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+                    {/* Navigation buttons - Hide for premium and complete pages */}
+          {steps[step].component !== 'premium' && steps[step].component !== 'complete' && (
+            <View style={styles.navigationContainer}>
+              {step > 0 && steps[step].component !== 'complete' && (
+                <TouchableOpacity style={styles.backButton} onPress={prevStep}>
+                  <Ionicons name="arrow-back" size={20} color={currentTheme.colors.textSecondary} />
+                  <Text style={[styles.backButtonText, { color: currentTheme.colors.textSecondary }]}>Back</Text>
+                </TouchableOpacity>
+              )}
+              
+              {step === 0 || steps[step].component === 'complete' ? (
+                // First page and complete page - centered prominent button
+                <View style={styles.firstPageButtonContainer}>
+                  <TouchableOpacity 
+                    onPress={nextStep}
+                    disabled={!canProceed()}
+                    style={[
+                      styles.firstPageButton,
+                      {
+                        backgroundColor: !canProceed() ? 'rgba(79, 140, 255, 0.4)' : currentTheme.colors.primary,
+                        opacity: !canProceed() ? 0.7 : 1,
+                      }
+                    ]}
+                  >
+                    <Text style={styles.firstPageButtonText}>Get Started</Text>
+                    <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                // Other pages - settings-style text button
+                <View style={styles.nextButtonContainer}>
+                  <TouchableOpacity 
+                    onPress={nextStep}
+                    disabled={!canProceed()}
+                    style={styles.nextButton}
+                  >
+                    <Text style={[
+                      styles.nextButtonText,
+                      { 
+                        color: !canProceed() ? currentTheme.colors.textSecondary : currentTheme.colors.primary,
+                        opacity: !canProceed() ? 0.6 : 1,
+                      }
+                    ]}>
+                      {step === steps.length - 1 ? 'Get Started' : 'Continue'}
+                    </Text>
+                    <Ionicons 
+                      name="arrow-forward" 
+                      size={20} 
+                      color={!canProceed() ? currentTheme.colors.textSecondary : currentTheme.colors.primary}
+                      style={{ opacity: !canProceed() ? 0.6 : 1 }}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
         </Animated.View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -641,45 +1189,56 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.backgroundDark,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   scrollContainer: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 32,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    minHeight: '100%',
   },
   content: {
-    flex: 1,
-    minHeight: '100%',
-    paddingTop: 20,
+    justifyContent: 'flex-start',
+    paddingTop: 16,
+    paddingBottom: 32,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: 24,
+    marginTop: 32,
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: colors.textPrimary,
     textAlign: 'center',
     marginBottom: 12,
-    lineHeight: 34,
+    lineHeight: 38,
+    marginTop: 16,
   },
   description: {
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
     paddingHorizontal: 8,
   },
   progressContainer: {
-    marginBottom: 40,
+    marginBottom: 24,
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   progressBar: {
     width: '100%',
@@ -699,119 +1258,148 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   stepContent: {
+    justifyContent: 'flex-start',
+    paddingHorizontal: 4,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+
+  welcomeStepContent: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 40,
+  },
+  welcomeOrbContainer: {
+    alignItems: 'center',
+    marginBottom: 60,
+  },
+  completeStepContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
     minHeight: 400,
-    paddingHorizontal: 8,
-  },
-  logoContainer: {
-    marginBottom: 40,
-    alignItems: 'center',
-  },
-  logoOuter: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoInner: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.textPrimary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.backgroundDark,
   },
   welcomeText: {
-    fontSize: 16,
+    fontSize: 17,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    lineHeight: 26,
+    paddingHorizontal: 16,
   },
   formContainer: {
     width: '100%',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
+    paddingTop: 16,
   },
   inputContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
+    width: '100%',
+  },
+  inputContainerLast: {
+    marginBottom: 8,
     width: '100%',
   },
   inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '500',
     marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   input: {
     width: '100%',
-    height: 52,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    color: colors.textPrimary,
     fontSize: 16,
+    borderWidth: 1,
+  },
+  autocompleteContainer: {
+    position: 'relative',
+    zIndex: 1000,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    borderRadius: 12,
+    marginTop: 4,
+    maxHeight: 200,
+    borderWidth: 1,
+    zIndex: 1001,
+    elevation: 5,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  suggestionsScrollView: {
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  suggestionText: {
+    fontSize: 16,
+    lineHeight: 20,
   },
   optionsContainer: {
     width: '100%',
-    gap: 16,
-    paddingHorizontal: 8,
+    gap: 10,
+    paddingHorizontal: 4,
+    marginTop: 8,
   },
   optionCard: {
-    padding: 24,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
     alignItems: 'center',
-    minHeight: 140,
+    minHeight: 100,
     justifyContent: 'center',
   },
-  optionCardSelected: {
-    backgroundColor: 'rgba(79, 140, 255, 0.2)',
-    borderColor: colors.primaryBlue,
-  },
+
   optionTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
-    color: colors.textPrimary,
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 10,
+    marginBottom: 6,
     textAlign: 'center',
-  },
-  optionTitleSelected: {
-    color: colors.primaryBlue,
   },
   optionDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
+    fontSize: 13,
     textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 12,
+    lineHeight: 18,
+    paddingHorizontal: 8,
   },
   preferencesContainer: {
     width: '100%',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
+    marginTop: 8,
   },
   preferenceSection: {
-    marginBottom: 32,
+    marginBottom: 28,
+    width: '100%',
+  },
+  preferenceSectionLast: {
+    marginBottom: 8,
     width: '100%',
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: colors.textPrimary,
     marginBottom: 20,
     textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 8,
   },
   timeOptionsContainer: {
     gap: 12,
@@ -821,22 +1409,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  timeOptionSelected: {
-    backgroundColor: 'rgba(79, 140, 255, 0.2)',
-    borderColor: colors.primaryBlue,
   },
   timeOptionText: {
     fontSize: 16,
-    color: colors.textPrimary,
     marginLeft: 12,
     fontWeight: '500',
-  },
-  timeOptionTextSelected: {
-    color: colors.primaryBlue,
   },
   sliderContainer: {
     flexDirection: 'row',
@@ -848,26 +1426,17 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 8,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
-  },
-  durationOptionSelected: {
-    backgroundColor: colors.primaryBlue,
-    borderColor: colors.primaryBlue,
   },
   durationText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  durationTextSelected: {
-    color: colors.textPrimary,
   },
   integrationsContainer: {
     width: '100%',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
+    marginTop: 8,
   },
   integrationNote: {
     fontSize: 16,
@@ -887,14 +1456,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   integrationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+  },
+  integrationIcon: {
+    width: 24,
+    height: 24,
   },
   integrationText: {
     marginLeft: 16,
@@ -903,150 +1474,230 @@ const styles = StyleSheet.create({
   integrationTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.textPrimary,
     marginBottom: 4,
   },
   integrationDescription: {
     fontSize: 14,
-    color: colors.textSecondary,
     lineHeight: 18,
   },
   integrationFooter: {
     fontSize: 14,
-    color: colors.textSecondary,
     textAlign: 'center',
     fontStyle: 'italic',
   },
-  notificationsContainer: {
-    width: '100%',
-    paddingHorizontal: 8,
-  },
-  notificationNote: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
-    paddingHorizontal: 8,
-  },
-  notificationsList: {
-    gap: 16,
-  },
-  notificationItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  notificationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  notificationText: {
-    marginLeft: 16,
-    flex: 1,
-  },
-  notificationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  notificationDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
+
   completionContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
   },
   checkmarkContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 32,
+    marginBottom: 40,
   },
   completionText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.textPrimary,
+    fontSize: 32,
+    fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 16,
-    lineHeight: 26,
-    paddingHorizontal: 8,
+    lineHeight: 38,
   },
   completionSubtext: {
-    fontSize: 14,
-    color: colors.textSecondary,
+    fontSize: 16,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 24,
+    paddingHorizontal: 16,
+  },
+  completeButtonContainer: {
+    marginTop: 40,
+    alignItems: 'center',
   },
   navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 40,
-    paddingTop: 20,
-    paddingHorizontal: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    marginTop: 8,
+    paddingTop: 4,
+    paddingHorizontal: 4,
+    gap: 16,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 44,
+    minWidth: 80,
+    borderRadius: 8,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '500',
-    color: colors.textSecondary,
     marginLeft: 8,
   },
+  nextButtonContainer: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
   nextButton: {
-    backgroundColor: colors.primaryBlue,
-    paddingVertical: 16,
-    paddingHorizontal: 28,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 44,
+    minWidth: 100,
+    borderRadius: 8,
+    gap: 8,
+  },
+  nextButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  firstPageButtonContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  firstPageButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    borderRadius: 14,
+    minHeight: 56,
     gap: 8,
-    shadowColor: colors.primaryBlue,
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
-    minWidth: 140,
+    minWidth: 180,
   },
-  nextButtonDisabled: {
-    backgroundColor: 'rgba(79, 140, 255, 0.5)',
-    shadowOpacity: 0,
-    elevation: 0,
+  firstPageButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  nextButtonFull: {
+
+  // Premium page styles
+  premiumContainer: {
+    paddingHorizontal: 4,
+    paddingTop: 8,
+  },
+  premiumBrandingSection: {
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  premiumLogoContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  premiumMainTitle: {
+    fontSize: 20,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  premiumAppName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  premiumFeaturesSection: {
+    marginTop: 12,
+    marginBottom: 24,
+    gap: 12,
+  },
+  premiumFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  premiumFeatureText: {
+    fontSize: 15,
+    lineHeight: 20,
     flex: 1,
-    marginLeft: 0,
   },
-  nextButtonText: {
-    color: colors.textPrimary,
+  premiumPlanSection: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  premiumPlanTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  premiumPlanSubtitle: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  premiumPriceCard: {
+    borderWidth: 2,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  premiumPlanName: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  premiumPrice: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginVertical: 4,
+  },
+  premiumBillingCycle: {
+    fontSize: 14,
+  },
+  premiumRadioSelected: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  premiumRadioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  premiumButtonsContainer: {
+    gap: 12,
+    marginBottom: 8,
+  },
+  premiumCtaButton: {
+    paddingVertical: 16,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  premiumCtaButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  premiumSkipButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  premiumSkipButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
 });

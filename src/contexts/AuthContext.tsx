@@ -54,8 +54,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const checkOnboardingStatus = async (userId: string) => {
     try {
-      const onboardingData = await AsyncStorage.getItem(`${ONBOARDING_KEY}_${userId}`);
-      return onboardingData === 'true';
+      // Check Supabase for authoritative onboarding completion status
+      const { data, error } = await supabase
+        .from('users')
+        .select('onboarding_completed_at')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error checking onboarding status from Supabase:', error);
+        // Fallback to AsyncStorage check
+        const onboardingData = await AsyncStorage.getItem(`${ONBOARDING_KEY}_${userId}`);
+        return onboardingData === 'true';
+      }
+
+      // User has completed onboarding if onboarding_completed_at is not null
+      const hasCompleted = !!data?.onboarding_completed_at;
+      
+      // Sync AsyncStorage with Supabase state for faster future checks
+      if (hasCompleted) {
+        await AsyncStorage.setItem(`${ONBOARDING_KEY}_${userId}`, 'true');
+      } else {
+        await AsyncStorage.removeItem(`${ONBOARDING_KEY}_${userId}`);
+      }
+      
+      return hasCompleted;
     } catch (error) {
       console.error('Error checking onboarding status:', error);
       return false;
@@ -66,6 +89,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (!user?.id) return;
     
     try {
+      // Update Supabase first (authoritative source)
+      const { error: supabaseError } = await supabase
+        .from('users')
+        .update({ onboarding_completed_at: new Date().toISOString() })
+        .eq('id', user.id);
+
+      if (supabaseError) {
+        console.error('Error updating onboarding completion in Supabase:', supabaseError);
+        // Continue with AsyncStorage update even if Supabase fails
+      }
+
+      // Update AsyncStorage for faster local checks
       await AsyncStorage.setItem(`${ONBOARDING_KEY}_${user.id}`, 'true');
       setNeedsOnboarding(false);
       console.log('✅ Onboarding marked as complete');

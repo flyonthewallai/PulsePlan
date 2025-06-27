@@ -402,19 +402,22 @@ export default function AuthScreen() {
                 )}
               </View>
 
-              <TouchableOpacity onPress={isLogin ? handleSignIn : handleSignUp} disabled={loading}>
-                <LinearGradient
-                  colors={currentTheme.id.includes('dark') ? [currentTheme.colors.primary, '#4A90E2'] : [currentTheme.colors.primary, '#63B4FF']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.authButton}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.authButtonText}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
-                  )}
-                </LinearGradient>
+              <TouchableOpacity 
+                onPress={isLogin ? handleSignIn : handleSignUp} 
+                disabled={loading}
+                style={[
+                  styles.authButton,
+                  { 
+                    backgroundColor: loading ? 'rgba(79, 140, 255, 0.6)' : currentTheme.colors.primary,
+                    opacity: loading ? 0.8 : 1,
+                  }
+                ]}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.authButtonText}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
+                )}
               </TouchableOpacity>
             
               {isLogin && (
@@ -513,15 +516,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   authButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 16,
+    minHeight: 56,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   authButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   footer: {
     marginTop: 24,
