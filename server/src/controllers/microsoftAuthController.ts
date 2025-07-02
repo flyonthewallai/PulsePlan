@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { getAuthUrl, exchangeCodeForTokens, SCOPES } from '../config/microsoft';
 import supabase from '../config/supabase';
+import { tokenService } from '../services/tokenService';
 
 /**
  * Initiates the Microsoft OAuth flow
@@ -82,22 +83,16 @@ export const handleMicrosoftCallback = async (req: Request, res: Response) => {
       .select('displayName,mail,userPrincipalName')
       .get();
     
-    // Store tokens in database
-    const { error } = await supabase
-      .from('calendar_connections')
-      .upsert({
-        user_id: userId,
-        provider: 'microsoft',
+    // Store tokens using token service (with encryption)
+    try {
+      await tokenService.storeUserTokens(userId, 'microsoft', {
         access_token: accessToken,
-        refresh_token: refreshToken || '', // Store empty string if no refresh token
-        expires_at: expiresOn ? new Date(expiresOn).toISOString() : null,
+        refresh_token: refreshToken,
+        expires_at: expiresOn ? new Date(expiresOn).toISOString() : undefined,
         scopes: SCOPES,
         email: userInfo.mail || userInfo.userPrincipalName
-      }, {
-        onConflict: 'user_id,provider'
       });
-    
-    if (error) {
+    } catch (error) {
       console.error('Error storing tokens:', error);
       return res.status(500).json({ error: 'Failed to store connection' });
     }
@@ -127,14 +122,11 @@ export const disconnectMicrosoft = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
     
-    // Delete the connection from database
-    const { error } = await supabase
-      .from('calendar_connections')
-      .delete()
-      .eq('user_id', userId)
-      .eq('provider', 'microsoft');
-    
-    if (error) {
+    // Remove tokens using token service
+    try {
+      await tokenService.removeUserTokens(userId, 'microsoft');
+    } catch (error) {
+      console.error('Error removing tokens:', error);
       return res.status(500).json({ error: 'Failed to remove connection' });
     }
     

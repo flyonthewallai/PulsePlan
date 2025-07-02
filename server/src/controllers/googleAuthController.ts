@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { google } from 'googleapis';
 import { oauth2Client, SCOPES } from '../config/google';
 import supabase from '../config/supabase';
+import { tokenService } from '../services/tokenService';
 
 /**
  * Initiates the Google OAuth flow
@@ -70,22 +71,16 @@ export const handleGoogleCallback = async (req: Request, res: Response) => {
       console.warn('No refresh token received. User may need to revoke access and try again.');
     }
     
-    // Store tokens in database
-    const { error } = await supabase
-      .from('calendar_connections')
-      .upsert({
-        user_id: userId,
-        provider: 'google',
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token || '', // Store empty string if no refresh token
-        expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
+    // Store tokens using token service (with encryption)
+    try {
+      await tokenService.storeUserTokens(userId, 'google', {
+        access_token: tokens.access_token || '',
+        refresh_token: tokens.refresh_token || undefined,
+        expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : undefined,
         scopes: SCOPES,
-        email: userInfo.data.email
-      }, {
-        onConflict: 'user_id,provider'
+        email: userInfo.data.email || undefined
       });
-    
-    if (error) {
+    } catch (error) {
       console.error('Error storing tokens:', error);
       return res.status(500).json({ error: 'Failed to store connection' });
     }
@@ -114,14 +109,11 @@ export const disconnectGoogle = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
     
-    // Delete the connection from database
-    const { error } = await supabase
-      .from('calendar_connections')
-      .delete()
-      .eq('user_id', userId)
-      .eq('provider', 'google');
-    
-    if (error) {
+    // Remove tokens using token service
+    try {
+      await tokenService.removeUserTokens(userId, 'google');
+    } catch (error) {
+      console.error('Error removing tokens:', error);
       return res.status(500).json({ error: 'Failed to remove connection' });
     }
     
