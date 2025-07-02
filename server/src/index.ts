@@ -13,6 +13,9 @@ import chatRoutes from './routes/chat';
 import canvasRoutes from './routes/canvasRoutes';
 import scrapingRoutes from './routes/scrapingRoutes';
 import cacheRoutes from './routes/cacheRoutes';
+import briefingRoutes from './routes/briefingRoutes';
+import schedulerRoutes from './routes/schedulerRoutes';
+import connectionRoutes from './routes/connectionRoutes';
 
 // Try to import agent routes with error handling
 let agentRoutes;
@@ -31,6 +34,7 @@ try {
 }
 
 import { findAvailablePort } from './utils/portUtils';
+import { emailScheduler } from '../jobs/scheduler';
 
 // Load environment variables
 dotenv.config();
@@ -111,6 +115,9 @@ app.use('/canvas', canvasRoutes);
 app.use('/scraping', scrapingRoutes);
 app.use('/agent', agentRoutes);
 app.use('/cache', cacheRoutes);
+app.use('/agents', briefingRoutes);
+app.use('/scheduler', schedulerRoutes);
+app.use('/connections', connectionRoutes);
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {
@@ -147,6 +154,15 @@ async function startServer() {
       console.log(`🔗 Microsoft OAuth callback URL: ${microsoftUrl}`);
       console.log(`🏥 Health check: http://localhost:${availablePort}/health`);
       console.log(`📊 API Base URL: http://localhost:${availablePort}`);
+      
+      // Start the email scheduler
+      try {
+        emailScheduler.start();
+        console.log('📅 Email scheduler started successfully');
+      } catch (error) {
+        console.error('❌ Failed to start email scheduler:', error);
+        // Don't exit - let the server continue running without the scheduler
+      }
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

@@ -75,13 +75,6 @@
         }
       ],
       [
-        "@react-native-async-storage/async-storage",
-        {
-          "merchantIdentifier": "merchant.com.pulseplan.app",
-          "enableGooglePay": true
-        }
-      ],
-      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "This app uses location to provide personalized recommendations and improve your experience."
@@ -96,7 +89,7 @@
       "apiPort": "5000",
 
       "supabaseUrl": "https://jwvohxsgokfcysfqhtzo.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3dm9oeHNnb2tmY3lzZnFodHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNjQwNjYsImV4cCI6MjA2Mjk0MDA2Nn0.76EqvgoCCoOwxc5KTrSqX5PLeHtB6YD2GbEjSpeOvaU"
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3dm9oeXNnb2tmY3lzZnFodHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNjQwNjYsImV4cCI6MjA2Mjk0MDA2Nn0.76EqvgoCCoOwxc5KTrSqX5PLeHtB6YD2GbEjSpeOvaU"
     }
   }
 }
