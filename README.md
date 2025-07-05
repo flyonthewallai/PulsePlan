@@ -1,8 +1,7 @@
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/0833a286-ba32-42a2-a5ca-4ae8bda63168" alt="PulsePlan" width="355"/>
-</p>
-
-# PulsePlan – AI-Powered Planner
+<div align="center">
+  <img src="https://www.pulseplan.app/assets/logo.png" alt="PulsePlan Logo" width="90px" />
+  <h1>PulsePlan – AI-Powered Planner</h1>
+</div>
 
 PulsePlan is a mobile-first academic planning assistant that integrates with Canvas, Google Calendar, Apple Calendar, and Outlook to create adaptive schedules using AI. Designed for students, it streamlines planning with intelligent time-blocking, real-time task updates, and personalized assistance.
 
