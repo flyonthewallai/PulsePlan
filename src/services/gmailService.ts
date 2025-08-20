@@ -83,7 +83,7 @@ export interface ParsedGmailMessage {
  * Handles Gmail API operations using connected Google account tokens
  */
 export class GmailService {
-  private static baseUrl = API_BASE_URL || 'http://localhost:5000';
+  private static baseUrl = API_BASE_URL;
 
   /**
    * Get Gmail messages

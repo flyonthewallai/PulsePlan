@@ -1,6 +1,7 @@
 import n8nAgentConfig from '../config/n8nAgent';
 import supabase from '../config/supabase';
 import { cacheService, CACHE_CONFIG } from './cacheService';
+import { agentStatusService } from './agentStatusService';
 
 export interface N8nAgentPayload {
   userId: string;
@@ -79,7 +80,7 @@ export class N8nAgentService {
    */
   private getTimeout(operation: 'task' | 'natural_language' | 'batch' | 'health' | 'database' | 'database_query' | 'database_batch'): number {
     const baseTimeout = this.timeout;
-    
+
     switch (operation) {
       case 'natural_language':
         return baseTimeout * 3; // 3x longer for complex AI workflows
@@ -128,10 +129,10 @@ export class N8nAgentService {
   /**
    * Get comprehensive user information with caching
    */
-  private async getUserInfo(userId: string): Promise<{ 
-    userName?: string; 
-    isPremium?: boolean; 
-    timezone?: string; 
+  private async getUserInfo(userId: string): Promise<{
+    userName?: string;
+    isPremium?: boolean;
+    timezone?: string;
     city?: string;
     school?: string;
     academicYear?: string;
@@ -149,9 +150,9 @@ export class N8nAgentService {
   }> {
     // Try cache first
     const cachedUserInfo = await cacheService.get<{
-      userName?: string; 
-      isPremium?: boolean; 
-      timezone?: string; 
+      userName?: string;
+      isPremium?: boolean;
+      timezone?: string;
       city?: string;
       school?: string;
       academicYear?: string;
@@ -167,10 +168,10 @@ export class N8nAgentService {
       avatarUrl?: string;
       lastLoginAt?: string;
     }>(
-      CACHE_CONFIG.KEYS.USER_INFO, 
+      CACHE_CONFIG.KEYS.USER_INFO,
       userId
     );
-    
+
     if (cachedUserInfo) {
       console.log(`📝 User info cache hit for user ${userId}`);
       return cachedUserInfo;
@@ -259,8 +260,8 @@ export class N8nAgentService {
         CACHE_CONFIG.TTL.USER_INFO
       );
 
-      console.log(`📊 Found and cached comprehensive user info for user ${userId}:`, { 
-        hasName: !!userInfo.userName, 
+      console.log(`📊 Found and cached comprehensive user info for user ${userId}:`, {
+        hasName: !!userInfo.userName,
         isPremium: userInfo.isPremium,
         timezone: userInfo.timezone,
         hasCity: !!userInfo.city,
@@ -268,7 +269,7 @@ export class N8nAgentService {
         userType: userInfo.userType,
         onboardingComplete: userInfo.onboardingComplete
       });
-      
+
       return userInfo;
     } catch (error) {
       console.error('Error getting user info:', error);
@@ -285,10 +286,10 @@ export class N8nAgentService {
   private async getUserConnectedAccounts(userId: string): Promise<any> {
     // Try cache first
     const cachedAccounts = await cacheService.get<any>(
-      CACHE_CONFIG.KEYS.USER_CONNECTED_ACCOUNTS, 
+      CACHE_CONFIG.KEYS.USER_CONNECTED_ACCOUNTS,
       userId
     );
-    
+
     if (cachedAccounts) {
       console.log(`📝 Connected accounts cache hit for user ${userId}`);
       return cachedAccounts;
@@ -330,7 +331,7 @@ export class N8nAgentService {
       if (!connections || connections.length === 0) {
         console.log('No connected accounts found for user:', userId);
         const emptyResult = {};
-        
+
         // Cache empty result with shorter TTL
         await cacheService.set(
           CACHE_CONFIG.KEYS.USER_CONNECTED_ACCOUNTS,
@@ -338,7 +339,7 @@ export class N8nAgentService {
           emptyResult,
           60 // 1 minute TTL for empty results
         );
-        
+
         return emptyResult;
       }
 
@@ -346,7 +347,7 @@ export class N8nAgentService {
 
       for (const connection of connections) {
         // Only include valid tokens that haven't expired
-        const isExpired = connection.expires_at ? 
+        const isExpired = connection.expires_at ?
           new Date(connection.expires_at) <= new Date() : false;
 
         if (!isExpired && connection.access_token) {
@@ -388,10 +389,10 @@ export class N8nAgentService {
     basePayload: Omit<N8nAgentPayload, 'userName' | 'isPremium' | 'city' | 'timezone'>
   ): Promise<N8nAgentPayload> {
     const userInfo = await this.getUserInfo(basePayload.userId);
-    
+
     // Destructure basePayload to maintain proper field order
     const { userId, userEmail, ...rest } = basePayload;
-    
+
     return {
       userId,
       userEmail,
@@ -408,7 +409,7 @@ export class N8nAgentService {
    */
   async postToAgent(payload: N8nAgentPayload): Promise<N8nAgentResponse> {
     const url = `${this.baseUrl}${this.webhookPath}`;
-    
+
     try {
       console.log(`Sending request to n8n agent: ${url}`);
       console.log('Payload:', JSON.stringify(payload, null, 2));
@@ -441,7 +442,7 @@ export class N8nAgentService {
       };
     } catch (error) {
       console.error('Error communicating with n8n agent:', error);
-      
+
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           return {
@@ -454,7 +455,7 @@ export class N8nAgentService {
           error: `Agent error: ${error.message}`,
         };
       }
-      
+
       return {
         success: false,
         error: 'Unknown error occurred while communicating with n8n agent',
@@ -477,7 +478,7 @@ export class N8nAgentService {
   ): Promise<N8nAgentResponse> {
     // Get user information to include in payload
     const userInfo = await this.getUserInfo(userId);
-    
+
     const payload: N8nAgentPayload = {
       userId,
       userEmail,
@@ -511,7 +512,7 @@ export class N8nAgentService {
   ): Promise<N8nAgentResponse> {
     // Get user information to include in payload
     const userInfo = await this.getUserInfo(userId);
-    
+
     const payload: N8nAgentPayload = {
       userId,
       userEmail,
@@ -536,7 +537,7 @@ export class N8nAgentService {
   async processNaturalLanguage(payload: N8nNaturalLanguagePayload): Promise<N8nAgentResponse> {
     const url = `${this.baseUrl}${this.webhookPath}`;
     const timeoutMs = this.getTimeout('natural_language');
-    
+
     try {
       // Enhance payload with user's connected accounts
       const connectedAccounts = await this.getUserConnectedAccounts(payload.userId);
@@ -593,7 +594,7 @@ export class N8nAgentService {
       };
     } catch (error) {
       console.error('Error processing query:', error);
-      
+
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           return {
@@ -606,12 +607,87 @@ export class N8nAgentService {
           error: `Agent error: ${error.message}`,
         };
       }
-      
+
       return {
         success: false,
         error: 'Unknown error occurred while communicating with n8n agent',
       };
     }
+  }
+
+  /**
+   * Send agent status update
+   */
+  async updateAgentStatus(
+    userId: string,
+    tool: string,
+    status: 'active' | 'completed' | 'error' | 'idle',
+    message?: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    try {
+      await agentStatusService.addStatusUpdate({
+        userId,
+        tool,
+        status,
+        message,
+        metadata,
+        timestamp: new Date().toISOString(),
+      });
+      console.log(`📊 Agent status updated: ${userId} - ${tool} - ${status}`);
+    } catch (error) {
+      console.error('❌ Failed to update agent status:', error);
+    }
+  }
+
+  /**
+   * Send workflow start status
+   */
+  async notifyWorkflowStart(userId: string, workflowName: string, message?: string): Promise<void> {
+    await this.updateAgentStatus(
+      userId,
+      workflowName,
+      'active',
+      message || `Starting ${workflowName} workflow...`
+    );
+  }
+
+  /**
+   * Send workflow completion status
+   */
+  async notifyWorkflowComplete(userId: string, workflowName: string, message?: string): Promise<void> {
+    await this.updateAgentStatus(
+      userId,
+      workflowName,
+      'completed',
+      message || `${workflowName} workflow completed successfully`
+    );
+  }
+
+  /**
+   * Send workflow error status
+   */
+  async notifyWorkflowError(userId: string, workflowName: string, error: string): Promise<void> {
+    await this.updateAgentStatus(
+      userId,
+      workflowName,
+      'error',
+      `Error in ${workflowName}: ${error}`
+    );
+  }
+
+  /**
+   * Send subworkflow status update
+   */
+  async notifySubworkflowStatus(
+    userId: string,
+    mainWorkflow: string,
+    subworkflow: string,
+    status: 'active' | 'completed' | 'error',
+    message?: string
+  ): Promise<void> {
+    const toolName = `${mainWorkflow} > ${subworkflow}`;
+    await this.updateAgentStatus(userId, toolName, status, message);
   }
 
   /**
@@ -638,10 +714,10 @@ export class N8nAgentService {
     basePayload: Omit<N8nNaturalLanguagePayload, 'userName' | 'isPremium' | 'city' | 'timezone'>
   ): Promise<N8nNaturalLanguagePayload> {
     const userInfo = await this.getUserInfo(basePayload.userId);
-    
+
     // Destructure basePayload to maintain proper field order
     const { userId, userEmail, ...rest } = basePayload;
-    
+
     return {
       userId,
       userEmail,

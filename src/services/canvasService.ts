@@ -18,7 +18,7 @@ export interface QRConnectionData {
 }
 
 export class CanvasService {
-  private static baseUrl = API_BASE_URL || 'http://localhost:5000';
+  private static baseUrl = API_BASE_URL;
 
   /**
    * Get Canvas integration status for the current user

@@ -2,6 +2,15 @@ import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { colors } from '../constants/theme';
 
+// Shared animation values for synchronization across all orbs
+const sharedGlowAnim = new Animated.Value(0.4);
+const sharedPulseAnim = new Animated.Value(1);
+const sharedFloatAnim = new Animated.Value(0);
+
+// Track if animations are already running
+let animationsStarted = false;
+let animationLoops: Animated.CompositeAnimation[] = [];
+
 interface GlowingOrbProps {
   size?: 'sm' | 'ms' | 'md' | 'lg';
   color?: 'lavender' | 'coral' | 'blue' | string;
@@ -11,68 +20,76 @@ interface GlowingOrbProps {
 }
 
 export const GlowingOrb = ({ size = 'md', color = 'blue', glowIntensity = 1.0, glowOpacity = 1.0, style }: GlowingOrbProps) => {
-  const glowAnim = useRef(new Animated.Value(0.4)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const floatAnim = useRef(new Animated.Value(0)).current;
+  // Use shared animation values instead of creating new ones
+  const glowAnim = sharedGlowAnim;
+  const pulseAnim = sharedPulseAnim;
+  const floatAnim = sharedFloatAnim;
 
   useEffect(() => {
-    const createGlow = () => {
-      return Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 0.8,
-          duration: 3000,
-          useNativeDriver: false,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0.4,
-          duration: 3000,
-          useNativeDriver: false,
-        }),
-      ]);
-    };
+    // Only start animations once for the first orb instance
+    if (!animationsStarted) {
+      const createGlow = () => {
+        return Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 0.7,
+            duration: 4000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0.3,
+            duration: 4000,
+            useNativeDriver: false,
+          }),
+        ]);
+      };
 
-    const createPulse = () => {
-      return Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.08,
-          duration: 2500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 2500,
-          useNativeDriver: true,
-        }),
-      ]);
-    };
+      const createPulse = () => {
+        return Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.04,
+            duration: 3000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 3000,
+            useNativeDriver: true,
+          }),
+        ]);
+      };
 
-    const createFloat = () => {
-      return Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: 1,
-          duration: 4000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 4000,
-          useNativeDriver: true,
-        }),
-      ]);
-    };
+      const createFloat = () => {
+        return Animated.sequence([
+          Animated.timing(floatAnim, {
+            toValue: 1,
+            duration: 5000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(floatAnim, {
+            toValue: 0,
+            duration: 5000,
+            useNativeDriver: true,
+          }),
+        ]);
+      };
 
-    const glowLoop = Animated.loop(createGlow());
-    const pulseLoop = Animated.loop(createPulse());
-    const floatLoop = Animated.loop(createFloat());
+      const glowLoop = Animated.loop(createGlow());
+      const pulseLoop = Animated.loop(createPulse());
+      const floatLoop = Animated.loop(createFloat());
 
-    glowLoop.start();
-    pulseLoop.start();
-    floatLoop.start();
+      animationLoops = [glowLoop, pulseLoop, floatLoop];
 
+      glowLoop.start();
+      pulseLoop.start();
+      floatLoop.start();
+
+      animationsStarted = true;
+    }
+
+    // Cleanup function - only stop animations when the last orb is unmounted
     return () => {
-      glowLoop.stop();
-      pulseLoop.stop();
-      floatLoop.stop();
+      // This is a simplified cleanup - in a real app you might want to track orb instances
+      // For now, we'll let the animations continue running
     };
   }, []);
 
@@ -95,25 +112,25 @@ export const GlowingOrb = ({ size = 'md', color = 'blue', glowIntensity = 1.0, g
     switch (color) {
       case 'lavender':
         return {
-          outerGlow: colors.accentPurple + '15', // 8% opacity
-          middleGlow: colors.accentPurple + '25', // 15% opacity
-          innerGlow: colors.accentPurple + '40', // 25% opacity
+          outerGlow: colors.accentPurple + '08', // 3% opacity
+          middleGlow: colors.accentPurple + '12', // 7% opacity
+          innerGlow: colors.accentPurple + '20', // 12% opacity
           core: colors.accentPurple,
           shadowColor: colors.accentPurple,
         };
       case 'coral':
         return {
-          outerGlow: '#FF6B6B15', // 8% opacity
-          middleGlow: '#FF6B6B25', // 15% opacity
-          innerGlow: '#FF6B6B40', // 25% opacity
+          outerGlow: '#FF6B6B08', // 3% opacity
+          middleGlow: '#FF6B6B12', // 7% opacity
+          innerGlow: '#FF6B6B20', // 12% opacity
           core: '#FF6B6B',
           shadowColor: '#FF6B6B',
         };
       case 'blue':
         return {
-          outerGlow: colors.primaryBlue + '15', // 8% opacity
-          middleGlow: colors.primaryBlue + '25', // 15% opacity
-          innerGlow: colors.primaryBlue + '40', // 25% opacity
+          outerGlow: colors.primaryBlue + '08', // 3% opacity
+          middleGlow: colors.primaryBlue + '12', // 7% opacity
+          innerGlow: colors.primaryBlue + '20', // 12% opacity
           core: colors.primaryBlue,
           shadowColor: colors.primaryBlue,
         };
@@ -121,9 +138,9 @@ export const GlowingOrb = ({ size = 'md', color = 'blue', glowIntensity = 1.0, g
         // Handle custom color strings
         const customColor = typeof color === 'string' ? color : colors.primaryBlue;
         return {
-          outerGlow: customColor + '15', // 8% opacity
-          middleGlow: customColor + '25', // 15% opacity
-          innerGlow: customColor + '40', // 25% opacity
+          outerGlow: customColor + '08', // 3% opacity
+          middleGlow: customColor + '12', // 7% opacity
+          innerGlow: customColor + '20', // 12% opacity
           core: customColor,
           shadowColor: customColor,
         };
@@ -132,7 +149,7 @@ export const GlowingOrb = ({ size = 'md', color = 'blue', glowIntensity = 1.0, g
 
   const sizeStyles = getSizeStyles();
   const colorStyles = getColorStyles();
-  const coreSize = Math.floor(Math.min(sizeStyles.width, sizeStyles.height) * 0.3);
+  const coreSize = Math.floor(Math.min(sizeStyles.width, sizeStyles.height) * 0.25);
 
   return (
     <Animated.View
@@ -145,7 +162,7 @@ export const GlowingOrb = ({ size = 'md', color = 'blue', glowIntensity = 1.0, g
             { 
               translateY: floatAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, -2],
+                outputRange: [0, -1],
               })
             }
           ],
@@ -158,18 +175,18 @@ export const GlowingOrb = ({ size = 'md', color = 'blue', glowIntensity = 1.0, g
         style={[
           styles.glowLayer,
           {
-            width: sizeStyles.width * (2.5 * glowIntensity),
-            height: sizeStyles.height * (2.5 * glowIntensity),
+            width: sizeStyles.width * (1.8 * glowIntensity),
+            height: sizeStyles.height * (1.8 * glowIntensity),
             backgroundColor: colorStyles.outerGlow,
             shadowColor: colorStyles.shadowColor,
-            shadowRadius: 40 * glowIntensity,
+            shadowRadius: 20 * glowIntensity,
             shadowOpacity: glowAnim.interpolate({
-              inputRange: [0.4, 0.8],
-              outputRange: [0.1 * glowOpacity, 0.3 * glowOpacity],
+              inputRange: [0.3, 0.7],
+              outputRange: [0.05 * glowOpacity, 0.15 * glowOpacity],
             }),
             opacity: glowAnim.interpolate({
-              inputRange: [0.4, 0.8],
-              outputRange: [0.3 * glowOpacity, 0.6 * glowOpacity],
+              inputRange: [0.3, 0.7],
+              outputRange: [0.2 * glowOpacity, 0.4 * glowOpacity],
             }),
           },
         ]}
@@ -180,18 +197,18 @@ export const GlowingOrb = ({ size = 'md', color = 'blue', glowIntensity = 1.0, g
         style={[
           styles.glowLayer,
           {
-            width: sizeStyles.width * (1.8 * glowIntensity),
-            height: sizeStyles.height * (1.8 * glowIntensity),
+            width: sizeStyles.width * (1.4 * glowIntensity),
+            height: sizeStyles.height * (1.4 * glowIntensity),
             backgroundColor: colorStyles.middleGlow,
             shadowColor: colorStyles.shadowColor,
-            shadowRadius: 25 * glowIntensity,
+            shadowRadius: 12 * glowIntensity,
             shadowOpacity: glowAnim.interpolate({
-              inputRange: [0.4, 0.8],
-              outputRange: [0.2 * glowOpacity, 0.5 * glowOpacity],
+              inputRange: [0.3, 0.7],
+              outputRange: [0.1 * glowOpacity, 0.25 * glowOpacity],
             }),
             opacity: glowAnim.interpolate({
-              inputRange: [0.4, 0.8],
-              outputRange: [0.4 * glowOpacity, 0.7 * glowOpacity],
+              inputRange: [0.3, 0.7],
+              outputRange: [0.3 * glowOpacity, 0.5 * glowOpacity],
             }),
           },
         ]}
@@ -202,18 +219,18 @@ export const GlowingOrb = ({ size = 'md', color = 'blue', glowIntensity = 1.0, g
         style={[
           styles.glowLayer,
           {
-            width: sizeStyles.width * (1.3 * glowIntensity),
-            height: sizeStyles.height * (1.3 * glowIntensity),
+            width: sizeStyles.width * (1.1 * glowIntensity),
+            height: sizeStyles.height * (1.1 * glowIntensity),
             backgroundColor: colorStyles.innerGlow,
             shadowColor: colorStyles.shadowColor,
-            shadowRadius: 15 * glowIntensity,
+            shadowRadius: 8 * glowIntensity,
             shadowOpacity: glowAnim.interpolate({
-              inputRange: [0.4, 0.8],
-              outputRange: [0.3 * glowOpacity, 0.6 * glowOpacity],
+              inputRange: [0.3, 0.7],
+              outputRange: [0.15 * glowOpacity, 0.3 * glowOpacity],
             }),
             opacity: glowAnim.interpolate({
-              inputRange: [0.4, 0.8],
-              outputRange: [0.5 * glowOpacity, 0.8 * glowOpacity],
+              inputRange: [0.3, 0.7],
+              outputRange: [0.4 * glowOpacity, 0.6 * glowOpacity],
             }),
           },
         ]}
@@ -227,11 +244,11 @@ export const GlowingOrb = ({ size = 'md', color = 'blue', glowIntensity = 1.0, g
           {
             backgroundColor: colorStyles.core,
             shadowColor: colorStyles.shadowColor,
-            shadowRadius: 8 * glowIntensity,
-            shadowOpacity: 0.8 * glowOpacity,
+            shadowRadius: 4 * glowIntensity,
+            shadowOpacity: 0.4 * glowOpacity,
             opacity: glowAnim.interpolate({
-              inputRange: [0.4, 0.8],
-              outputRange: [0.6 * glowOpacity, 0.9 * glowOpacity],
+              inputRange: [0.3, 0.7],
+              outputRange: [0.5 * glowOpacity, 0.7 * glowOpacity],
             }),
           },
         ]}
@@ -264,13 +281,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: 1000,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 20,
+    elevation: 8,
   },
   core: {
     borderRadius: 1000,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 10,
+    shadowOpacity: 0.6,
+    shadowRadius: 2,
+    elevation: 4,
   },
 }); 

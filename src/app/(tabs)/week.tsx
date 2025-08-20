@@ -104,7 +104,7 @@ export default function WeekScreen() {
             style={styles.titleContainer}
             onPress={() => setShowMonthView(true)}
           >
-            <Calendar size={28} color={currentTheme.colors.textPrimary} />
+            <Calendar size={28} color={currentTheme.colors.textSecondary} />
           </TouchableOpacity>
           
           <View style={styles.weekSelector}>
@@ -276,13 +276,17 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   monthTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '500',
+    marginBottom: 2,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   weekTitle: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '400',
+    opacity: 0.7,
+    letterSpacing: 0.3,
   },
   daysContainer: {
     flexDirection: 'row',

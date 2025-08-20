@@ -54,7 +54,7 @@ export default function NotesIntegrationScreen() {
 
         <View style={styles.sectionContainer}>
           <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>SIGN IN WITH YOUR PROVIDER</Text>
-          <View style={[styles.sectionBody, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+          <View style={[styles.sectionBody, { backgroundColor: currentTheme.colors.surface }]}>
             <SettingsRow 
               icon={<Image source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/4/45/Notion_app_logo.png' }} style={styles.providerIcon} />} 
               title="Add Notion Account" 
@@ -127,7 +127,6 @@ const styles = StyleSheet.create({
   sectionBody: {
     borderRadius: 10,
     overflow: 'hidden',
-    borderWidth: 1,
   },
   row: {
     flexDirection: 'row',

@@ -119,7 +119,7 @@ export default function WeeklyPulseScreen() {
         </Text>
 
         {/* General Settings */}
-        <View style={[styles.settingsCard, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+        <View style={[styles.settingsCard, { backgroundColor: currentTheme.colors.surface }]}>
           <View style={styles.settingRow}>
             <View style={styles.settingLeft}>
               <Mail size={20} color={currentTheme.colors.textSecondary} />
@@ -178,7 +178,7 @@ export default function WeeklyPulseScreen() {
            <>
 
              {/* Newspaper Structure */}
-             <View style={[styles.newspaperContainer, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+             <View style={[styles.newspaperContainer, { backgroundColor: currentTheme.colors.surface }]}>
                <View style={styles.newspaperHeader}>
                  <Text style={[styles.newspaperTitle, { color: currentTheme.colors.textPrimary }]}>The Weekly Pulse</Text>
                  <Text style={[styles.newspaperSubtitle, { color: currentTheme.colors.textSecondary }]}>Your Personalized Academic Digest</Text>
@@ -275,7 +275,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 20,
     borderRadius: 12,
-    borderWidth: 1,
     overflow: 'hidden',
   },
   settingRow: {
@@ -331,7 +330,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 20,
     borderRadius: 16,
-    borderWidth: 2,
     overflow: 'hidden',
   },
   newspaperHeader: {
@@ -365,7 +363,6 @@ const styles = StyleSheet.create({
   },
   textInputContainer: {
     borderRadius: 8,
-    borderWidth: 1,
     padding: 12,
     minHeight: 80,
   },

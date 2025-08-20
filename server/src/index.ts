@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
@@ -16,6 +17,9 @@ import cacheRoutes from './routes/cacheRoutes';
 import briefingRoutes from './routes/briefingRoutes';
 import schedulerRoutes from './routes/schedulerRoutes';
 import connectionRoutes from './routes/connectionRoutes';
+import agentStatusRoutes from './routes/agentStatusRoutes';
+import n8nStatusRoutes from './routes/n8nStatusRoutes';
+import { websocketService } from './services/websocketService';
 
 // Try to import agent routes with error handling
 let agentRoutes;
@@ -118,6 +122,8 @@ app.use('/cache', cacheRoutes);
 app.use('/agents', briefingRoutes);
 app.use('/scheduler', schedulerRoutes);
 app.use('/connections', connectionRoutes);
+app.use('/api/agent-status', agentStatusRoutes);
+app.use('/api/n8n/status', n8nStatusRoutes);
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {
@@ -132,7 +138,13 @@ async function startServer() {
   try {
     const availablePort = await findAvailablePort(PORT);
     
-    app.listen(availablePort, '0.0.0.0', () => {
+    // Create HTTP server for WebSocket support
+    const server = createServer(app);
+    
+    // Initialize WebSocket service
+    websocketService.initialize(server);
+    
+    server.listen(availablePort, '0.0.0.0', () => {
       console.log(`🚀 Server successfully started on port ${availablePort}`);
       console.log(`🌐 Server accessible at:`);
       console.log(`   - http://localhost:${availablePort}`);

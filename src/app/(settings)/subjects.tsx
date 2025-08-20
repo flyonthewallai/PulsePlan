@@ -16,8 +16,7 @@ const SubjectCard = ({ subject, onPress }: { subject: Subject; onPress: () => vo
             style={[
                 styles.subjectCard, 
                 { 
-                    backgroundColor: currentTheme.colors.surface,
-                    borderColor: currentTheme.colors.border
+                    backgroundColor: currentTheme.colors.surface
                 }
             ]}
             onPress={onPress}
@@ -185,7 +184,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderWidth: 1,
     },
     subjectCardContent: {
         flex: 1,

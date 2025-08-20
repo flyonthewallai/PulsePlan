@@ -125,7 +125,7 @@ export default function BriefingsScreen() {
         </Text>
 
         {/* General Settings */}
-        <View style={[styles.settingsCard, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+        <View style={[styles.settingsCard, { backgroundColor: currentTheme.colors.surface }]}>
           <View style={styles.settingRow}>
             <View style={styles.settingLeft}>
               <Bell size={20} color={currentTheme.colors.textSecondary} />
@@ -187,7 +187,7 @@ export default function BriefingsScreen() {
         {isEnabled && (
           <>
             {/* Morning Briefing Structure */}
-            <View style={[styles.briefingContainer, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+            <View style={[styles.briefingContainer, { backgroundColor: currentTheme.colors.surface }]}>
               <View style={styles.briefingHeader}>
                 <Text style={[styles.briefingTitle, { color: currentTheme.colors.textPrimary }]}>
                   Good Morning {getUserName()}
@@ -280,7 +280,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 20,
     borderRadius: 12,
-    borderWidth: 1,
     overflow: 'hidden',
   },
   settingRow: {
@@ -323,7 +322,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 20,
     borderRadius: 16,
-    borderWidth: 2,
     overflow: 'hidden',
   },
   briefingHeader: {
@@ -355,7 +353,6 @@ const styles = StyleSheet.create({
   },
   textInputContainer: {
     borderRadius: 8,
-    borderWidth: 1,
     padding: 12,
     minHeight: 60,
   },

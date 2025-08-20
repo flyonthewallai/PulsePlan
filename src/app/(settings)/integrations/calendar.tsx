@@ -249,7 +249,6 @@ const styles = StyleSheet.create({
   sectionBody: {
     borderRadius: 10,
     overflow: 'hidden',
-    borderWidth: 1,
   },
   row: {
     flexDirection: 'row',

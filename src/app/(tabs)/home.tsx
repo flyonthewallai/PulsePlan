@@ -62,7 +62,9 @@ export default function HomeScreen() {
         {/* Header with Greeting and Progress */}
         <View style={styles.header}>
           <View>
-            <Text style={[styles.greeting, { color: currentTheme.colors.textPrimary }]}>{getGreeting()}, Conner</Text>
+            <Text style={[styles.greeting, { color: currentTheme.colors.textPrimary }]}>
+              {getGreeting()}, <Text style={[styles.name, { color: currentTheme.colors.textPrimary }]}>Conner</Text>
+            </Text>
             <Text style={[styles.date, { color: currentTheme.colors.textSecondary }]}>
               {new Date().toLocaleDateString('en-US', { 
                 weekday: 'long',
@@ -154,9 +156,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   greeting: {
-    fontSize: 24,
+    fontSize: 18,
+    fontWeight: '500',
+    marginBottom: 2,
+    opacity: 0.8,
+  },
+  name: {
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 4,
   },
   date: {
     fontSize: 16,

@@ -47,7 +47,10 @@ router.get('/status/:userId', async (req, res) => {
     const { userId } = req.params;
     
     // Use the same connection status logic as calendar
-    const response = await fetch(`http://localhost:5000/calendar/status/${userId}`);
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://api.pulseplan.app' 
+      : `http://localhost:${process.env.PORT || 5000}`;
+    const response = await fetch(`${baseUrl}/calendar/status/${userId}`);
     const status = await response.json();
     
     // Filter to only show Google connections and add Gmail-specific messaging

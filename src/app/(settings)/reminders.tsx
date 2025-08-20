@@ -11,7 +11,7 @@ const SettingsSection = ({ title, children }: { title: string; children: React.R
   return (
     <View style={styles.sectionContainer}>
       <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>{title.toUpperCase()}</Text>
-      <View style={[styles.sectionBody, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+              <View style={[styles.sectionBody, { backgroundColor: currentTheme.colors.surface }]}>
         {children}
       </View>
     </View>
@@ -204,7 +204,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginHorizontal: 16,
     overflow: 'hidden',
-    borderWidth: 1,
   },
   fieldContainer: {
     flexDirection: 'row',

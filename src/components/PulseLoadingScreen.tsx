@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, Image } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { CachedImage } from './CachedImage';
 
 interface PulseLoadingScreenProps {
   visible?: boolean;
@@ -16,8 +17,8 @@ export default function PulseLoadingScreen({
 
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
-      <Image 
-        source={require('@/assets/images/icon.png')} 
+      <CachedImage 
+        imageKey="icon" 
         style={styles.icon}
         resizeMode="contain"
       />

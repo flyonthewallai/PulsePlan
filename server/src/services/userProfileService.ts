@@ -33,10 +33,10 @@ export class UserProfileService {
   async getUserProfile(userId: string): Promise<UserProfile | null> {
     // Try cache first
     const cachedProfile = await cacheService.get<UserProfile>(
-      CACHE_CONFIG.KEYS.USER_INFO, 
+      CACHE_CONFIG.KEYS.USER_INFO,
       userId
     );
-    
+
     if (cachedProfile) {
       console.log(`📝 User profile cache hit for user ${userId}`);
       return cachedProfile;
@@ -122,8 +122,8 @@ export class UserProfileService {
         CACHE_CONFIG.TTL.USER_INFO
       );
 
-      console.log(`📊 Found and cached user profile for user ${userId}:`, { 
-        hasName: !!userProfile.name, 
+      console.log(`📊 Found and cached user profile for user ${userId}:`, {
+        hasName: !!userProfile.name,
         isPremium: userProfile.isPremium,
         timezone: userProfile.timezone,
         hasCity: !!userProfile.city,
@@ -131,7 +131,7 @@ export class UserProfileService {
         userType: userProfile.userType,
         onboardingComplete: userProfile.onboardingComplete
       });
-      
+
       return userProfile;
     } catch (error) {
       console.error('Error in getUserProfile:', error);
@@ -187,7 +187,7 @@ export class UserProfileService {
       await cacheService.delete(CACHE_CONFIG.KEYS.USER_INFO, userId);
 
       console.log(`✅ User profile updated for user ${userId}:`, Object.keys(updates));
-      
+
       // Return the updated profile (will be fetched fresh from cache next time)
       return this.getUserProfile(userId);
     } catch (error) {

@@ -7,7 +7,12 @@ export const navigationAnimations = {
     animationTypeForReplace: 'push' as const,
   },
   
-  // Smooth fade for tab switches and quick transitions
+  // No animation for tab switches - standard for major apps
+  noAnimation: {
+    animation: 'none' as const,
+  },
+  
+  // Smooth fade for quick transitions (deprecated for tabs)
   fade: {
     animation: 'fade' as const,
     animationDuration: 200,

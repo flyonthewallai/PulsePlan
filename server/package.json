@@ -11,7 +11,8 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "ports": "lsof -i :5000-5010",
-    "test:n8n": "ts-node src/scripts/test-n8n-agent.ts"
+    "test:n8n": "ts-node src/scripts/test-n8n-agent.ts",
+    "test:status": "node test-n8n-status.js"
   },
   "keywords": [
     "pulseplan",
