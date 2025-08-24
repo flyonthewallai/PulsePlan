@@ -1,7 +1,7 @@
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/0833a286-ba32-42a2-a5ca-4ae8bda63168" alt="PulsePlan" width="355"/>
+<div align="center">
+  <img src="https://www.pulseplan.app/assets/logo.png" alt="PulsePlan Logo" width="90px" />
   <h1>PulsePlan – AI-Powered Academic Planner</h1>
-</p>
+</div>
 
 PulsePlan is an intelligent academic planning assistant powered by LangGraph agents that integrates with Canvas, Google Calendar, Microsoft Outlook, and other academic platforms. Built for students, it provides conversational AI assistance, automated scheduling, and comprehensive productivity analytics through a sophisticated multi-agent system.
 
