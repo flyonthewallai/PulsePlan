@@ -73,11 +73,11 @@
   },
   "resolutions": {
     "buffer": "^6.0.3",
-    "on-headers": "^1.0.3"
+    "on-headers": "^1.0.4"
   },
   "overrides": {
-    "on-headers": "^1.0.3",
-    "form-data": "^4.0.1"
+    "on-headers": "^1.0.4",
+    "form-data": "^4.0.2"
   },
   "private": true,
   "keywords": [],

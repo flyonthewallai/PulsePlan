@@ -1,7 +1,7 @@
 # FastAPI and server
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-gunicorn==22.0.0
+gunicorn==22.0.1
 
 # Database and ORM
 supabase==2.0.2
@@ -12,7 +12,7 @@ pydantic==2.5.0
 pydantic-settings==2.1.0
 
 # Security and authentication
-cryptography==42.0.0
+cryptography==42.0.5
 PyJWT==2.8.0
 passlib[bcrypt]==1.7.4
 
@@ -34,11 +34,11 @@ python-socketio==5.10.0
 
 # LangGraph and AI workflows
 langgraph==0.0.62
-langchain-core==0.2.0
+langchain-core==0.2.38
 langchain-openai==0.1.7
 
 # Monitoring and observability
-sentry-sdk[fastapi]==1.45.0
+sentry-sdk[fastapi]==1.48.0
 structlog==23.2.0
 
 # AWS (for future KMS integration)
