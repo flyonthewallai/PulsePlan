@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Platform, Image } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
@@ -26,6 +27,7 @@ import {
   Heart,
   Newspaper,
   Mail,
+  Lightbulb,
 } from 'lucide-react-native';
 
 import { useTheme } from '@/contexts/ThemeContext';
@@ -302,31 +304,31 @@ export default function SettingsScreen() {
         
         <SettingsSection title="Integrations">
           <SettingsRow 
-            icon={<Image source={require('@/assets/images/applecalendar.png')} style={{ width: 20, height: 20 }} />} 
+            icon={<CachedImage imageKey="applecalendar" style={{ width: 20, height: 20 }} />} 
             title="Calendar" 
             value="Not Connected" 
             onPress={() => router.push('/(settings)/integrations/calendar')} 
           />
           <SettingsRow 
-            icon={<Image source={require('@/assets/images/gmail.png')} style={{ width: 20, height: 20 }} />} 
+            icon={<CachedImage imageKey="gmail" style={{ width: 20, height: 20 }} />} 
             title="Mail" 
             value="Not Connected" 
             onPress={() => router.push('/(settings)/integrations/mail')} 
           />
           <SettingsRow 
-            icon={<Image source={require('@/assets/images/applecontacts.webp')} style={{ width: 20, height: 20 }} />} 
+            icon={<CachedImage imageKey="applecontacts" style={{ width: 20, height: 20 }} />} 
             title="Contacts" 
             value="Not Connected" 
             onPress={() => router.push('/(settings)/integrations/contacts')} 
           />
           <SettingsRow 
-            icon={<Image source={require('@/assets/images/canvas.png')} style={{ width: 20, height: 20 }} />} 
+            icon={<CachedImage imageKey="canvas" style={{ width: 20, height: 20 }} />} 
             title="Canvas" 
             value="Not Connected" 
             onPress={() => router.push('/(settings)/integrations/canvas')} 
           />
           <SettingsRow 
-            icon={<Image source={require('@/assets/images/notion.png')} style={{ width: 20, height: 20 }} />} 
+            icon={<CachedImage imageKey="notion" style={{ width: 20, height: 20 }} />} 
             title="Notes" 
             value="Not Connected" 
             onPress={() => router.push('/(settings)/integrations/notes')} 
@@ -343,7 +345,8 @@ export default function SettingsScreen() {
                 : () => setIsSubscriptionModalVisible(true)
               } 
             />
-            <SettingsRow icon={<LifeBuoy color={currentTheme.colors.textSecondary} size={20} />} title="Help Center" onPress={() => {}} />
+            <SettingsRow icon={<Lightbulb color={currentTheme.colors.textSecondary} size={20} />} title="Feature Requests" onPress={() => Linking.openURL('https://pulseplan.featurebase.app/')} />
+            <SettingsRow icon={<Star color={currentTheme.colors.textSecondary} size={20} />} title="Leave a Review" onPress={() => {}} />
             <SettingsRow 
               icon={<Shield color={currentTheme.colors.textSecondary} size={20} />} 
               title="Privacy Policy" 

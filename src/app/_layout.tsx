@@ -12,9 +12,23 @@ import { useAuth } from '../contexts/AuthContext';
 import { ProfileProvider } from '../contexts/ProfileContext';
 import { SubjectsProvider } from '../contexts/SubjectsContext';
 import { navigationAnimations } from '../config/animations';
+import { imageCacheService } from '../services/imageCacheService';
 
 function AppWithTheme() {
   const { currentTheme } = useTheme();
+  
+  // Initialize image cache on app startup
+  useEffect(() => {
+    const initializeImageCache = async () => {
+      try {
+        await imageCacheService.initialize();
+      } catch (error) {
+        console.error('Failed to initialize image cache:', error);
+      }
+    };
+    
+    initializeImageCache();
+  }, []);
   
   return (
     <>
@@ -39,7 +53,7 @@ function AppWithTheme() {
         />
         <Stack.Screen 
           name="(tabs)" 
-          options={navigationAnimations.fade} 
+          options={navigationAnimations.noAnimation} 
         />
         <Stack.Screen 
           name="(settings)" 

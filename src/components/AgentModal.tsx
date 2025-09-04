@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Send, Calendar, Clock, Zap, BarChart3, CheckCircle2, BrainCircuit, ArrowUp } from 'lucide-react-native';
+import { X, Send, Calendar, Clock, Zap, BarChart3, CheckCircle2, BrainCircuit, ArrowUp } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { GlowingOrb } from './GlowingOrb';
@@ -377,7 +377,7 @@ export default function AIAssistantModal({ visible, onClose }: AIAssistantModalP
       <View style={[styles.modalContainer, { backgroundColor: currentTheme.colors.background }]}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <ArrowLeft color={currentTheme.colors.textSecondary} size={24} />
+            <X color={currentTheme.colors.textSecondary} size={24} />
           </TouchableOpacity>
           
           <View style={styles.aiInfo}>

@@ -488,7 +488,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 14,
     borderRadius: 12,
-    borderWidth: 1,
     gap: 8,
   },
   timeOptionText: {

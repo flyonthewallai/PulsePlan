@@ -22,7 +22,7 @@ class EnhancedAgentService {
   ): Promise<any> {
     try {
       const url = `${this.baseURL}${endpoint}`;
-      
+
       const config: AxiosRequestConfig = {
         method: 'POST',
         url,
@@ -41,7 +41,7 @@ class EnhancedAgentService {
       });
 
       const response = await axios(config);
-      
+
       logger.info(`Agent request successful for ${endpoint}`, {
         userId: payload.userId,
         status: response.status
@@ -68,10 +68,10 @@ class EnhancedAgentService {
     try {
       // Get user tokens
       const userTokens = await tokenService.getUserTokensForAgent(userId);
-      
+
       // Build connected accounts object
       const connectedAccounts: AgentPayloadWithTokens['connectedAccounts'] = {};
-      
+
       if (userTokens.google) {
         connectedAccounts.google = {
           access_token: userTokens.google.access_token,
@@ -81,7 +81,7 @@ class EnhancedAgentService {
           email: undefined // Will be populated if needed
         };
       }
-      
+
       if (userTokens.microsoft) {
         connectedAccounts.microsoft = {
           access_token: userTokens.microsoft.access_token,
@@ -91,7 +91,7 @@ class EnhancedAgentService {
           email: undefined // Will be populated if needed
         };
       }
-      
+
       if (userTokens.canvas) {
         connectedAccounts.canvas = {
           access_token: userTokens.canvas.access_token,
@@ -100,7 +100,7 @@ class EnhancedAgentService {
           scopes: userTokens.canvas.scopes
         };
       }
-      
+
       if (userTokens.notion) {
         connectedAccounts.notion = {
           access_token: userTokens.notion.access_token,
@@ -121,7 +121,7 @@ class EnhancedAgentService {
       return enhancedPayload;
     } catch (error) {
       logger.error(`Error preparing payload with tokens for user ${userId}`, error);
-      
+
       // Return payload without tokens on error
       return {
         ...basePayload,

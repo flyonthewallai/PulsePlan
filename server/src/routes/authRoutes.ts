@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { 
+import {
   initiateGoogleAuth,
   handleGoogleCallback,
   disconnectGoogle
@@ -121,11 +121,11 @@ setInterval(() => {
 router.post('/qr-init', qrAuthRateLimit, (req, res) => {
   try {
     const { sessionId, extensionId } = req.body;
-    
+
     if (!sessionId || !extensionId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    
+
     // Create new QR session
     const session = {
       sessionId,
@@ -136,16 +136,16 @@ router.post('/qr-init', qrAuthRateLimit, (req, res) => {
       token: null,
       userId: null
     };
-    
+
     qrSessions.set(sessionId, session);
     console.log(`🎯 QR Session ${sessionId} initialized`);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       sessionId,
       expiresAt: session.expiresAt
     });
-    
+
   } catch (error) {
     console.error('QR init error:', error);
     res.status(500).json({ error: 'Failed to initialize QR session' });
@@ -160,35 +160,35 @@ router.post('/qr-init', qrAuthRateLimit, (req, res) => {
 router.get('/qr-status/:sessionId', qrAuthRateLimit, (req, res) => {
   try {
     const { sessionId } = req.params;
-    
+
     if (!sessionId) {
       return res.status(400).json({ error: 'Session ID required' });
     }
-    
+
     const session = qrSessions.get(sessionId);
-    
+
     if (!session) {
-      return res.json({ 
-        authenticated: false, 
-        error: 'Session not found or expired' 
+      return res.json({
+        authenticated: false,
+        error: 'Session not found or expired'
       });
     }
-    
+
     if (Date.now() > session.expiresAt) {
       qrSessions.delete(sessionId);
-      return res.json({ 
-        authenticated: false, 
-        error: 'Session expired' 
+      return res.json({
+        authenticated: false,
+        error: 'Session expired'
       });
     }
-    
+
     res.json({
       authenticated: session.authenticated,
       token: session.authenticated ? session.token : null,
       userId: session.authenticated ? session.userId : null,
       expiresAt: session.expiresAt
     });
-    
+
   } catch (error) {
     console.error('QR status error:', error);
     res.status(500).json({ error: 'Failed to check session status' });
@@ -203,40 +203,40 @@ router.get('/qr-status/:sessionId', qrAuthRateLimit, (req, res) => {
 router.post('/qr-authenticate', qrAuthRateLimit, async (req, res) => {
   try {
     const { sessionId, userToken, userId } = req.body;
-    
+
     if (!sessionId || !userToken || !userId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    
+
     const session = qrSessions.get(sessionId);
-    
+
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
-    
+
     if (Date.now() > session.expiresAt) {
       qrSessions.delete(sessionId);
       return res.status(410).json({ error: 'Session expired' });
     }
-    
+
     if (session.authenticated) {
       return res.status(409).json({ error: 'Session already authenticated' });
     }
-    
+
     // Update session with authentication
     session.authenticated = true;
     session.token = userToken;
     session.userId = userId;
     session.authenticatedAt = Date.now();
-    
+
     console.log(`✅ QR Session ${sessionId} authenticated for user ${userId}`);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: 'Authentication successful',
-      sessionId 
+      sessionId
     });
-    
+
   } catch (error) {
     console.error('QR authenticate error:', error);
     res.status(500).json({ error: 'Authentication failed' });
@@ -249,7 +249,7 @@ router.post('/qr-authenticate', qrAuthRateLimit, async (req, res) => {
  * @access  Public
  */
 router.get('/qr-test', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'QR Auth service is running',
     timestamp: new Date().toISOString(),
     activeSessions: qrSessions.size

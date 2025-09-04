@@ -530,7 +530,7 @@ export default function AgentScreen() {
 
   return (
     <KeyboardAvoidingView 
-      style={styles.container} 
+      style={[styles.container, { backgroundColor: currentTheme.colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
@@ -538,7 +538,7 @@ export default function AgentScreen() {
         <Header />
         <ScrollView 
           ref={scrollViewRef}
-          style={styles.scrollView}
+          style={[styles.scrollView, { backgroundColor: currentTheme.colors.background }]}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
@@ -653,7 +653,7 @@ export default function AgentScreen() {
               }]}
               placeholder="Message"
               placeholderTextColor={currentTheme.colors.textSecondary}
-              keyboardAppearance="default"
+              keyboardAppearance="dark"
               returnKeyType="send"
               enablesReturnKeyAutomatically={true}
               multiline

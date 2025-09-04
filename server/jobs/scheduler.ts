@@ -17,7 +17,7 @@ export class EmailScheduler {
       'SUPABASE_URL',
       'SUPABASE_SERVICE_KEY',
       'RESEND_API_KEY',
-      'AGENT_API_BASE_URL'
+      'N8N_AGENT_URL'
     ];
 
     const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);

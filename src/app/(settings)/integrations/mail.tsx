@@ -8,6 +8,7 @@ import { ChevronLeft, Mail as MailIcon, Check } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { GmailService } from '@/services/gmailService';
+import { getApiUrl } from '@/config/api';
 
 const SettingsRow = ({
   icon,
@@ -81,7 +82,7 @@ export default function MailIntegrationScreen() {
     try {
       setIsLoading(true);
       // Use the same connection status endpoint as calendar since they share the same OAuth tokens
-      const response = await fetch(`http://localhost:5000/calendar/status/${user.id}`);
+      const response = await fetch(getApiUrl(`/calendar/status/${user.id}`));
       if (response.ok) {
         const status = await response.json();
         setConnectionStatus(status);
@@ -102,7 +103,7 @@ export default function MailIntegrationScreen() {
     try {
       setIsConnecting({ ...isConnecting, google: true });
       // Use the Gmail-specific OAuth endpoint
-      const url = `http://localhost:5000/gmail/auth?userId=${encodeURIComponent(user.id)}`;
+      const url = `${getApiUrl('/gmail/auth')}?userId=${encodeURIComponent(user.id)}`;
       
       // Open OAuth URL
       if (typeof window !== 'undefined' && window.location) {
@@ -128,7 +129,7 @@ export default function MailIntegrationScreen() {
 
     try {
       setIsConnecting({ ...isConnecting, microsoft: true });
-      const url = `http://localhost:5000/auth/microsoft?userId=${encodeURIComponent(user.id)}`;
+      const url = `${getApiUrl('/auth/microsoft')}?userId=${encodeURIComponent(user.id)}`;
       
       // Open OAuth URL
       if (typeof window !== 'undefined' && window.location) {
@@ -174,7 +175,7 @@ export default function MailIntegrationScreen() {
 
         <View style={styles.sectionContainer}>
           <Text style={[styles.sectionTitle, { color: currentTheme.colors.textSecondary }]}>SIGN IN WITH YOUR PROVIDER</Text>
-          <View style={[styles.sectionBody, { backgroundColor: currentTheme.colors.surface, borderColor: currentTheme.colors.border }]}>
+          <View style={[styles.sectionBody, { backgroundColor: currentTheme.colors.surface }]}>
             <SettingsRow 
               icon={<Image source={require('@/assets/images/gmail.png')} style={styles.providerIcon} />} 
               title="Add Google Account" 
@@ -265,7 +266,6 @@ const styles = StyleSheet.create({
   sectionBody: {
     borderRadius: 10,
     overflow: 'hidden',
-    borderWidth: 1,
   },
   row: {
     flexDirection: 'row',

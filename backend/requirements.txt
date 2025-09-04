@@ -1,0 +1,57 @@
+# FastAPI and server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+gunicorn==22.0.1
+
+# Database and ORM
+supabase==2.0.2
+asyncpg==0.29.0
+
+# Validation and serialization
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Security and authentication
+cryptography==42.0.5
+PyJWT==2.8.0
+passlib[bcrypt]==1.7.4
+
+# Redis and caching
+redis[hiredis]==5.0.1
+
+# Scheduling and timezone handling
+APScheduler==3.10.4
+pytz==2023.3
+
+# Email services
+resend==0.8.0
+
+# HTTP client
+httpx==0.25.2
+
+# WebSocket support
+python-socketio==5.10.0
+
+# LangGraph and AI workflows
+langgraph==0.0.62
+langchain-core==0.2.38
+langchain-openai==0.1.7
+
+# Monitoring and observability
+sentry-sdk[fastapi]==1.48.0
+structlog==23.2.0
+
+# AWS (for future KMS integration)
+boto3==1.35.0
+botocore==1.35.0
+
+# Environment and utilities
+python-dotenv==1.0.0
+typing-extensions==4.8.0
+
+# Development and testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+black==24.3.0
+ruff==0.1.6

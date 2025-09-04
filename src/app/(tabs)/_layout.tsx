@@ -23,8 +23,8 @@ export default function TabLayout() {
         tabBarActiveTintColor: currentTheme.colors.primary,
         tabBarInactiveTintColor: currentTheme.colors.textSecondary,
         tabBarLabelStyle: styles.tabBarLabel,
-        animation: 'fade',
-        animationDuration: 200,
+        // No animation for tab switches - standard for major apps
+        animation: 'none',
       }}
     >
       <Tabs.Screen

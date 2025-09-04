@@ -25,8 +25,10 @@ export interface UserProfile {
   updatedAt?: string;
 }
 
+import { API_BASE_URL } from '../config/api';
+
 class UserService {
-  private apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+  private apiUrl = API_BASE_URL;
 
   /**
    * Get comprehensive user profile from server
@@ -146,7 +148,7 @@ class UserService {
       if (onboardingStep !== undefined) {
         updates.onboardingStep = onboardingStep;
       }
-      
+
       const updatedProfile = await this.updateProfile(userId, updates);
       console.log('🎯 Onboarding status updated:', { onboardingComplete, onboardingStep });
       return updatedProfile;

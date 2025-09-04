@@ -1,9 +1,10 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { API_URL } from '../config/api';
 
-// Get configuration from app.json
-const apiUrl = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:5000';
-const apiPort = Constants.expoConfig?.extra?.apiPort || '5000';
+// Use the same API configuration as the main app
+const apiUrl = API_URL;
+const apiPort = '5000';
 
 /**
  * Test multiple connection endpoints for Windows compatibility
@@ -13,13 +14,22 @@ export const testNetworkConnectivity = async (): Promise<{
   workingUrl?: string;
   results: Array<{ url: string; success: boolean; error?: string; responseTime?: number }>;
 }> => {
-  // Generate test URLs
-  const testUrls = [
-    apiUrl,
-    `http://localhost:${apiPort}`,
-    `http://127.0.0.1:${apiPort}`,
-    `http://10.0.0.4:${apiPort}`, // Windows host IP for iOS connectivity
-  ];
+  // Generate test URLs based on platform and current API URL
+  const testUrls = [apiUrl]; // Always test the configured API URL first
+  
+  // Only add localhost variants if we're not already using them
+  if (!apiUrl.includes('localhost') && !apiUrl.includes('127.0.0.1')) {
+    testUrls.push(`http://localhost:${apiPort}`);
+    testUrls.push(`http://127.0.0.1:${apiPort}`);
+  }
+  
+  // Add platform-specific alternatives
+  if (Platform.OS === 'ios' && !apiUrl.includes('10.0.0.4')) {
+    testUrls.push(`http://10.0.0.4:${apiPort}`); // Windows host IP for iOS
+  }
+  if (Platform.OS === 'android' && !apiUrl.includes('10.0.2.2')) {
+    testUrls.push(`http://10.0.2.2:${apiPort}`); // Android emulator host IP
+  }
 
   // Remove duplicates
   const uniqueUrls = [...new Set(testUrls)];

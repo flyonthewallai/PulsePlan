@@ -105,7 +105,7 @@ export interface CreateEventRequest {
  * Handles all calendar-related operations for both Google and Microsoft calendars
  */
 export class CalendarService {
-  private static baseUrl = API_BASE_URL || 'http://localhost:5000';
+  private static baseUrl = API_BASE_URL;
 
   /**
    * Authentication Methods
