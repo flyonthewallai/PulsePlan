@@ -1,0 +1,1 @@
+"""I/O subsystem for data persistence, caching, and DTOs."""
