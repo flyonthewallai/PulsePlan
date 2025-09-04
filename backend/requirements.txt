@@ -12,7 +12,7 @@ pydantic==2.5.0
 pydantic-settings==2.1.0
 
 # Security and authentication
-cryptography==43.0.0
+cryptography==43.0.3
 PyJWT==2.8.0
 passlib[bcrypt]==1.7.4
 
@@ -34,7 +34,7 @@ python-socketio==5.10.0
 
 # LangGraph and AI workflows
 langgraph==0.0.62
-langchain-core==0.3.0
+langchain-core==0.3.18
 langchain-openai==0.1.7
 
 # Monitoring and observability
