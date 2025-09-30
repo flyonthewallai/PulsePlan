@@ -15,12 +15,12 @@ try:
 except ImportError:
     httpx = None
 
-from app.config.supabase import get_supabase_client
-from app.services.cache_service import get_cache_service
-from app.services.token_service import get_token_service
-from app.config.settings import get_settings
+from app.config.database.supabase import get_supabase_client
+from app.services.infrastructure.cache_service import get_cache_service
+from app.services.auth.token_service import get_token_service
+from app.config.core.settings import get_settings
 from app.memory import get_ingestion_service
-from app.memory.types import Assignment
+from app.memory.core.types import Assignment
 
 logger = logging.getLogger(__name__)
 
@@ -658,3 +658,4 @@ async def get_upcoming_assignments(
     return await canvas_sync.get_upcoming_assignments(
         user_id, days_ahead, canvas_api_key, canvas_url
     )
+

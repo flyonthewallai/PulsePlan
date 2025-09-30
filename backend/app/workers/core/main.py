@@ -8,7 +8,7 @@ import signal
 import sys
 from typing import Optional
 
-from .timezone_scheduler import get_timezone_scheduler
+from ..scheduling.timezone_scheduler import get_timezone_scheduler
 
 logger = logging.getLogger(__name__)
 

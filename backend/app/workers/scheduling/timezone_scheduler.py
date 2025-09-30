@@ -12,7 +12,7 @@ import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from ..config.supabase import get_supabase_client
+from ...config.database.supabase import get_supabase_client
 from .scheduler import WorkerScheduler
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ class TimezoneAwareScheduler:
         """Get analysis of user timezones and briefing times"""
         try:
             # Query user preferences to understand timezone distribution
-            response = await self.supabase.table("user_preferences").select(
+            response = self.supabase.table("user_preferences").select(
                 "user_id, daily_briefing_enabled, daily_briefing_time, daily_briefing_timezone, weekly_pulse_enabled, weekly_pulse_day, weekly_pulse_time"
             ).eq("daily_briefing_enabled", True).execute()
             
@@ -246,7 +246,7 @@ class TimezoneAwareScheduler:
             for user in users:
                 # Get full user info from auth.users table
                 try:
-                    user_response = await self.supabase.table("users").select(
+                    user_response = self.supabase.table("users").select(
                         "id, email, name"
                     ).eq("id", user["user_id"]).execute()
                     
@@ -303,7 +303,7 @@ class TimezoneAwareScheduler:
             formatted_users = []
             for user in users:
                 try:
-                    user_response = await self.supabase.table("users").select(
+                    user_response = self.supabase.table("users").select(
                         "id, email, name"
                     ).eq("id", user["user_id"]).execute()
                     

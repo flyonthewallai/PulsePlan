@@ -8,10 +8,10 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from ..config.supabase import get_supabase_client
-from ..agents.orchestrator import get_agent_orchestrator
-from .email_service import get_email_service
-from .types import JobResult, JobStatus
+from ...config.database.supabase import get_supabase_client
+from ...agents.orchestrator import get_agent_orchestrator
+from ..communication.email_service import get_email_service
+from ..core.types import JobResult, JobStatus
 
 logger = logging.getLogger(__name__)
 

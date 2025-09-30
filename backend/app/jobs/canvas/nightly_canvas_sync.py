@@ -8,9 +8,9 @@ import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 
-from app.config.supabase import get_supabase_client
-from app.services.cache_service import get_cache_service
-from app.jobs.canvas_sync import get_canvas_sync
+from app.config.database.supabase import get_supabase_client
+from app.services.infrastructure.cache_service import get_cache_service
+from app.jobs.canvas.canvas_sync import get_canvas_sync
 
 logger = logging.getLogger(__name__)
 

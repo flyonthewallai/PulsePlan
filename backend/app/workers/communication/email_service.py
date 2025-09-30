@@ -7,11 +7,14 @@ from datetime import datetime
 import os
 
 try:
-    from resend import Resend
+    import resend
+    resend.api_key = os.getenv("RESEND_API_KEY")
+    if not resend.api_key:
+        raise ValueError("RESEND_API_KEY environment variable is required")
 except ImportError:
-    Resend = None
+    resend = None
 
-from .types import EmailData, BriefingData, WeeklyPulseData
+from ..core.types import EmailData, BriefingData, WeeklyPulseData
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +23,11 @@ class EmailService:
     """Email service using Resend API"""
     
     def __init__(self):
-        if not Resend:
+        if not resend:
             raise ImportError("resend package is required. Install with: pip install resend")
         
-        api_key = os.getenv("RESEND_API_KEY")
-        if not api_key:
-            raise ValueError("RESEND_API_KEY environment variable is required")
-        
-        self.resend = Resend(api_key)
+        # resend.api_key is already set in the import block above
+        self.resend = resend
         self.from_email = os.getenv("RESEND_FROM_EMAIL", "hello@pulseplan.app")
     
     async def send_email(self, email_data: EmailData) -> Dict[str, Any]:

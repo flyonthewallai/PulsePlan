@@ -11,10 +11,10 @@ from datetime import datetime, timedelta
 import pytz
 from enum import Enum
 
-from app.config.supabase import get_supabase_client
-from app.services.cache_service import get_cache_service
-from app.services.ios_notification_service import get_ios_notification_service
-from app.memory import get_ingestion_service
+from app.config.database.supabase import get_supabase_client
+from app.services.infrastructure.cache_service import get_cache_service
+from app.services.notifications.ios_notification_service import get_ios_notification_service
+from app.memory.processing.ingestion import get_ingestion_service
 
 logger = logging.getLogger(__name__)
 
@@ -431,19 +431,19 @@ class NotificationJobs:
             
             # Determine reminder message and priority based on time left
             if hours_until_due <= 6:
-                title = f"⚠️ Due in {int(hours_until_due)} hours: {assignment_name}"
+                title = f"Due in {int(hours_until_due)} hours: {assignment_name}"
                 priority = NotificationPriority.CRITICAL.value
                 body = f"{course_name} - Submit soon to avoid being late!"
             elif hours_until_due <= 24:
-                title = f"📅 Due tomorrow: {assignment_name}"
+                title = f"Due tomorrow: {assignment_name}"
                 priority = NotificationPriority.HIGH.value
                 body = f"{course_name} - Make sure to complete this today"
             elif days_until_due <= 3:
-                title = f"📚 Due in {days_until_due} days: {assignment_name}"
+                title = f"Due in {days_until_due} days: {assignment_name}"
                 priority = NotificationPriority.NORMAL.value
                 body = f"{course_name} - Start working on this soon"
             else:
-                title = f"📖 Due in {days_until_due} days: {assignment_name}"
+                title = f"Due in {days_until_due} days: {assignment_name}"
                 priority = NotificationPriority.LOW.value
                 body = f"{course_name} - Plan ahead for this assignment"
             
@@ -495,26 +495,26 @@ class NotificationJobs:
             # Create achievement-specific notification
             if achievement_type == "completion_streak":
                 days = achievement_data["streak_days"]
-                title = f"🔥 {days}-day completion streak!"
+                title = f"{days}-day completion streak!"
                 body = f"You've completed tasks {days} days in a row. Keep it up!"
             
             elif achievement_type == "productivity_milestone":
                 score = achievement_data["productivity_score"]
-                title = f"⭐ Productivity milestone: {score}/10!"
+                title = f"Productivity milestone: {score}/10!"
                 body = "You've reached a new personal best in weekly productivity"
             
             elif achievement_type == "early_completion":
                 assignment_name = achievement_data["assignment_name"]
                 hours_early = achievement_data["hours_early"]
-                title = f"⚡ Early bird! Completed ahead of schedule"
+                title = f"Early bird! Completed ahead of schedule"
                 body = f"Finished '{assignment_name}' {hours_early} hours early"
             
             elif achievement_type == "perfect_week":
-                title = "🎯 Perfect week achieved!"
+                title = "Perfect week achieved!"
                 body = "You completed every single task this week. Amazing work!"
             
             else:
-                title = "🎉 Achievement unlocked!"
+                title = "Achievement unlocked!"
                 body = "You've reached a new milestone in your productivity journey"
             
             notification = {
