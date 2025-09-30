@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,10 @@ const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
   const cardTranslateX = React.useRef(new Animated.Value(0)).current;
 
   // Filter to current/upcoming tasks (not completed)
-  const currentTasks = tasks.filter(task => task.status !== 'completed');
+  const currentTasks = useMemo(() =>
+    tasks.filter(task => task.status !== 'completed'),
+    [tasks]
+  );
 
   // Card swipe handlers
   const onCardGestureEvent = Animated.event(
@@ -99,7 +102,10 @@ const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
     }
   };
 
-  const currentTask = currentTasks[currentTaskIndex] || currentTasks[0];
+  const currentTask = useMemo(() =>
+    currentTasks[currentTaskIndex] || currentTasks[0],
+    [currentTasks, currentTaskIndex]
+  );
 
   const handleToggleTask = (taskId: string) => {
     const task = currentTasks.find(t => t.id === taskId);
@@ -120,42 +126,42 @@ const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
     setSelectedTask(null);
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = useCallback((priority: string) => {
     switch (priority) {
       case 'high': return '#FF3B30';
       case 'medium': return '#FF9500';
       case 'low': return '#34C759';
       default: return '#666666';
     }
-  };
+  }, []);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     if (date.toDateString() === today.toDateString()) {
       return 'Today';
     } else if (date.toDateString() === tomorrow.toDateString()) {
       return 'Tomorrow';
     } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
       });
     }
-  };
+  }, []);
 
-  const formatTime = (dateString: string) => {
+  const formatTime = useCallback((dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
     });
-  };
+  }, []);
 
   return (
     <GestureHandlerRootView>
@@ -242,105 +248,113 @@ const TasksCard: React.FC<TasksCardProps> = ({ onPress }) => {
         </Animated.View>
       </RNGHPanGestureHandler>
 
-      {/* Full Modal */}
+      {/* Full Modal - Only render content when visible */}
       <Modal
         visible={showModal}
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setShowModal(false)}
       >
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <View style={[styles.modalContainer, { backgroundColor: currentTheme.colors.background }]}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowModal(false)}>
-              <X size={24} color={currentTheme.colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: currentTheme.colors.textPrimary }]}>
-              Tasks
-            </Text>
-            <TouchableOpacity 
-              onPress={() => {
-                setShowModal(false); // Close the tasks modal first
-                setShowCreateModal(true);
-              }}
-              style={styles.addButton}
-            >
-              <Plus size={24} color={currentTheme.colors.primary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Tasks list */}
-          <ScrollView style={styles.tasksList} showsVerticalScrollIndicator={false}>
-            {currentTasks.map((task) => (
-              <TouchableOpacity
-                key={task.id}
-                style={[styles.modalTaskItem, { backgroundColor: currentTheme.colors.surface }]}
-                onPress={() => handleTaskPress(task)}
-                activeOpacity={0.7}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.modalCheckbox,
-                    { borderColor: currentTheme.colors.border },
-                    task.status === 'completed' && { backgroundColor: getPriorityColor(task.priority), borderColor: getPriorityColor(task.priority) }
-                  ]}
-                  onPress={(e) => {
-                    e.stopPropagation(); // Prevent task press when clicking checkbox
-                    handleToggleTask(task.id);
-                  }}
-                >
-                  {task.status === 'completed' && (
-                    <Text style={styles.modalCheckmark}>✓</Text>
-                  )}
-                </TouchableOpacity>
-                <View style={styles.modalTaskContent}>
-                  <Text style={[
-                    styles.modalTaskText,
-                    { color: currentTheme.colors.textPrimary },
-                    task.status === 'completed' && { 
-                      textDecorationLine: 'line-through',
-                      color: currentTheme.colors.textSecondary 
-                    }
-                  ]}>
-                    {task.title}
-                  </Text>
-                  <View style={styles.modalTaskMeta}>
-                    <View style={styles.taskMetaItem}>
-                      <Calendar size={12} color={currentTheme.colors.textSecondary} />
-                      <Text style={[styles.taskMetaText, { color: currentTheme.colors.textSecondary }]}>
-                        {formatDate(task.due_date)}
-                      </Text>
-                    </View>
-                    <View style={styles.taskMetaItem}>
-                      <Clock size={12} color={currentTheme.colors.textSecondary} />
-                      <Text style={[styles.taskMetaText, { color: currentTheme.colors.textSecondary }]}>
-                        {formatTime(task.due_date)}
-                      </Text>
-                    </View>
-                    <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(task.priority) + '20' }]}>
-                      <Text style={[styles.priorityText, { color: getPriorityColor(task.priority) }]}>
-                        {task.priority.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
+        {showModal && (
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <View style={[styles.modalContainer, { backgroundColor: currentTheme.colors.background }]}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setShowModal(false)}>
+                <X size={24} color={currentTheme.colors.textPrimary} />
               </TouchableOpacity>
-            ))}
+              <Text style={[styles.modalTitle, { color: currentTheme.colors.textPrimary }]}>
+                Tasks
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowModal(false);
+                  setShowCreateModal(true);
+                }}
+                style={styles.addButton}
+              >
+                <Plus size={24} color={currentTheme.colors.primary} />
+              </TouchableOpacity>
+            </View>
 
-            {currentTasks.length === 0 && (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyText, { color: currentTheme.colors.textSecondary }]}>
-                  No current tasks
-                </Text>
-                <Text style={[styles.emptySubtext, { color: currentTheme.colors.textSecondary }]}>
-                  Create a new task to get started
-                </Text>
-              </View>
-            )}
-          </ScrollView>
-        </View>
-        </GestureHandlerRootView>
+            {/* Tasks list */}
+            <ScrollView style={styles.tasksList} showsVerticalScrollIndicator={false}>
+              {currentTasks.map((task) => {
+                const priorityColor = getPriorityColor(task.priority);
+                const formattedDate = formatDate(task.due_date);
+                const formattedTime = formatTime(task.due_date);
+
+                return (
+                  <TouchableOpacity
+                    key={task.id}
+                    style={[styles.modalTaskItem, { backgroundColor: currentTheme.colors.surface }]}
+                    onPress={() => handleTaskPress(task)}
+                    activeOpacity={0.7}
+                  >
+                    <TouchableOpacity
+                      style={[
+                        styles.modalCheckbox,
+                        { borderColor: currentTheme.colors.border },
+                        task.status === 'completed' && { backgroundColor: priorityColor, borderColor: priorityColor }
+                      ]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleToggleTask(task.id);
+                      }}
+                    >
+                      {task.status === 'completed' && (
+                        <Text style={styles.modalCheckmark}>✓</Text>
+                      )}
+                    </TouchableOpacity>
+                    <View style={styles.modalTaskContent}>
+                      <Text style={[
+                        styles.modalTaskText,
+                        { color: currentTheme.colors.textPrimary },
+                        task.status === 'completed' && {
+                          textDecorationLine: 'line-through',
+                          color: currentTheme.colors.textSecondary
+                        }
+                      ]}>
+                        {task.title}
+                      </Text>
+                      <View style={styles.modalTaskMeta}>
+                        <View style={styles.taskMetaItem}>
+                          <Calendar size={12} color={currentTheme.colors.textSecondary} />
+                          <Text style={[styles.taskMetaText, { color: currentTheme.colors.textSecondary }]}>
+                            {formattedDate}
+                          </Text>
+                        </View>
+                        <View style={styles.taskMetaItem}>
+                          <Clock size={12} color={currentTheme.colors.textSecondary} />
+                          <Text style={[styles.taskMetaText, { color: currentTheme.colors.textSecondary }]}>
+                            {formattedTime}
+                          </Text>
+                        </View>
+                        <View style={[styles.priorityBadge, { backgroundColor: priorityColor + '20' }]}>
+                          <Text style={[styles.priorityText, { color: priorityColor }]}>
+                            {task.priority.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {currentTasks.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Text style={[styles.emptyText, { color: currentTheme.colors.textSecondary }]}>
+                    No current tasks
+                  </Text>
+                  <Text style={[styles.emptySubtext, { color: currentTheme.colors.textSecondary }]}>
+                    Create a new task to get started
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+          </GestureHandlerRootView>
+        )}
       </Modal>
 
       <TaskCreateModal 

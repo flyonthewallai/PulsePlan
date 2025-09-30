@@ -1,0 +1,51 @@
+{
+  "name": "earliest_start",
+  "description": "Test that tasks respect earliest_start constraints",
+  "tasks": [
+    {
+      "id": "morning_only_task",
+      "title": "Morning Only Task",
+      "kind": "study",
+      "estimated_minutes": 90,
+      "min_block_minutes": 90,
+      "earliest_start": "2025-09-26T10:00:00",
+      "deadline": "2025-09-26T23:59:00",
+      "weight": 2.0
+    },
+    {
+      "id": "afternoon_task",
+      "title": "Afternoon Task",
+      "kind": "assignment",
+      "estimated_minutes": 60,
+      "min_block_minutes": 30,
+      "earliest_start": "2025-09-26T14:00:00",
+      "deadline": "2025-09-26T23:59:00",
+      "weight": 1.5
+    }
+  ],
+  "availability": [
+    {
+      "start": "2025-09-26T08:00:00",
+      "end": "2025-09-26T18:00:00"
+    }
+  ],
+  "busy_events": [],
+  "preferences": {
+    "timezone": "UTC",
+    "workday_start": "08:00",
+    "workday_end": "18:00",
+    "max_daily_effort_minutes": 480,
+    "session_granularity_minutes": 30
+  },
+  "expected": {
+    "feasible": true,
+    "morning_task_after_10am": true,
+    "afternoon_task_after_2pm": true,
+    "no_blocks_before_earliest_start": true
+  },
+  "metadata": {
+    "category": "invariants",
+    "complexity": "low",
+    "test_type": "earliest_start_compliance"
+  }
+}

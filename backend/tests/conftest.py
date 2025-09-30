@@ -3,7 +3,9 @@ import asyncio
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 from main import app
-from app.config.settings import settings
+from app.config.core.settings import get_settings
+
+settings = get_settings()
 
 # Override settings for testing
 settings.ENVIRONMENT = "testing"

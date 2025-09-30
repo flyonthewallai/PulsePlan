@@ -15,7 +15,7 @@ try:
 except ImportError:
     ORTOOLS_AVAILABLE = False
 
-from ..domain import Task, Preferences
+from ..core.domain import Task, Preferences
 from .time_index import TimeIndex
 
 logger = logging.getLogger(__name__)

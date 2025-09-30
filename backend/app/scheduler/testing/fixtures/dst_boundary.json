@@ -1,0 +1,50 @@
+{
+  "name": "dst_boundary",
+  "description": "Test timezone and DST boundary handling correctness",
+  "tasks": [
+    {
+      "id": "dst_transition_task",
+      "title": "Task During DST Transition",
+      "kind": "study",
+      "estimated_minutes": 120,
+      "min_block_minutes": 60,
+      "deadline": "2025-03-10T06:00:00",
+      "weight": 2.0
+    },
+    {
+      "id": "normal_task",
+      "title": "Normal Task",
+      "kind": "assignment",
+      "estimated_minutes": 90,
+      "min_block_minutes": 45,
+      "deadline": "2025-03-09T23:59:00",
+      "weight": 1.5
+    }
+  ],
+  "availability": [
+    {
+      "start": "2025-03-09T01:00:00",
+      "end": "2025-03-09T05:00:00"
+    }
+  ],
+  "busy_events": [],
+  "preferences": {
+    "timezone": "America/New_York",
+    "workday_start": "01:00",
+    "workday_end": "05:00",
+    "max_daily_effort_minutes": 240,
+    "session_granularity_minutes": 30
+  },
+  "expected": {
+    "feasible": true,
+    "timezone_aware_scheduling": true,
+    "dst_transitions_handled": true,
+    "duration_preserved": true
+  },
+  "metadata": {
+    "category": "invariants",
+    "complexity": "high",
+    "test_type": "dst_boundary_handling",
+    "note": "DST transition occurs at 2:00 AM on March 9, 2025 in Eastern Time"
+  }
+}

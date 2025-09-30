@@ -11,10 +11,11 @@ import json
 import asyncio
 from contextlib import asynccontextmanager
 
-from ..domain import (
-    Task, BusyEvent, Preferences, CompletionEvent, 
+from ..core.domain import (
+    Task, BusyEvent, Preferences, CompletionEvent,
     ScheduleSolution, ScheduleBlock, SchedulerRun
 )
+from ...core.utils.timezone_utils import get_timezone_manager
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,8 @@ class Repository:
             backend: Storage backend ('memory', 'database', 'file')
         """
         self.backend = backend
-        
+        self.timezone_manager = get_timezone_manager()
+
         # In-memory storage for development/testing
         self.memory_store = {
             'tasks': {},           # user_id -> List[Task]
@@ -526,47 +528,320 @@ class Repository:
     
     async def _load_tasks_from_db(self, user_id: str, horizon_days: int) -> List[Task]:
         """Load tasks from database."""
-        # TODO: Implement database loading
-        logger.warning("Database backend not implemented")
-        return []
+        try:
+            from app.config.database.supabase import get_supabase
+            from datetime import datetime, timedelta
+            
+            supabase = get_supabase()
+            
+            # Calculate date range
+            end_date = datetime.utcnow() + timedelta(days=horizon_days)
+            
+            # Query tasks from database 
+            response = supabase.table("tasks").select("*").eq("user_id", user_id).eq("status", "pending").lte("due_date", end_date.isoformat()).execute()
+
+            tasks = []
+            for task_data in response.data:
+                # Convert database task to scheduler Task 
+                task = Task(
+                    id=task_data["id"],
+                    user_id=task_data["user_id"],
+                    title=task_data["title"],
+                    kind=task_data.get("kind", "task"),
+                    estimated_minutes=task_data.get("estimated_minutes", 60),
+                    min_block_minutes=task_data.get("min_block_minutes", 30),
+                    max_block_minutes=task_data.get("max_block_minutes", 120),
+                    deadline=datetime.fromisoformat(task_data["due_date"].replace('Z', '+00:00')) if task_data.get("due_date") else None,
+                    earliest_start=datetime.fromisoformat(task_data["earliest_start"].replace('Z', '+00:00')) if task_data.get("earliest_start") else None,
+                    preferred_windows=task_data.get("preferred_windows", []),
+                    avoid_windows=task_data.get("avoid_windows", []),
+                    fixed=task_data.get("fixed", False),
+                    parent_task_id=task_data.get("parent_task_id"),
+                    prerequisites=task_data.get("prerequisites", []),
+                    weight=task_data.get("weight", 1.0),
+                    course_id=task_data.get("course_id"),
+                    must_finish_before=task_data.get("must_finish_before"),
+                    tags=task_data.get("tags", []),
+                    pinned_slots=task_data.get("pinned_slots", [])
+                )
+                tasks.append(task)
+            
+            logger.info(f"Loaded {len(tasks)} tasks from database for user {user_id}")
+            return tasks
+            
+        except Exception as e:
+            logger.error(f"Failed to load tasks from database: {e}")
+            return []
     
     async def _load_events_from_db(self, user_id: str, horizon_days: int) -> List[BusyEvent]:
         """Load events from database."""
-        # TODO: Implement database loading
-        logger.warning("Database backend not implemented")
-        return []
+        try:
+            from app.config.database.supabase import get_supabase
+            from datetime import datetime, timedelta
+            
+            supabase = get_supabase()
+            
+            # Calculate date range
+            start_date = datetime.utcnow()
+            end_date = start_date + timedelta(days=horizon_days)
+            
+            # Query calendar events from database - first check calendar_events table, then tasks table for events
+            calendar_response = supabase.table("calendar_events").select("*").eq("user_id", user_id).gte("start_time", start_date.isoformat()).lte("end_time", end_date.isoformat()).execute()
+
+            # Also get events from consolidated tasks table
+            tasks_response = supabase.table("tasks").select("*").eq("user_id", user_id).eq("task_type", "event").gte("start_date", start_date.isoformat()).lte("end_date", end_date.isoformat()).execute()
+            
+            events = []
+
+            # Process calendar_events table data
+            for event_data in calendar_response.data:
+                # Convert database event to scheduler BusyEvent
+                start_time = datetime.fromisoformat(event_data["start_time"].replace('Z', '+00:00'))
+                end_time = datetime.fromisoformat(event_data["end_time"].replace('Z', '+00:00'))
+
+                event = BusyEvent(
+                    id=event_data["id"],
+                    user_id=user_id,
+                    title=event_data.get("title", "Calendar Event"),
+                    start=start_time,
+                    end=end_time,
+                    source=event_data.get("provider", "calendar"),
+                    hard=True,
+                    location=event_data.get("location", ""),
+                    metadata={"original_table": "calendar_events"}
+                )
+                events.append(event)
+
+            # Process tasks table events
+            for event_data in tasks_response.data:
+                # Convert task event to scheduler BusyEvent
+                start_time = datetime.fromisoformat(event_data["start_date"].replace('Z', '+00:00'))
+                end_time = datetime.fromisoformat(event_data["end_date"].replace('Z', '+00:00')) if event_data.get("end_date") else start_time + timedelta(hours=1)
+
+                event = BusyEvent(
+                    id=event_data["id"],
+                    user_id=user_id,
+                    title=event_data.get("title", "Event"),
+                    start=start_time,
+                    end=end_time,
+                    source=event_data.get("sync_source", "pulse"),
+                    hard=True,
+                    location=event_data.get("location", ""),
+                    metadata={"original_table": "tasks", "task_type": event_data.get("task_type")}
+                )
+                events.append(event)
+            
+            logger.info(f"Loaded {len(events)} calendar events from database for user {user_id}")
+            return events
+            
+        except Exception as e:
+            logger.error(f"Failed to load events from database: {e}")
+            return []
     
     async def _load_preferences_from_db(self, user_id: str) -> Preferences:
         """Load preferences from database."""
-        # TODO: Implement database loading
-        logger.warning("Database backend not implemented")
-        return Preferences(timezone="UTC")
+        try:
+            from app.config.database.supabase import get_supabase
+            
+            supabase = get_supabase()
+            
+            # Query user preferences from database
+            response = supabase.table("user_preferences").select("*").eq("user_id", user_id).execute()
+            
+            prefs = {}
+            for pref in response.data:
+                key = pref["preference_key"]
+                value = pref["value"]
+                prefs[key] = value
+            
+            # Get user timezone from users table
+            user_response = supabase.table("users").select("timezone").eq("id", user_id).single().execute()
+            timezone = user_response.data.get("timezone", "UTC") if user_response.data else "UTC"
+            
+            # Create Preferences object with database data
+            preferences = Preferences(
+                timezone=timezone,
+                working_hours_start=prefs.get("working_hours_start", 9),
+                working_hours_end=prefs.get("working_hours_end", 17),
+                break_duration_minutes=prefs.get("break_duration_minutes", 15),
+                max_daily_work_hours=prefs.get("max_daily_work_hours", 8),
+                preferred_work_days=prefs.get("preferred_work_days", [1, 2, 3, 4, 5]),  # Mon-Fri
+                focus_time_blocks=prefs.get("focus_time_blocks", True)
+            )
+            
+            logger.info(f"Loaded preferences from database for user {user_id}")
+            return preferences
+            
+        except Exception as e:
+            logger.error(f"Failed to load preferences from database: {e}")
+            return Preferences(timezone="UTC")
     
     async def _load_history_from_db(self, user_id: str, horizon_days: int) -> List[CompletionEvent]:
         """Load history from database."""
-        # TODO: Implement database loading
-        logger.warning("Database backend not implemented")
-        return []
+        try:
+            from app.config.database.supabase import get_supabase
+            from datetime import datetime, timedelta
+            
+            supabase = get_supabase()
+            
+            # Calculate date range (look back from current time)
+            end_date = datetime.utcnow()
+            start_date = end_date - timedelta(days=horizon_days)
+            
+            # Query completed tasks/task completions from database
+            response = supabase.table("task_completions").select("*").eq("user_id", user_id).gte("completed_at", start_date.isoformat()).lte("completed_at", end_date.isoformat()).execute()
+            
+            history = []
+            for completion_data in response.data:
+                # Convert database completion to scheduler CompletionEvent
+                completion_time = datetime.fromisoformat(completion_data["completed_at"].replace('Z', '+00:00'))
+                
+                completion = CompletionEvent(
+                    task_id=completion_data["task_id"],
+                    title=completion_data.get("task_title", "Completed Task"),
+                    completed_at=completion_time,
+                    actual_minutes=completion_data.get("actual_minutes", 60),
+                    planned_minutes=completion_data.get("planned_minutes", 60),
+                    quality_rating=completion_data.get("quality_rating", 5),
+                    focus_rating=completion_data.get("focus_rating", 5),
+                    difficulty_rating=completion_data.get("difficulty_rating", 3),
+                    notes=completion_data.get("notes", "")
+                )
+                history.append(completion)
+            
+            logger.info(f"Loaded {len(history)} completion events from database for user {user_id}")
+            return history
+            
+        except Exception as e:
+            logger.error(f"Failed to load history from database: {e}")
+            return []
     
     async def _persist_schedule_to_db(
         self, user_id: str, solution: ScheduleSolution, job_id: Optional[str]
     ):
         """Persist schedule to database."""
-        # TODO: Implement database persistence
-        logger.warning("Database backend not implemented")
+        try:
+            from app.config.database.supabase import get_supabase
+            
+            supabase = get_supabase()
+            
+            # Prepare schedule blocks for database storage
+            blocks = []
+            for block in solution.blocks:
+                block_data = {
+                    "id": f"{user_id}_{block.task_id}_{int(block.start.timestamp())}",
+                    "user_id": user_id,
+                    "job_id": job_id,
+                    "task_id": block.task_id,
+                    "task_title": block.title,
+                    "start_time": block.start.isoformat(),
+                    "end_time": block.end.isoformat(),
+                    "duration_minutes": int((block.end - block.start).total_seconds() / 60),
+                    "block_type": "task",
+                    "created_at": datetime.utcnow().isoformat(),
+                    "metadata": {
+                        "solution_score": solution.objective_value if hasattr(solution, 'objective_value') else None,
+                        "job_id": job_id
+                    }
+                }
+                blocks.append(block_data)
+            
+            # Insert schedule blocks into database
+            if blocks:
+                response = supabase.table("schedule_blocks").insert(blocks).execute()
+                logger.info(f"Persisted {len(blocks)} schedule blocks to database for user {user_id}")
+            
+            # Also persist schedule summary
+            schedule_summary = {
+                "id": job_id or f"schedule_{user_id}_{int(datetime.utcnow().timestamp())}",
+                "user_id": user_id,
+                "job_id": job_id,
+                "total_blocks": len(solution.blocks),
+                "total_tasks": len(set(block.task_id for block in solution.blocks)),
+                "objective_value": solution.objective_value if hasattr(solution, 'objective_value') else None,
+                "created_at": datetime.utcnow().isoformat(),
+                "metadata": solution.metadata if hasattr(solution, 'metadata') else {}
+            }
+            
+            supabase.table("schedules").insert(schedule_summary).execute()
+            logger.info(f"Persisted schedule summary to database for user {user_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to persist schedule to database: {e}")
     
     async def _persist_run_to_db(self, run: SchedulerRun):
         """Persist run summary to database."""
-        # TODO: Implement database persistence
-        logger.warning("Database backend not implemented")
+        try:
+            from app.config.database.supabase import get_supabase
+            
+            supabase = get_supabase()
+            
+            # Prepare run data for database storage
+            run_data = {
+                "id": run.run_id,
+                "user_id": run.user_id,
+                "job_id": run.job_id,
+                "status": run.status,
+                "start_time": run.start_time.isoformat(),
+                "end_time": run.end_time.isoformat() if run.end_time else None,
+                "duration_seconds": int(run.duration.total_seconds()) if run.duration else None,
+                "tasks_loaded": len(run.tasks_loaded) if hasattr(run, 'tasks_loaded') else None,
+                "events_loaded": len(run.events_loaded) if hasattr(run, 'events_loaded') else None,
+                "blocks_scheduled": len(run.solution.blocks) if run.solution else None,
+                "objective_value": run.solution.objective_value if run.solution and hasattr(run.solution, 'objective_value') else None,
+                "error_message": run.error_message if hasattr(run, 'error_message') else None,
+                "created_at": datetime.utcnow().isoformat(),
+                "metadata": {
+                    "solver_used": run.solver_used if hasattr(run, 'solver_used') else None,
+                    "optimization_time": run.optimization_time if hasattr(run, 'optimization_time') else None,
+                    "memory_usage": run.memory_usage if hasattr(run, 'memory_usage') else None
+                }
+            }
+            
+            # Insert run summary into database
+            supabase.table("scheduler_runs").insert(run_data).execute()
+            logger.info(f"Persisted scheduler run {run.run_id} to database")
+            
+        except Exception as e:
+            logger.error(f"Failed to persist run to database: {e}")
     
     async def _get_recent_schedules_from_db(
         self, user_id: str, days_back: int
     ) -> List[ScheduleBlock]:
         """Get recent schedules from database."""
-        # TODO: Implement database loading
-        logger.warning("Database backend not implemented")
-        return []
+        try:
+            from app.config.database.supabase import get_supabase
+            from datetime import datetime, timedelta
+            
+            supabase = get_supabase()
+            
+            # Calculate date range
+            end_date = datetime.utcnow()
+            start_date = end_date - timedelta(days=days_back)
+            
+            # Query recent schedule blocks from database
+            response = supabase.table("schedule_blocks").select("*").eq("user_id", user_id).gte("start_time", start_date.isoformat()).lte("end_time", end_date.isoformat()).order("start_time").execute()
+            
+            blocks = []
+            for block_data in response.data:
+                # Convert database block to scheduler ScheduleBlock
+                start_time = datetime.fromisoformat(block_data["start_time"].replace('Z', '+00:00'))
+                end_time = datetime.fromisoformat(block_data["end_time"].replace('Z', '+00:00'))
+                
+                block = ScheduleBlock(
+                    task_id=block_data["task_id"],
+                    title=block_data["task_title"],
+                    start=start_time,
+                    end=end_time
+                )
+                blocks.append(block)
+            
+            logger.info(f"Loaded {len(blocks)} recent schedule blocks from database for user {user_id}")
+            return blocks
+            
+        except Exception as e:
+            logger.error(f"Failed to load recent schedules from database: {e}")
+            return []
     
     async def _update_task_in_db(self, user_id: str, task_id: str, updates: Dict[str, Any]):
         """Update task in database."""
@@ -593,3 +868,5 @@ def get_repository(backend: str = "memory") -> Repository:
     if _repository is None:
         _repository = Repository(backend=backend)
     return _repository
+
+

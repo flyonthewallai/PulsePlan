@@ -83,7 +83,7 @@ const AgentStatusIndicator: React.FC<AgentStatusIndicatorProps> = ({ userId, sty
         }
       ]}>
         <Text style={[styles.errorIcon]}>⚠️</Text>
-        <Text style={[styles.errorText, { color: currentTheme.colors.error }]}>
+        <Text style={[styles.errorText, { color: '#FFFFFF' }]}>
           Connection error
         </Text>
       </Animated.View>
@@ -124,7 +124,7 @@ const AgentStatusIndicator: React.FC<AgentStatusIndicatorProps> = ({ userId, sty
         }
       ]}>
         <Text style={[styles.errorIcon]}>⚠️</Text>
-        <Text style={[styles.statusText, { color: currentTheme.colors.error }]}>
+        <Text style={[styles.statusText, { color: '#FFFFFF' }]}>
           Pulse encountered an error
           {status.currentTool && ` with ${status.currentTool}`}
         </Text>
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 122, 255, 0.1)',
   },
   errorContainer: {
-    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    backgroundColor: '#E53E3E',
   },
   statusDot: {
     width: 8,

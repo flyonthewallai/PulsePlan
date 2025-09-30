@@ -10,8 +10,8 @@ from typing import Optional
 import jwt
 import logging
 
-from app.config.settings import settings
-from app.services.rate_limiting import hierarchical_rate_limiter
+from app.config.core.settings import settings
+from app.services.infrastructure.rate_limiting import hierarchical_rate_limiter
 
 
 logger = logging.getLogger(__name__)
@@ -256,6 +256,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return request.client.host
         
         return "unknown"
+
+
+def rate_limit(identifier: str, max_calls: int = 10, window_seconds: int = 60):
+    """
+    Decorator for applying rate limiting to specific endpoints
+    
+    Args:
+        identifier: Unique identifier for this rate limit
+        max_calls: Maximum number of calls allowed
+        window_seconds: Time window in seconds
+    """
+    def decorator(func):
+        # For now, just return the function unchanged
+        # The actual rate limiting is handled by the middleware
+        # This decorator is kept for API compatibility
+        return func
+    return decorator
 
 
 def setup_rate_limiting(app):

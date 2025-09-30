@@ -39,7 +39,7 @@ export const useAgentStatus = (userId: string | null) => {
     }
 
     console.log('🔌 Connecting to agent status WebSocket...');
-    
+
     // Create socket connection
     const socket = io(API_BASE_URL, {
       transports: ['websocket', 'polling'],
@@ -53,7 +53,7 @@ export const useAgentStatus = (userId: string | null) => {
       console.log('✅ WebSocket connected');
       setIsConnected(true);
       setError(null);
-      
+
       // Authenticate with the server
       socket.emit('authenticate', { userId });
     });

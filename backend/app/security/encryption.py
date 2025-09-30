@@ -5,7 +5,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
-from app.config.settings import settings
+from app.config.core.settings import settings
 from typing import Optional, Union
 import logging
 import base64
@@ -178,12 +178,52 @@ class EncryptionService:
         if not self.use_kms:
             raise ValueError("KMS encryption not enabled")
         
-        # TODO: Implement KMS encryption in Phase 2
-        # This will use boto3 KMS client to encrypt with customer-managed key
-        raise NotImplementedError(
-            "KMS encryption will be implemented in Phase 2. "
-            "Set USE_KMS=false for Phase 1."
-        )
+        try:
+            import boto3
+            from botocore.exceptions import ClientError
+            import base64
+            import json
+            
+            # Initialize KMS client
+            kms = boto3.client('kms')
+            
+            # Use KMS key for encryption
+            kms_key_id = self.settings.KMS_KEY_ID or "alias/pulseplan-encryption"
+            
+            # Create encryption context for additional security
+            encryption_context = {
+                'user_id': user_id,
+                'service': 'pulseplan',
+                'data_type': 'auth_token'
+            }
+            
+            # Encrypt with KMS
+            response = kms.encrypt(
+                KeyId=kms_key_id,
+                Plaintext=plaintext_token,
+                EncryptionContext=encryption_context
+            )
+            
+            # Encode the ciphertext blob to base64 for storage
+            encrypted_blob = base64.b64encode(response['CiphertextBlob']).decode('utf-8')
+            
+            # Store encryption metadata with the encrypted data
+            encrypted_package = {
+                'ciphertext': encrypted_blob,
+                'key_id': response['KeyId'],
+                'encryption_context': encryption_context,
+                'algorithm': 'KMS',
+                'encrypted_at': datetime.utcnow().isoformat()
+            }
+            
+            return json.dumps(encrypted_package)
+            
+        except ClientError as e:
+            logger.error(f"KMS encryption failed: {e}")
+            raise EncryptionError(f"Failed to encrypt with KMS: {e}")
+        except Exception as e:
+            logger.error(f"KMS encryption error: {e}")
+            raise EncryptionError(f"KMS encryption failed: {e}")
     
     def _decrypt_with_kms(self, encrypted_token: str, user_id: str) -> str:
         """
@@ -192,17 +232,67 @@ class EncryptionService:
         if not self.use_kms:
             raise ValueError("KMS decryption not enabled")
         
-        # TODO: Implement KMS decryption in Phase 2
-        raise NotImplementedError(
-            "KMS decryption will be implemented in Phase 2. "
-            "Existing KMS tokens need migration."
-        )
+        try:
+            import boto3
+            from botocore.exceptions import ClientError
+            import base64
+            import json
+            
+            # Initialize KMS client
+            kms = boto3.client('kms')
+            
+            # Parse the encrypted package
+            try:
+                encrypted_package = json.loads(encrypted_token)
+                ciphertext_blob = base64.b64decode(encrypted_package['ciphertext'])
+                encryption_context = encrypted_package.get('encryption_context', {})
+            except (json.JSONDecodeError, KeyError, ValueError) as e:
+                raise EncryptionError(f"Invalid encrypted token format: {e}")
+            
+            # Verify encryption context
+            expected_context = {
+                'user_id': user_id,
+                'service': 'pulseplan',
+                'data_type': 'auth_token'
+            }
+            
+            if encryption_context != expected_context:
+                logger.warning(f"Encryption context mismatch for user {user_id}")
+                # Still attempt decryption but log the mismatch
+            
+            # Decrypt with KMS
+            response = kms.decrypt(
+                CiphertextBlob=ciphertext_blob,
+                EncryptionContext=encryption_context
+            )
+            
+            # Return the decrypted plaintext
+            return response['Plaintext'].decode('utf-8')
+            
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            if error_code in ['InvalidCiphertextException', 'InvalidKeyUsageException']:
+                logger.error(f"KMS decryption failed - invalid ciphertext or key for user {user_id}: {e}")
+                raise EncryptionError("Failed to decrypt token - invalid or corrupted data")
+            elif error_code == 'AccessDeniedException':
+                logger.error(f"KMS access denied for user {user_id}: {e}")
+                raise EncryptionError("Access denied for decryption")
+            else:
+                logger.error(f"KMS decryption failed for user {user_id}: {e}")
+                raise EncryptionError(f"Failed to decrypt with KMS: {e}")
+        except Exception as e:
+            logger.error(f"KMS decryption error for user {user_id}: {e}")
+            raise EncryptionError(f"KMS decryption failed: {e}")
     
     def rotate_key_version(self, new_version: int):
         """Update key version for key rotation"""
         self.key_version = new_version
         logger.info(f"Encryption key version updated to v{new_version}")
     
+    def get_master_key(self) -> bytes:
+        """Get the master encryption key"""
+        return self.master_key
+
     def health_check(self) -> bool:
         """Test encryption/decryption functionality"""
         try:
@@ -220,3 +310,7 @@ class EncryptionService:
 
 # Global encryption service instance
 encryption_service = EncryptionService()
+
+def get_encryption_service() -> EncryptionService:
+    """Get global encryption service instance"""
+    return encryption_service

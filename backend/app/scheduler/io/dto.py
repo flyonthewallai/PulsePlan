@@ -7,15 +7,35 @@ Defines Pydantic schemas for request/response validation and serialization.
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, validator
+from enum import Enum
+
+
+class ReplanScopeDto(str, Enum):
+    """Replanning scope levels for API."""
+    MINIMAL = "minimal"
+    CONSERVATIVE = "conservative"
+    MODERATE = "moderate"
+    AGGRESSIVE = "aggressive"
+    COMPLETE = "complete"
+
+
+class ReplanConstraintsDto(BaseModel):
+    """Replanning constraints for fine-grained control."""
+    protected_task_ids: Optional[List[str]] = Field(None, description="Task IDs that cannot be moved")
+    max_blocks_to_move: Optional[int] = Field(None, description="Maximum number of blocks to move")
+    max_move_distance_hours: Optional[float] = Field(None, description="Maximum hours blocks can be moved")
+    min_stability_ratio: Optional[float] = Field(None, ge=0.0, le=1.0, description="Minimum stability ratio")
 
 
 class ScheduleRequest(BaseModel):
     """Request schema for scheduling operations."""
-    
+
     user_id: str = Field(..., description="User identifier")
     horizon_days: int = Field(default=7, ge=1, le=30, description="Scheduling horizon in days")
     dry_run: bool = Field(default=False, description="Preview mode without persistence")
     lock_existing: bool = Field(default=True, description="Preserve existing schedule blocks")
+    replan_scope: ReplanScopeDto = Field(default=ReplanScopeDto.MODERATE, description="Replanning scope level")
+    replan_constraints: Optional[ReplanConstraintsDto] = Field(None, description="Custom replanning constraints")
     job_id: Optional[str] = Field(None, description="Optional job identifier for tracking")
     options: Dict[str, Any] = Field(default_factory=dict, description="Additional options")
     

@@ -34,8 +34,9 @@ except ImportError:
         UNKNOWN = "UNKNOWN"
         INT32_MAX = 2147483647
 
-from ..domain import Task, BusyEvent, Preferences, ScheduleBlock, ScheduleSolution
+from ..core.domain import Task, BusyEvent, Preferences, ScheduleBlock, ScheduleSolution
 from .time_index import TimeIndex
+from ...core.utils.timezone_utils import get_timezone_manager
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,8 @@ class SchedulerSolver:
         self.time_limit_seconds = time_limit_seconds
         self.num_search_workers = num_search_workers
         self.random_seed = random_seed
-        
+        self.timezone_manager = get_timezone_manager()
+
         # Solution tracking
         self.best_solution = None
         self.solution_callback = None
@@ -685,3 +687,4 @@ class SolutionCallback(cp_model.CpSolverSolutionCallback):
             self.best_objective = objective
             
         # Could store solution details here if needed
+
