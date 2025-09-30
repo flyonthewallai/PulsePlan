@@ -37,5 +37,5 @@ def get_supabase_db():
     """
     Get Supabase client for database operations
     """
-    from app.config.supabase import get_supabase
+    from app.config.database.supabase import get_supabase
     return get_supabase()

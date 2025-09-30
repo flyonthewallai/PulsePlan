@@ -31,7 +31,12 @@ class BaseDBModel(BaseModel):
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for Supabase operations"""
-        return self.dict(exclude_none=True)
+        data = self.dict(exclude_none=True)
+        # Convert datetime objects to ISO strings for Supabase
+        for key, value in data.items():
+            if isinstance(value, datetime):
+                data[key] = value.isoformat()
+        return data
     
     def to_supabase_insert(self) -> Dict[str, Any]:
         """Format for Supabase insert operations"""
@@ -66,7 +71,7 @@ class UserModel(BaseDBModel):
     timezone: Optional[str] = Field(None, description="User timezone")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "user@example.com",
                 "subscription_status": "premium",
@@ -80,6 +85,72 @@ class TokenStatus(str, Enum):
     EXPIRED = "expired"
     REVOKED = "revoked"
     REFRESH_NEEDED = "refresh_needed"
+
+
+class IntegrationStatus(str, Enum):
+    OK = "ok"
+    NEEDS_REAUTH = "needs_reauth"
+    ERROR = "error"
+
+
+# Standard course colors for consistent theming
+STANDARD_COURSE_COLORS = [
+    "#FF6B6B",  # Red
+    "#4ECDC4",  # Teal
+    "#45B7D1",  # Blue
+    "#96CEB4",  # Green
+    "#FECA57",  # Yellow
+    "#FF9FF3",  # Pink
+    "#54A0FF",  # Light Blue
+    "#5F27CD",  # Purple
+    "#00D2D3",  # Cyan
+    "#FF9F43",  # Orange
+    "#10AC84",  # Dark Green
+    "#EE5A24",  # Dark Orange
+    "#0097E6",  # Dark Blue
+    "#8C7AE6",  # Light Purple
+    "#2F3640",  # Dark Gray
+]
+
+
+class CourseModel(BaseDBModel):
+    """Course model for organizing tasks by subject/class"""
+
+    user_id: str = Field(..., description="User ID")
+    name: str = Field(..., description="Course name")
+    color: str = Field(..., description="Course color (hex code)")
+
+    # Canvas integration fields
+    canvas_id: Optional[int] = Field(None, description="Canvas course ID")
+    canvas_name: Optional[str] = Field(None, description="Canvas course name")
+    canvas_course_code: Optional[str] = Field(None, description="Canvas course code")
+    external_source: str = Field("manual", description="Source of the course (manual, canvas)")
+
+    # Optional fields
+    icon: Optional[str] = Field(None, description="Course icon/emoji")
+
+    @classmethod
+    def get_next_color(cls, existing_colors: List[str]) -> str:
+        """Get the next available color from the standard palette"""
+        used_colors = set(existing_colors)
+        for color in STANDARD_COURSE_COLORS:
+            if color not in used_colors:
+                return color
+        # If all colors are used, cycle through them again
+        return STANDARD_COURSE_COLORS[len(existing_colors) % len(STANDARD_COURSE_COLORS)]
+
+    @classmethod
+    def from_canvas_course(cls, user_id: str, canvas_course: Dict[str, Any], color: str) -> 'CourseModel':
+        """Create a CourseModel from Canvas course data"""
+        return cls(
+            user_id=user_id,
+            name=canvas_course.get("name", "Untitled Course"),
+            color=color,
+            canvas_id=canvas_course.get("id"),
+            canvas_name=canvas_course.get("name"),
+            canvas_course_code=canvas_course.get("course_code"),
+            external_source="canvas"
+        )
 
 
 class OAuthTokenModel(BaseDBModel):
@@ -98,35 +169,204 @@ class OAuthTokenModel(BaseDBModel):
     expires_at: datetime = Field(..., description="Token expiration time")
     last_refreshed: Optional[datetime] = Field(None, description="Last refresh timestamp")
     status: TokenStatus = Field(TokenStatus.ACTIVE, description="Token status")
-    
-    # Encryption metadata
-    encryption_key_version: int = Field(1, description="Encryption key version")
-    
-    @validator('provider')
-    def validate_provider(cls, v):
-        allowed_providers = ['google', 'microsoft', 'canvas']
-        if v not in allowed_providers:
-            raise ValueError(f'Provider must be one of: {allowed_providers}')
-        return v
-    
-    def is_expired(self) -> bool:
-        """Check if token is expired"""
-        return datetime.utcnow() >= self.expires_at
-    
-    def expires_soon(self, minutes: int = 30) -> bool:
-        """Check if token expires within specified minutes"""
-        from datetime import timedelta
-        expiry_threshold = datetime.utcnow() + timedelta(minutes=minutes)
-        return self.expires_at <= expiry_threshold
-    
+
+
+class CanvasIntegrationModel(BaseDBModel):
+    """Canvas integration model with secure token storage"""
+
+    user_id: str = Field(..., description="User ID")
+    base_url: str = Field(..., description="Canvas base URL")
+
+    # Encrypted token storage
+    token_ciphertext: str = Field(..., description="Encrypted Canvas API token")
+    kms_key_id: str = Field(..., description="KMS key ID for token encryption")
+
+    # Integration status
+    status: IntegrationStatus = Field(IntegrationStatus.OK, description="Integration status")
+    last_full_sync_at: Optional[datetime] = Field(None, description="Last full sync timestamp")
+    last_delta_at: Optional[datetime] = Field(None, description="Last delta sync timestamp")
+    last_error_code: Optional[str] = Field(None, description="Last error code if any")
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
-                "user_id": "user-uuid",
-                "provider": "google",
-                "access_token": "encrypted_token_data",
-                "expires_at": "2024-01-15T12:00:00Z",
-                "status": "active"
+                "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                "base_url": "https://canvas.university.edu",
+                "status": "ok"
+            }
+        }
+
+
+class ExternalCursorModel(BaseDBModel):
+    """External system cursor for tracking sync state"""
+
+    user_id: str = Field(..., description="User ID")
+    source: str = Field(..., description="External source (canvas, google_calendar, etc.)")
+    cursor_type: str = Field(..., description="Type of cursor (assignments, events, etc.)")
+    cursor_value: str = Field(..., description="Cursor value (etag, updated_at, etc.)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                "source": "canvas",
+                "cursor_type": "assignments",
+                "cursor_value": "2023-10-01T12:00:00Z"
+            }
+        }
+
+
+class ExternalSource(str, Enum):
+    CANVAS = "canvas"
+    MANUAL = "manual"
+    CALENDAR = "calendar"
+
+
+class TaskType(str, Enum):
+    TASK = "task"
+    ASSIGNMENT = "assignment"
+    TODO = "todo"
+    EVENT = "event"
+    EXAM = "exam"
+    QUIZ = "quiz"
+    MEETING = "meeting"
+    APPOINTMENT = "appointment"
+    DEADLINE = "deadline"
+    CLASS = "class"
+    SOCIAL = "social"
+    PERSONAL = "personal"
+    WORK = "work"
+    STUDY = "study"
+    READING = "reading"
+    PROJECT = "project"
+    HOBBY = "hobby"
+    ADMIN = "admin"
+
+
+class TaskModel(BaseDBModel):
+    """Comprehensive task model supporting all database fields including Canvas integration"""
+
+    # Core task fields
+    user_id: str = Field(..., description="User ID")
+    title: str = Field(..., description="Task title")
+    description: Optional[str] = Field(None, description="Task description")
+    notes: Optional[str] = Field(None, description="Additional notes")
+
+    # Task metadata
+    task_type: TaskType = Field(..., description="Academic task type (assignment, quiz, exam)")
+    subject: Optional[str] = Field(None, description="Subject/course")
+    tags: Optional[List[str]] = Field(None, description="Task tags")
+
+    # Status and completion
+    status: str = Field("pending", description="Task status")
+    completed_at: Optional[datetime] = Field(None, description="Completion timestamp")
+
+    # Priority and scheduling
+    priority: str = Field("medium", description="Task priority")
+    difficulty: Optional[str] = Field(None, description="Task difficulty")
+    weight: Optional[float] = Field(1.0, description="Task weight")
+
+    # Timing fields
+    due_date: Optional[datetime] = Field(None, description="Due date")
+    estimated_minutes: Optional[int] = Field(None, description="Estimated duration")
+    actual_minutes: Optional[int] = Field(None, description="Actual duration")
+    min_block_minutes: Optional[int] = Field(None, description="Minimum block size")
+    max_block_minutes: Optional[int] = Field(None, description="Maximum block size")
+    preparation_time_minutes: Optional[int] = Field(0, description="Preparation time")
+
+    # Scheduling constraints
+    earliest_start: Optional[datetime] = Field(None, description="Earliest start time")
+    deadline: Optional[datetime] = Field(None, description="Hard deadline")
+    preferred_windows: Optional[Dict[str, Any]] = Field(None, description="Preferred time windows")
+    avoid_windows: Optional[Dict[str, Any]] = Field(None, description="Windows to avoid")
+    pinned_slots: Optional[Dict[str, Any]] = Field(None, description="Pinned time slots")
+    fixed: Optional[bool] = Field(False, description="Fixed scheduling")
+
+    # Calendar-style fields
+    start_date: Optional[datetime] = Field(None, description="Start date")
+    end_date: Optional[datetime] = Field(None, description="End date")
+    all_day: Optional[bool] = Field(False, description="All-day event")
+    location: Optional[str] = Field(None, description="Location")
+    location_type: Optional[str] = Field(None, description="Location type")
+    meeting_url: Optional[str] = Field(None, description="Meeting URL")
+    reminder_minutes: Optional[List[int]] = Field(None, description="Reminder minutes")
+    attendees: Optional[List[str]] = Field(None, description="Attendees")
+
+    # Recurrence
+    is_recurring: Optional[bool] = Field(False, description="Is recurring")
+    recurrence_pattern: Optional[str] = Field(None, description="Recurrence pattern")
+    recurrence_interval: Optional[int] = Field(1, description="Recurrence interval")
+    recurrence_end_date: Optional[datetime] = Field(None, description="Recurrence end date")
+
+    # Task relationships
+    parent_task_id: Optional[str] = Field(None, description="Parent task ID")
+    must_finish_before: Optional[str] = Field(None, description="Task that must finish before this")
+    prerequisites: Optional[List[str]] = Field(None, description="Prerequisites")
+
+    # External source tracking (legacy)
+    source: Optional[str] = Field("manual", description="Source system")
+    external_id: Optional[str] = Field(None, description="External ID")
+
+    # Canvas-specific fields
+    canvas_id: Optional[int] = Field(None, description="Canvas assignment ID")
+    canvas_url: Optional[str] = Field(None, description="Canvas assignment URL")
+    canvas_course_id: Optional[int] = Field(None, description="Canvas course ID")
+    canvas_grade: Optional[Dict[str, Any]] = Field(None, description="Canvas grade info")
+    canvas_points: Optional[float] = Field(None, description="Canvas points possible")
+    canvas_max_points: Optional[float] = Field(None, description="Canvas max points")
+    submission_type: Optional[str] = Field(None, description="Submission type")
+    html_url: Optional[str] = Field(None, description="Canvas HTML URL")
+
+    # Calendar integration
+    external_calendar_id: Optional[str] = Field(None, description="External calendar ID")
+    external_event_id: Optional[str] = Field(None, description="External event ID")
+    sync_source: Optional[str] = Field("manual", description="Sync source")
+    last_synced_at: Optional[datetime] = Field(None, description="Last sync timestamp")
+
+    # Additional metadata
+    kind: Optional[str] = Field(None, description="Task kind")
+    course_id: Optional[str] = Field(None, description="Course ID")
+    color: Optional[str] = Field(None, description="Color")
+
+    # External source tracking (new schema)
+    external_source: Optional[str] = Field("manual", description="External source")
+    external_course_id: Optional[str] = Field(None, description="External course ID")
+    external_updated_at: Optional[datetime] = Field(None, description="External update timestamp")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                "title": "Complete assignment",
+                "external_source": "canvas",
+                "canvas_id": 12345
+            }
+        }
+
+
+class AssignmentImportModel(BaseDBModel):
+    """Staging table for raw Canvas assignment payloads"""
+
+    user_id: str = Field(..., description="User ID")
+    canvas_id: str = Field(..., description="Canvas assignment ID")
+    course_id: str = Field(..., description="Canvas course ID")
+
+    # Raw Canvas payload
+    raw_payload: Dict[str, Any] = Field(..., description="Raw Canvas assignment data")
+    processed: bool = Field(False, description="Processing flag")
+
+    # Processing metadata
+    processed_at: Optional[datetime] = Field(None, description="Processing timestamp")
+    processing_error: Optional[str] = Field(None, description="Processing error if any")
+
+    class Config:
+        validate_assignment = True
+        json_schema_extra = {
+            "example": {
+                "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                "canvas_id": "12345",
+                "course_id": "67890",
+                "processed": False
             }
         }
 
@@ -145,70 +385,69 @@ class TaskPriority(str, Enum):
     URGENT = "urgent"
 
 
-class TaskModel(BaseDBModel):
-    """Task model for user tasks"""
-    
-    user_id: str = Field(..., description="User ID")
-    title: str = Field(..., description="Task title")
-    description: Optional[str] = Field(None, description="Task description")
-    
-    # Task properties
-    status: TaskStatus = Field(TaskStatus.PENDING, description="Task status")
-    priority: TaskPriority = Field(TaskPriority.MEDIUM, description="Task priority")
-    
-    # Timing
-    due_date: Optional[datetime] = Field(None, description="Due date")
-    estimated_duration: Optional[int] = Field(None, description="Estimated duration in minutes")
-    actual_duration: Optional[int] = Field(None, description="Actual duration in minutes")
-    
-    # Metadata
-    tags: Optional[List[str]] = Field(None, description="Task tags")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
-    
-    # Completion tracking
-    completed_at: Optional[datetime] = Field(None, description="Completion timestamp")
-    
+
+class TodoPriority(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class PredefinedTagModel(BaseDBModel):
+    """Predefined tag model for system tags"""
+
+    name: str = Field(..., description="Tag name")
+    category: Optional[str] = Field(None, description="Tag category")
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
-                "user_id": "user-uuid",
-                "title": "Complete project proposal",
-                "description": "Write and review the Q1 project proposal",
-                "status": "pending",
-                "priority": "high",
-                "due_date": "2024-01-20T17:00:00Z",
-                "estimated_duration": 120,
-                "tags": ["work", "urgent"]
+                "name": "fitness",
+                "category": "health"
             }
         }
 
 
-class TodoStatus(str, Enum):
-    OPEN = "open"
-    COMPLETED = "completed"
+class UserTagModel(BaseDBModel):
+    """User custom tag model"""
+
+    user_id: str = Field(..., description="User ID")
+    name: str = Field(..., description="Tag name")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": "user-uuid",
+                "name": "meal prep"
+            }
+        }
 
 
 class TodoModel(BaseDBModel):
-    """Todo model for simple todos"""
-    
+    """Todo model for lightweight task management"""
+
     user_id: str = Field(..., description="User ID")
-    text: str = Field(..., description="Todo text")
-    status: TodoStatus = Field(TodoStatus.OPEN, description="Todo status")
-    
-    # Optional fields
-    due_date: Optional[datetime] = Field(None, description="Due date")
+    title: str = Field(..., description="Todo title")
+    description: Optional[str] = Field(None, description="Todo description")
+    notes: Optional[str] = Field(None, description="Additional notes")
+
+    # Core todo fields
+    completed: bool = Field(False, description="Completion flag")
     completed_at: Optional[datetime] = Field(None, description="Completion timestamp")
-    
-    # Metadata
-    tags: Optional[List[str]] = Field(None, description="Todo tags")
-    
+    priority: TodoPriority = Field(TodoPriority.MEDIUM, description="Todo priority")
+
+    # Timing
+    due_date: Optional[datetime] = Field(None, description="Due date")
+    estimated_minutes: Optional[int] = Field(None, description="Estimated duration")
+    actual_minutes: Optional[int] = Field(None, description="Actual duration")
+    reminder_minutes: Optional[List[int]] = Field(None, description="Reminder times")
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "user_id": "user-uuid",
-                "text": "Buy groceries",
-                "status": "open",
-                "tags": ["personal", "shopping"]
+                "title": "Buy groceries",
+                "priority": "medium",
+                "description": "Need to get milk, eggs, and bread"
             }
         }
 
@@ -238,7 +477,7 @@ class CalendarEventModel(BaseDBModel):
     sync_status: str = Field("synced", description="Sync status")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "user_id": "user-uuid",
                 "provider": "google",
@@ -279,7 +518,7 @@ class MemoryModel(BaseDBModel):
     expires_at: Optional[datetime] = Field(None, description="Memory expiration")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "user_id": "user-uuid",
                 "memory_type": "user_preference",
@@ -317,7 +556,7 @@ class WorkflowExecutionModel(BaseDBModel):
     metrics: Optional[Dict[str, Any]] = Field(None, description="Execution metrics")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "user_id": "user-uuid",
                 "workflow_type": "natural_language",
@@ -336,6 +575,9 @@ MODEL_REGISTRY = {
     'oauth_tokens': OAuthTokenModel,
     'tasks': TaskModel,
     'todos': TodoModel,
+    'predefined_tags': PredefinedTagModel,
+    'user_tags': UserTagModel,
+    'todo_tags': None,  # Junction table - no specific model needed
     'calendar_events': CalendarEventModel,
     'memories': MemoryModel,
     'workflow_executions': WorkflowExecutionModel

@@ -2,8 +2,8 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 import logging
-from app.config.redis import redis_client
-from app.config.supabase import supabase_client
+from app.config.cache.redis_client import get_redis_client
+from app.config.database.supabase import get_supabase_client
 from app.security.encryption import encryption_service
 
 logger = logging.getLogger(__name__)

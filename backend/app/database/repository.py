@@ -8,7 +8,7 @@ import logging
 from abc import ABC, abstractmethod
 
 from .models import BaseDBModel, MODEL_REGISTRY
-from ..config.supabase import get_supabase_client
+from ..config.database.supabase import get_supabase_client
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.httpx import HttpxIntegration
-from app.config.settings import settings
+from app.config.core.settings import settings
 import logging
 
 logger = logging.getLogger(__name__)
