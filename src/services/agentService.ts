@@ -19,6 +19,7 @@ export interface AgentResponse {
 
 export interface AgentQueryPayload {
   query: string;
+  conversation_id?: string;
   context?: {
     currentPage?: string;
     userPreferences?: any;
@@ -34,6 +35,27 @@ export interface AgentQueryPayload {
 }
 
 class AgentAPIService {
+  private conversationId: string | null = null;
+
+  private async getStoredConversationId(): Promise<string | null> {
+    try {
+      const stored = await AsyncStorage.getItem('@conversation_id');
+      return stored;
+    } catch (error) {
+      console.error('Failed to get stored conversation ID:', error);
+      return null;
+    }
+  }
+
+  private async storeConversationId(conversationId: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem('@conversation_id', conversationId);
+      this.conversationId = conversationId;
+    } catch (error) {
+      console.error('Failed to store conversation ID:', error);
+    }
+  }
+
   private async getLocationData(): Promise<{ city?: string; timezone?: string }> {
     try {
       // Get userId from auth session
@@ -121,24 +143,43 @@ class AgentAPIService {
   async sendQuery(payload: AgentQueryPayload): Promise<AgentResponse> {
     try {
       const token = await this.getAuthToken();
-      
+
       if (!token) {
         throw new Error('Authentication required. Please log in again.');
+      }
+
+      // Get conversation_id - prioritize payload, then stored, then memory, then null
+      let conversationId = payload.conversation_id || this.conversationId;
+      if (!conversationId) {
+        conversationId = await this.getStoredConversationId();
+        this.conversationId = conversationId;
       }
 
       // Enrich context with location data
       const enrichedPayload = {
         ...payload,
+        conversation_id: conversationId,
         context: await this.enrichContextWithLocation(payload.context)
       };
 
-      const response = await fetch(getApiUrl('/agent/query'), {
+      console.log(`🗨️ [AGENT-SERVICE] Using conversation_id: ${conversationId} (payload: ${payload.conversation_id}, stored: ${await this.getStoredConversationId()})`);
+
+      const requestBody = {
+        query: enrichedPayload.query,
+        conversation_id: conversationId,
+        context: enrichedPayload.context,
+        duration: enrichedPayload.duration
+      };
+
+      console.log(`🗨️ [AGENT-SERVICE] Request body:`, requestBody);
+
+      const response = await fetch(getApiUrl('/agents/process'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(enrichedPayload),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -150,6 +191,14 @@ class AgentAPIService {
       }
 
       const data = await response.json();
+      console.log(`🗨️ [AGENT-SERVICE] Response data:`, data);
+
+      // Store conversation_id if received in response
+      if (data.conversation_id && data.conversation_id !== conversationId) {
+        console.log(`🗨️ [AGENT-SERVICE] Storing new conversation_id: ${data.conversation_id}`);
+        await this.storeConversationId(data.conversation_id);
+      }
+
       return data;
     } catch (error) {
       console.error('Agent API error:', error);
@@ -178,7 +227,7 @@ class AgentAPIService {
       // Enrich context with location data
       const enrichedContext = await this.enrichContextWithLocation(context);
 
-      const response = await fetch(getApiUrl('/agent/chat'), {
+      const response = await fetch(getApiUrl('/agents/process'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -221,7 +270,7 @@ class AgentAPIService {
         return false;
       }
 
-      const response = await fetch(getApiUrl('/agent/health'), {
+      const response = await fetch(getApiUrl('/agents/health'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

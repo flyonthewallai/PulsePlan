@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 import { API_URL, testConnection } from '../config/api';
 import NetInfo from '@react-native-community/netinfo';
-import { useStreak } from './StreakContext';
 
 // Define task type
 export interface Task {
@@ -41,13 +40,14 @@ const LAST_SYNC_KEY = 'last_sync_timestamp';
 
 export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { session } = useAuth();
-  const { updateStreak } = useStreak();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(true);
   const [lastSync, setLastSync] = useState<number>(0);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const cacheUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingCacheUpdate = useRef<Task[] | null>(null);
 
   // Monitor network status
   useEffect(() => {
@@ -111,16 +111,28 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [session?.access_token, isOnline]);
 
-  const updateCache = async (newTasks: Task[]) => {
-    try {
-      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(newTasks));
-      const timestamp = Date.now();
-      await AsyncStorage.setItem(LAST_SYNC_KEY, timestamp.toString());
-      setLastSync(timestamp);
-    } catch (err) {
-      console.error('Error updating task cache:', err);
+  const updateCache = useCallback(async (newTasks: Task[]) => {
+    // Debounce cache updates to reduce AsyncStorage operations
+    pendingCacheUpdate.current = newTasks;
+
+    if (cacheUpdateTimeoutRef.current) {
+      clearTimeout(cacheUpdateTimeoutRef.current);
     }
-  };
+
+    cacheUpdateTimeoutRef.current = setTimeout(async () => {
+      try {
+        const tasksToCache = pendingCacheUpdate.current;
+        if (tasksToCache) {
+          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(tasksToCache));
+          const timestamp = Date.now();
+          await AsyncStorage.setItem(LAST_SYNC_KEY, timestamp.toString());
+          setLastSync(timestamp);
+        }
+      } catch (err) {
+        console.error('Error updating task cache:', err);
+      }
+    }, 300); // Debounce for 300ms
+  }, []);
 
   const refreshTasks = useCallback(async () => {
     if (!session?.access_token) return;
@@ -202,13 +214,24 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateTask = async (taskId: string, updates: Partial<Task>) => {
+  const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
     if (!session?.access_token) {
       throw new Error('Not authenticated');
     }
 
     try {
       setLoading(true);
+
+      // Optimistically update local state first for immediate UI response
+      let newTasks: Task[];
+      setTasks(prevTasks => {
+        newTasks = prevTasks.map(task =>
+          task.id === taskId ? { ...task, ...updates } : task
+        );
+        return newTasks;
+      });
+
+      // Make API call in background
       const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PATCH',
         headers: {
@@ -219,24 +242,27 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (!res.ok) {
+        // Revert optimistic update on error
+        setTasks(prevTasks => prevTasks.map(task =>
+          task.id === taskId ? { ...task, ...Object.keys(updates).reduce((acc, key) => {
+            delete acc[key as keyof Task];
+            return acc;
+          }, { ...task }) } : task
+        ));
         throw new Error(`Failed to update task: ${res.status}`);
       }
 
       const updatedTask = await res.json();
-      
-      // Update local state
+
+      // Update with server response
       setTasks(prevTasks => {
-        const newTasks = prevTasks.map(task =>
+        const finalTasks = prevTasks.map(task =>
           task.id === taskId ? { ...task, ...updatedTask } : task
         );
-        updateCache(newTasks);
-        return newTasks;
+        updateCache(finalTasks);
+        return finalTasks;
       });
 
-      // Update streak if task was completed
-      if (updates.status === 'completed') {
-        await updateStreak(true);
-      }
 
       return updatedTask;
     } catch (err) {
@@ -246,7 +272,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.access_token, updateCache]);
 
   const deleteTask = async (taskId: string) => {
     if (!session?.access_token) throw new Error('Not authenticated');

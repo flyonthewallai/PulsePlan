@@ -50,6 +50,7 @@ export default function AgentScreen() {
   const [messageText, setMessageText] = useState('');
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [messages, setMessages] = useState<Array<{id: string, text: string, isUser: boolean}>>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const actionsFadeAnim = useRef(new Animated.Value(1)).current;
   const scrollViewRef = useRef<ScrollView>(null);
@@ -77,6 +78,11 @@ export default function AgentScreen() {
     const hasUserMessages = messages.some(msg => msg.isUser);
     setShowQuickActions(!hasUserMessages);
   }, [messages]);
+
+  // Debug conversation ID changes
+  useEffect(() => {
+    console.log(`🗨️ [FRONTEND-STATE] conversationId changed to: ${conversationId}`);
+  }, [conversationId]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -432,21 +438,32 @@ export default function AgentScreen() {
       isUser: true,
     };
     setMessages(prev => [...prev, userMessage]);
-    
+
     setIsTyping(true);
-    
+
     try {
       const context = {
         currentPage: 'agent',
         recentTasks: tasks.slice(0, 5),
       };
 
+      console.log(`🗨️ [FRONTEND] Sending message with conversation_id: ${conversationId}`);
+
       const response = await agentAPIService.sendQuery({
         query: message,
+        conversation_id: conversationId,
         context
       });
 
+      console.log(`🗨️ [FRONTEND] Received response with conversation_id: ${response.conversationId}`);
+
       if (response.success) {
+        // Update conversation_id from response if provided
+        if (response.conversationId && response.conversationId !== conversationId) {
+          console.log(`🗨️ [FRONTEND] Updating conversation_id from ${conversationId} to ${response.conversationId}`);
+          setConversationId(response.conversationId);
+        }
+
         let responseText = '';
         if (response.data && typeof response.data.response === 'string') {
           responseText = response.data.response;
@@ -457,7 +474,7 @@ export default function AgentScreen() {
         } else {
           responseText = 'I have successfully completed your request.';
         }
-        
+
         // Add AI response to conversation
         const aiMessage = {
           id: (Date.now() + 1).toString(),

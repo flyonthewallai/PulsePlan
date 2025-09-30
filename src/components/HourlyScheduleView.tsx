@@ -100,7 +100,9 @@ export default function HourlyScheduleView({
   };
 
   const getHourFromPosition = (y: number) => {
-    const hourIndex = Math.floor(y / TOTAL_HOUR_HEIGHT);
+    // Calculate which hour slot we're in, considering the middle grid line (half hour)
+    // Round to the nearest half hour, then snap to the hour
+    const hourIndex = Math.round(y / TOTAL_HOUR_HEIGHT);
     return validStartHour + Math.max(0, Math.min(hourIndex, studyHours.length - 1));
   };
 
@@ -180,11 +182,13 @@ export default function HourlyScheduleView({
     
     const finalY = temporaryTask.startY + translationY;
     
-    // Calculate hour based on the final position
-    const hourIndex = Math.floor((finalY + HOUR_HEIGHT / 2) / TOTAL_HOUR_HEIGHT);
+    // Calculate hour based on the final position, aligning to the center of hour slots
+    const hourIndex = Math.round(finalY / TOTAL_HOUR_HEIGHT);
     const newHour = Math.max(validStartHour, Math.min(validEndHour, validStartHour + hourIndex));
     const newHourIndex = newHour - validStartHour;
     const snappedY = newHourIndex * TOTAL_HOUR_HEIGHT;
+    
+    console.log('Temp drag end:', { finalY, hourIndex, newHour, snappedY });
     
     setTemporaryTask(prev => {
       if (!prev) return null;
@@ -218,9 +222,11 @@ export default function HourlyScheduleView({
     const { translationY } = event.nativeEvent;
     const finalY = draggedTask.startY + translationY;
     
-    // Calculate which hour slot this corresponds to
+    // Calculate which hour slot this corresponds to, rounding to nearest hour
     const hourIndex = Math.round(finalY / TOTAL_HOUR_HEIGHT);
     const newHour = Math.max(validStartHour, Math.min(validEndHour, validStartHour + hourIndex));
+    
+    console.log('Existing task drag end:', { finalY, hourIndex, newHour, startY: draggedTask.startY, translationY });
     
     try {
       const taskDate = new Date(draggedTask.due_date);
@@ -309,13 +315,15 @@ export default function HourlyScheduleView({
         {studyHours.map((hour) => {
           const tasks = getTasksForHour(hour);
           return (
-            <View key={hour} style={styles.hourRow}>
+            <View key={hour} style={[styles.hourRow, { borderBottomColor: currentTheme.colors.border + '20' }]}>
               <View style={styles.hourLabelContainer}>
                 <Text style={[styles.hourLabel, { color: currentTheme.colors.textSecondary }]}>
                   {formatHour(hour)}
                 </Text>
               </View>
               <View style={[styles.dropZone, { backgroundColor: currentTheme.colors.surface }]}>
+                {/* Half-hour grid line */}
+                <View style={[styles.halfHourLine, { backgroundColor: currentTheme.colors.border + '30' }]} />
                 {tasks.map((task) => (
                   <TouchableOpacity
                     key={task.id}
@@ -354,14 +362,23 @@ export default function HourlyScheduleView({
       return;
     }
 
-    const { y } = event;
-    const hour = getHourFromPosition(y);
+    // Get the touch position relative to the schedule container
+    const { y, absoluteY } = event;
+    
+    // Use the relative Y position within the schedule container
+    const relativeY = y;
+    
+    console.log('Touch position:', { y, absoluteY, relativeY });
+    
+    const hour = getHourFromPosition(relativeY);
     
     if (hour < validStartHour || hour > validEndHour) {
-      console.log('Long press outside valid hours');
+      console.log('Long press outside valid hours:', { hour, validStartHour, validEndHour });
       return;
     }
 
+    // Calculate the exact Y position where the task should appear
+    // This should align with the middle of the hour slot (the half-hour grid line)
     const hourIndex = hour - validStartHour;
     const startY = hourIndex * TOTAL_HOUR_HEIGHT;
     
@@ -373,7 +390,7 @@ export default function HourlyScheduleView({
       hour,
     };
     
-    console.log('Creating temporary task:', { hour, startY });
+    console.log('Creating temporary task:', { hour, startY, hourIndex, touchY: relativeY });
     
     setTemporaryTask(tempTask);
     setHasDragged(false);
@@ -588,8 +605,7 @@ const styles = StyleSheet.create({
   hourRow: {
     flexDirection: 'row',
     height: TOTAL_HOUR_HEIGHT,
-    borderBottomWidth: HOUR_BORDER_HEIGHT,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    borderBottomWidth: 0.5,
   },
   hourLabelContainer: {
     width: 60,
@@ -727,5 +743,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 8,
     height: HOUR_HEIGHT,
+  },
+  halfHourLine: {
+    position: 'absolute',
+    top: HOUR_HEIGHT / 2,
+    left: 0,
+    right: 0,
+    height: 0.5,
+    opacity: 0.5,
   },
 }); 

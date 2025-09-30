@@ -3,19 +3,37 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient, Session, User } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
-import { EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY } from '@env';
+// Import environment variables with fallbacks for web
+const getEnvVar = (name: string, fallback?: string) => {
+  // For web builds, Vite uses import.meta.env
+  if (typeof window !== 'undefined' && import.meta?.env) {
+    return import.meta.env[name] || fallback;
+  }
+  // For React Native
+  try {
+    const envVars = require('@env');
+    return envVars[name] || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+// Get environment variables with fallbacks
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || 
+                   getEnvVar('EXPO_PUBLIC_SUPABASE_URL') || 
+                   'https://jwvohxsgokfcysfqhtzo.supabase.co';
+
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || 
+                       getEnvVar('EXPO_PUBLIC_SUPABASE_ANON_KEY') || 
+                       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3dm9oeHNnb2tmY3lzZnFodHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNjQwNjYsImV4cCI6MjA2Mjk0MDA2Nn0.76EqvgoCCoOwxc5KTrSqX5PLeHtB6YD2GbEjSpeOvaU';
 
 // Debug: Log environment variables
 console.log('Environment variables:', {
-  fromEnv: {
-    supabaseUrl: EXPO_PUBLIC_SUPABASE_URL,
-    supabaseAnonKey: EXPO_PUBLIC_SUPABASE_ANON_KEY,
-  }
+  supabaseUrl,
+  hasAnonKey: !!supabaseAnonKey,
+  anonKeyLength: supabaseAnonKey?.length,
+  source: typeof window !== 'undefined' ? 'web' : 'react-native'
 });
-
-// Initialize Supabase client
-const supabaseUrl = EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 console.log('Supabase configuration:', {
   supabaseUrl,

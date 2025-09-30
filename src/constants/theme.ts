@@ -6,14 +6,14 @@ export const colors = {
   textSecondary: '#C6C6D9',
   premiumThemeName: 'rgba(255, 255, 255, 0.5)',
   taskColors: {
-    high: '#FF5757',
+    high: '#E53E3E',
     medium: '#FFC043',
     low: '#4CD964',
     default: '#8E6FFF',
   },
   success: '#4CD964',
   warning: '#FFC043',
-  error: '#FF5757',
+  error: '#E53E3E',
 };
 
 export const shadows = {
