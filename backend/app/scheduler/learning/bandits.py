@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from .model_store import ModelStore, get_model_store
+from ...core.utils.timezone_utils import get_timezone_manager
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,9 @@ class BanditArm:
         old_mean = self.mean_reward
         self.num_pulls += 1
         self.total_reward += reward
-        self.last_pulled = datetime.now()
+        # Use timezone-aware datetime
+        timezone_manager = get_timezone_manager()
+        self.last_pulled = timezone_manager.ensure_timezone_aware(datetime.now())
         
         # Update variance (Welford's online algorithm)
         new_mean = self.mean_reward
@@ -523,3 +526,4 @@ def compute_reward(
         reward += (obj_value / max_possible_obj) * 0.3
     
     return max(-2.0, min(3.0, reward))  # Clip to reasonable range
+

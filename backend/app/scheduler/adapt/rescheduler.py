@@ -9,9 +9,10 @@ import logging
 from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime, timedelta
 
-from ..domain import Task, BusyEvent, Preferences, ScheduleBlock
+from ..core.domain import Task, BusyEvent, Preferences, ScheduleBlock
 from ..io.dto import ScheduleRequest, ScheduleResponse
 from ..io.repository import Repository
+from ...core.utils.timezone_utils import get_timezone_manager
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class ReschedulingStrategy:
     def __init__(self, name: str):
         """Initialize strategy with name."""
         self.name = name
+        self.timezone_manager = get_timezone_manager()
     
     async def should_reschedule(
         self, 
@@ -600,3 +602,5 @@ _reschedule_metrics = ReschedulingMetrics()
 def get_reschedule_metrics() -> ReschedulingMetrics:
     """Get global rescheduling metrics instance."""
     return _reschedule_metrics
+
+

@@ -313,30 +313,159 @@ class ModelStore:
     # Database backend methods (stubbed for now)
     async def _save_to_db(self, key: str, data: Dict) -> bool:
         """Save data to database."""
-        # TODO: Implement database storage
-        # Would use SQLAlchemy/asyncpg to store in learning_params table
-        logger.warning("Database backend not implemented, falling back to memory")
-        self.memory_store[key] = data
-        return True
+        try:
+            from app.config.database.supabase import get_supabase
+            import json
+            
+            supabase = get_supabase()
+            
+            # Prepare data for storage
+            storage_data = {
+                "key": key,
+                "data": json.dumps(data, default=str),
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+                "data_type": "learning_params",
+                "size_bytes": len(json.dumps(data, default=str).encode())
+            }
+            
+            # Try to update first, then insert if not exists
+            try:
+                response = supabase.table("learning_data").update({
+                    "data": storage_data["data"],
+                    "updated_at": storage_data["updated_at"],
+                    "size_bytes": storage_data["size_bytes"]
+                }).eq("key", key).execute()
+                
+                if not response.data:
+                    # Record doesn't exist, insert new one
+                    response = supabase.table("learning_data").insert(storage_data).execute()
+                
+            except Exception:
+                # Fallback to insert (might be first time)
+                response = supabase.table("learning_data").insert(storage_data).execute()
+            
+            if response.data:
+                logger.info(f"Saved learning data to database: {key}")
+                return True
+            else:
+                logger.error(f"Failed to save learning data: {key}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Database save failed for {key}: {e}, falling back to memory")
+            self.memory_store[key] = data
+            return True
     
     async def _load_from_db(self, key: str) -> Optional[Dict]:
         """Load data from database."""
-        # TODO: Implement database loading
-        logger.warning("Database backend not implemented, falling back to memory")
-        return self.memory_store.get(key)
+        try:
+            from app.config.database.supabase import get_supabase
+            import json
+            
+            supabase = get_supabase()
+            
+            # Load from database
+            response = supabase.table("learning_data").select("data").eq("key", key).single().execute()
+            
+            if response.data:
+                data = json.loads(response.data["data"])
+                logger.info(f"Loaded learning data from database: {key}")
+                return data
+            else:
+                logger.info(f"No learning data found in database for key: {key}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Database load failed for {key}: {e}, falling back to memory")
+            return self.memory_store.get(key)
     
     async def _save_blob_to_db(self, key: str, data: Dict) -> bool:
         """Save blob data to database."""
-        # TODO: Implement database blob storage
-        logger.warning("Database backend not implemented, falling back to memory")
-        self.memory_store[key] = data
-        return True
+        try:
+            from app.config.database.supabase import get_supabase
+            import json
+            import base64
+            
+            supabase = get_supabase()
+            
+            # For large blob data, we might want to compress or use external storage
+            # For now, we'll store as base64 encoded JSON
+            blob_data = json.dumps(data, default=str)
+            encoded_data = base64.b64encode(blob_data.encode()).decode()
+            
+            # Prepare storage data
+            storage_data = {
+                "key": key,
+                "data": encoded_data,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+                "data_type": "learning_blob",
+                "size_bytes": len(blob_data.encode()),
+                "encoding": "base64"
+            }
+            
+            # Try to update first, then insert if not exists
+            try:
+                response = supabase.table("learning_data").update({
+                    "data": storage_data["data"],
+                    "updated_at": storage_data["updated_at"],
+                    "size_bytes": storage_data["size_bytes"]
+                }).eq("key", key).execute()
+                
+                if not response.data:
+                    # Record doesn't exist, insert new one
+                    response = supabase.table("learning_data").insert(storage_data).execute()
+                
+            except Exception:
+                # Fallback to insert (might be first time)
+                response = supabase.table("learning_data").insert(storage_data).execute()
+            
+            if response.data:
+                logger.info(f"Saved learning blob to database: {key} ({storage_data['size_bytes']} bytes)")
+                return True
+            else:
+                logger.error(f"Failed to save learning blob: {key}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Database blob save failed for {key}: {e}, falling back to memory")
+            self.memory_store[key] = data
+            return True
     
     async def _load_blob_from_db(self, key: str) -> Optional[Dict]:
         """Load blob data from database."""
-        # TODO: Implement database blob loading
-        logger.warning("Database backend not implemented, falling back to memory")
-        return self.memory_store.get(key)
+        try:
+            from app.config.database.supabase import get_supabase
+            import json
+            import base64
+            
+            supabase = get_supabase()
+            
+            # Load from database
+            response = supabase.table("learning_data").select("data, encoding").eq("key", key).single().execute()
+            
+            if response.data:
+                encoded_data = response.data["data"]
+                encoding = response.data.get("encoding", "json")
+                
+                if encoding == "base64":
+                    # Decode base64 then JSON
+                    decoded_data = base64.b64decode(encoded_data.encode()).decode()
+                    data = json.loads(decoded_data)
+                else:
+                    # Assume JSON
+                    data = json.loads(encoded_data)
+                
+                logger.info(f"Loaded learning blob from database: {key}")
+                return data
+            else:
+                logger.info(f"No learning blob found in database for key: {key}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Database blob load failed for {key}: {e}, falling back to memory")
+            return self.memory_store.get(key)
 
 
 # Global model store instance

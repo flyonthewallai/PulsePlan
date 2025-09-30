@@ -12,7 +12,8 @@ import numpy as np
 from dataclasses import dataclass
 from enum import Enum
 
-from ..domain import Task, ScheduleBlock, ScheduleSolution, Preferences
+from ..core.domain import Task, ScheduleBlock, ScheduleSolution, Preferences
+from ...core.utils.timezone_utils import get_timezone_manager
 
 logger = logging.getLogger(__name__)
 
@@ -686,3 +687,5 @@ _quality_tracker = QualityTracker()
 def get_quality_tracker() -> QualityTracker:
     """Get global quality tracker instance."""
     return _quality_tracker
+
+

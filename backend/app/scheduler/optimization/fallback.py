@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import numpy as np
 from heapq import heappush, heappop
 
-from ..domain import Task, BusyEvent, Preferences, ScheduleBlock, ScheduleSolution
+from ..core.domain import Task, BusyEvent, Preferences, ScheduleBlock, ScheduleSolution
 from .time_index import TimeIndex
 
 logger = logging.getLogger(__name__)

@@ -1,110 +1,93 @@
 """
-Memory system package for PulsePlan.
+Memory module - Comprehensive memory system organized by domain.
 
-This package provides:
-- Ephemeral chat memory using Redis
-- Persistent semantic memory using pgvector
-- Retrieval fusion combining recent context and long-term memory
+This module provides organized access to all memory functionality grouped by domain:
+- core: Core memory infrastructure, types, and database utilities
+- processing: Chat processing, ingestion, and summarization workflows  
+- retrieval: Embedding generation, vector search, and retrieval operations
+- management: Profile management and memory lifecycle
 """
 
-from .chat_memory import (
-    ChatTurn,
-    ChatMemoryService,
-    chat_memory_service,
-    get_chat_memory_service
-)
-
-from .vector_memory import (
-    VectorMemoryService,
-    vector_memory_service,
-    get_vector_memory_service
-)
-
-from .retrieval import (
-    RetrievalService,
-    retrieval_service,
-    get_retrieval_service
-)
-
-from .ingestion import (
-    IngestionService,
-    ingestion_service,
-    get_ingestion_service
-)
-
-from .summarization import (
-    SummarizationService,
-    summarization_service,
-    get_summarization_service
-)
-
-from .profile_snapshots import (
-    WeeklyProfileService,
-    weekly_profile_service,
-    get_weekly_profile_service
-)
-
-from .chat_loop import (
-    ChatLoopService,
-    chat_loop_service,
-    get_chat_loop_service
-)
-
-from .embeddings import (
-    EmbeddingService,
-    embedding_service,
-    get_embedding_service,
-    embed,
-    embed_batch
-)
-
-from .types import *
-from .database import get_memory_database
+# Re-export from modules for backward compatibility
+from .core import *
+from .processing import *
+from .retrieval import *
+from .management import *
 
 __all__ = [
-    # Chat Memory
-    'ChatTurn',
-    'ChatMemoryService', 
-    'chat_memory_service',
-    'get_chat_memory_service',
+    # Core memory infrastructure
+    "ChatTurn",
+    "ChatMemoryService",
+    "get_chat_memory_service", 
+    "create_chat_turn",
+    "ChatTurnCache",
+    "Namespace",
+    "VecMemoryRow",
+    "MemoryContext",
+    "SearchOptions",
+    "SearchResult",
+    "MemoryResult",
+    "EmbeddingResult",
+    "IngestionResult",
+    "RetrievalResult",
+    "MemoryStats",
+    "ProfileSnapshot",
+    "ProfileMetrics",
+    "MemoryDatabase",
+    "get_memory_database",
+    "create_memory_database_session",
+    "initialize_memory_tables",
+    "cleanup_old_memory_data",
     
-    # Vector Memory
-    'VectorMemoryService',
-    'vector_memory_service',
-    'get_vector_memory_service',
+    # Memory processing
+    "ChatLoopService",
+    "get_chat_loop_service",
+    "process_chat_turn", 
+    "build_conversation_context",
+    "manage_memory_storage",
+    "execute_chat_session",
+    "IngestionService",
+    "get_ingestion_service",
+    "ingest_text_content",
+    "ingest_documents",
+    "process_content_chunks",
+    "validate_ingestion_input",
+    "SummarizationService",
+    "get_summarization_service",
+    "summarize_conversation",
+    "summarize_memory_context",
+    "create_profile_snapshot",
+    "compress_memory_content",
     
-    # Retrieval
-    'RetrievalService',
-    'retrieval_service',
-    'get_retrieval_service',
+    # Memory retrieval
+    "EmbeddingService",
+    "get_embedding_service",
+    "embed_batch",
+    "embed_text",
+    "cosine_similarity",
+    "calculate_vector_distance",
+    "optimize_embedding_batch",
+    "RetrievalService",
+    "get_retrieval_service",
+    "search_memory",
+    "ContextItem",
+    "execute_mmr_search",
+    "rank_context_items",
+    "fuse_search_results",
+    "VectorMemoryService",
+    "get_vector_memory_service",
+    "store_vector_memory",
+    "query_vector_memory",
+    "manage_vector_storage",
+    "optimize_vector_indexes",
     
-    # Ingestion
-    'IngestionService',
-    'ingestion_service',
-    'get_ingestion_service',
-    
-    # Summarization
-    'SummarizationService',
-    'summarization_service',
-    'get_summarization_service',
-    
-    # Profile Snapshots
-    'WeeklyProfileService',
-    'weekly_profile_service',
-    'get_weekly_profile_service',
-    
-    # Chat Loop
-    'ChatLoopService',
-    'chat_loop_service',
-    'get_chat_loop_service',
-    
-    # Embeddings
-    'EmbeddingService',
-    'embedding_service',
-    'get_embedding_service',
-    'embed',
-    'embed_batch',
-    
-    # Database
-    'get_memory_database'
+    # Memory management
+    "ProfileManager",
+    "get_profile_manager",
+    "generate_snapshot",
+    "analyze_user_patterns",
+    "track_behavior_metrics",
+    "export_profile_data",
+    "ProfileSnapshotService",
+    "UserBehaviorAnalyzer",
 ]

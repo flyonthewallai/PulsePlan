@@ -7,7 +7,8 @@ Provides efficient mapping between continuous time and discrete scheduling slots
 from datetime import datetime, timedelta, time
 from typing import List, Dict, Tuple, Set, Optional
 import pytz
-from ..domain import BusyEvent, Preferences
+from ..core.domain import BusyEvent, Preferences
+from ...core.utils.timezone_utils import get_timezone_manager
 
 
 class TimeIndex:
@@ -37,12 +38,11 @@ class TimeIndex:
         self.timezone = pytz.timezone(timezone)
         self.granularity_minutes = granularity_minutes
         self.granularity_delta = timedelta(minutes=granularity_minutes)
-        
-        # Ensure timezone-aware datetimes
-        if start_dt.tzinfo is None:
-            start_dt = self.timezone.localize(start_dt)
-        if end_dt.tzinfo is None:
-            end_dt = self.timezone.localize(end_dt)
+        self.timezone_manager = get_timezone_manager()
+
+        # Ensure timezone-aware datetimes using timezone manager
+        start_dt = self.timezone_manager.ensure_timezone_aware(start_dt, self.timezone)
+        end_dt = self.timezone_manager.ensure_timezone_aware(end_dt, self.timezone)
             
         self.start_dt = start_dt
         self.end_dt = end_dt

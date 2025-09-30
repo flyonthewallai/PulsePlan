@@ -1,0 +1,55 @@
+{
+  "name": "deadline_conflict",
+  "description": "Tasks with tight deadlines that may not all fit",
+  "tasks": [
+    {
+      "id": "urgent_task",
+      "title": "Urgent Assignment",
+      "kind": "assignment",
+      "estimated_minutes": 240,
+      "min_block_minutes": 120,
+      "deadline": "2025-09-26T18:00:00",
+      "weight": 3.0
+    },
+    {
+      "id": "long_task",
+      "title": "Long Project",
+      "kind": "project",
+      "estimated_minutes": 360,
+      "min_block_minutes": 60,
+      "deadline": "2025-09-26T20:00:00",
+      "weight": 2.0
+    }
+  ],
+  "availability": [
+    {
+      "start": "2025-09-26T09:00:00",
+      "end": "2025-09-26T17:00:00"
+    }
+  ],
+  "busy_events": [
+    {
+      "id": "meeting",
+      "title": "Team Meeting",
+      "start": "2025-09-26T14:00:00",
+      "end": "2025-09-26T15:00:00",
+      "hard": true
+    }
+  ],
+  "preferences": {
+    "timezone": "UTC",
+    "workday_start": "09:00",
+    "workday_end": "17:00",
+    "max_daily_effort_minutes": 420,
+    "session_granularity_minutes": 30
+  },
+  "expected": {
+    "feasible": false,
+    "num_tasks_scheduled": 1,
+    "solver_status": "infeasible"
+  },
+  "metadata": {
+    "category": "constraints",
+    "complexity": "medium"
+  }
+}

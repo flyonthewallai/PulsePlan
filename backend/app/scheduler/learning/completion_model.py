@@ -14,7 +14,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss, accuracy_score
 
 from .model_store import ModelStore, get_model_store
-from ..domain import CompletionEvent
+from ..core.domain import CompletionEvent
+from ...core.utils.timezone_utils import get_timezone_manager
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ class CompletionModel:
         self.learning_rate = learning_rate
         self.regularization = regularization
         self.random_state = random_state
+        self.timezone_manager = get_timezone_manager()
         
         # Initialize model components
         self.model = SGDClassifier(
@@ -462,3 +464,4 @@ def build_training_data(
         return np.array(X_list), np.array(y_list)
     else:
         return np.array([]).reshape(0, len(feature_names)), np.array([])
+

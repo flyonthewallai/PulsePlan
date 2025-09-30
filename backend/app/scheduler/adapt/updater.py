@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import asyncio
 
-from ..domain import Task, ScheduleBlock, CompletionEvent
+from ..core.domain import Task, ScheduleBlock, CompletionEvent
 from ..learning.completion_model import CompletionModel
 from ..learning.bandits import WeightTuner, compute_reward
 from .evaluator import ScheduleEvaluator, get_quality_tracker
