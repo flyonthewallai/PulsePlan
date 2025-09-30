@@ -2,7 +2,7 @@
 Workflow Manager
 Central orchestrator for LangGraph workflows with error handling and observability
 """
-from typing import Dict, Any, Optional, Type, List
+from typing import Dict, Any, Optional, Type, List, Callable
 from datetime import datetime
 import asyncio
 import logging
@@ -11,19 +11,21 @@ import uuid
 from .graphs.base import BaseWorkflow, WorkflowType, WorkflowState, WorkflowError, create_initial_state
 from .models.workflow_output import create_workflow_output, WorkflowStatus, ConversationResponse
 from .services.supervisor import get_workflow_supervisor
-from .graphs.chat_graph import ChatGraph
+# Removed ChatGraph - using unified system instead
 from .graphs.calendar_graph import CalendarGraph  
 from .graphs.task_graph import TaskGraph
-from .graphs.database_graph import DatabaseGraph
 from .graphs.briefing_graph import BriefingWorkflow as BriefingGraph
 from .graphs.scheduling_graph import SchedulingWorkflow as SchedulingGraph
 from .graphs.search_graph import SearchGraph
 
 # Import new architecture components
-from .core.workflow_container import WorkflowContainer, WorkflowContainerFactory, WorkflowResourceLimits
-from .core.error_boundary import workflow_error_boundary, ErrorBoundaryConfig
-from .core.state_manager import workflow_state_manager, StatePersistenceLevel
-from .core.recovery_service import workflow_recovery_service, RecoveryTrigger
+from .core.state.workflow_container import WorkflowContainer, WorkflowContainerFactory, WorkflowResourceLimits
+from .core.error.error_boundary import WorkflowErrorBoundary
+from .core.state.state_manager import WorkflowStateManager, StatePersistenceLevel
+from .core.error.recovery_service import WorkflowRecoveryService, RecoveryTrigger
+
+# Import unified system services
+from .core.orchestration.intent_processor import get_intent_processor
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +43,9 @@ class AgentOrchestrator:
     
     def __init__(self, enable_isolation: bool = True):
         self.workflows: Dict[WorkflowType, Type[BaseWorkflow]] = {
-            WorkflowType.NATURAL_LANGUAGE: ChatGraph,
+            # WorkflowType.NATURAL_LANGUAGE now handled by unified system
             WorkflowType.CALENDAR: CalendarGraph,
             WorkflowType.TASK: TaskGraph,
-            WorkflowType.DATABASE: DatabaseGraph,
             WorkflowType.BRIEFING: BriefingGraph,
             WorkflowType.SCHEDULING: SchedulingGraph,
             WorkflowType.SEARCH: SearchGraph
@@ -90,7 +91,11 @@ class AgentOrchestrator:
         
         # Update metrics
         self.execution_metrics["total_executions"] += 1
-        
+
+        # Log workflow execution start
+        logger.info(f"🚀 [WORKFLOW START] {workflow_type.value} | ID: {workflow_id} | User: {user_id}")
+        logger.info(f"📋 [WORKFLOW INPUT] {workflow_type.value} | Input: {input_data}")
+
         try:
             if self.enable_isolation:
                 # Use enhanced isolation architecture
@@ -117,9 +122,12 @@ class AgentOrchestrator:
                 )
                 
         except WorkflowError as e:
+            # Log workflow error
+            logger.error(f"❌ [WORKFLOW ERROR] {workflow_type.value} | ID: {workflow_id} | Error: {e.message}")
             # Handle workflow-specific errors
             await self._handle_workflow_error(workflow_id, workflow_type, e)
-            raise e
+            # Don't re-raise to avoid duplicate error messages
+            return self._create_error_response(workflow_id, workflow_type, e)
             
         except Exception as e:
             # Handle unexpected errors
@@ -128,9 +136,26 @@ class AgentOrchestrator:
                 {"workflow_type": workflow_type.value, "user_id": user_id},
                 recoverable=self._is_recoverable_error(e)
             )
-            
+
+            # Log unexpected error
+            logger.error(f"💥 [WORKFLOW CRITICAL ERROR] {workflow_type.value} | ID: {workflow_id} | Error: {str(e)}")
+
             await self._handle_workflow_error(workflow_id, workflow_type, workflow_error)
-            raise workflow_error
+            return self._create_error_response(workflow_id, workflow_type, workflow_error)
+    
+    def _create_error_response(self, workflow_id: str, workflow_type: WorkflowType, error: WorkflowError) -> Dict[str, Any]:
+        """Create a standardized error response"""
+        return {
+            "workflow_id": workflow_id,
+            "workflow_type": workflow_type.value,
+            "status": "failed",
+            "success": False,
+            "error": error.message,
+            "recoverable": error.recoverable,
+            "context": error.context,
+            "timestamp": datetime.utcnow().isoformat(),
+            "execution_time": 0.0
+        }
     
     async def execute_natural_language_query(
         self,
@@ -141,16 +166,36 @@ class AgentOrchestrator:
         trace_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Execute natural language processing workflow - main entry point
+        Execute natural language processing using unified system
         """
-        return await self.execute_workflow(
-            workflow_type=WorkflowType.NATURAL_LANGUAGE,
-            user_id=user_id,
-            input_data={"query": query},
-            user_context=user_context,
-            connected_accounts=connected_accounts,
-            trace_id=trace_id
-        )
+        try:
+            # Use unified intent processor instead of ChatGraph workflow
+            intent_processor = get_intent_processor()
+
+            result = await intent_processor.process_user_query(
+                user_id=user_id,
+                query=query,
+                conversation_id=user_context.get("conversation_id") if user_context else None,
+                include_history=True
+            )
+
+            return {
+                "status": "completed",
+                "success": True,
+                "result": result.dict(),
+                "timestamp": datetime.utcnow().isoformat(),
+                "trace_id": trace_id
+            }
+
+        except Exception as e:
+            logger.error(f"Natural language query failed: {e}")
+            return {
+                "status": "failed",
+                "success": False,
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat(),
+                "trace_id": trace_id
+            }
     
     async def execute_workflow_with_conversation_layer(
         self,
@@ -321,51 +366,6 @@ class AgentOrchestrator:
             input_data={"query": query},
             user_context=user_context,
             connected_accounts=connected_accounts
-        )
-    
-    async def execute_database_operation(
-        self,
-        user_id: str,
-        entity_type: str,
-        operation: str,
-        data: Optional[Dict[str, Any]] = None,
-        entity_id: Optional[str] = None,
-        entity_ids: Optional[List[str]] = None,
-        filters: Optional[Dict[str, Any]] = None,
-        user_context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """
-        Execute database workflow directly for tasks and todos
-        """
-        input_data = {
-            "entity_type": entity_type,
-            "operation": operation
-        }
-        
-        if data:
-            if entity_type == "task":
-                input_data["task_data"] = data
-            elif entity_type == "todo":
-                input_data["todo_data"] = data
-        
-        if entity_id:
-            if entity_type == "task":
-                input_data["task_id"] = entity_id
-            elif entity_type == "todo":
-                input_data["todo_id"] = entity_id
-        
-        if entity_ids:
-            if entity_type == "todo":
-                input_data["todo_ids"] = entity_ids
-        
-        if filters:
-            input_data["filters"] = filters
-        
-        return await self.execute_workflow(
-            workflow_type=WorkflowType.DATABASE,
-            user_id=user_id,
-            input_data=input_data,
-            user_context=user_context
         )
     
     def get_workflow_status(self, workflow_id: str) -> Optional[Dict[str, Any]]:
@@ -542,14 +542,24 @@ class AgentOrchestrator:
         """
         Format workflow result for API response
         """
+        workflow_id = result_state["trace_id"]
+        workflow_type = result_state["workflow_type"]
+        execution_time = (datetime.utcnow() - result_state["execution_start"]).total_seconds()
+        nodes_executed = len(result_state.get("visited_nodes", []))
+        output_data = result_state.get("output_data", {})
+
+        # Log workflow completion
+        logger.info(f"✅ [WORKFLOW SUCCESS] {workflow_type} | ID: {workflow_id} | Time: {execution_time:.2f}s | Nodes: {nodes_executed}")
+        logger.info(f"📤 [WORKFLOW OUTPUT] {workflow_type} | Output: {output_data}")
+
         return {
-            "workflow_id": result_state["trace_id"],
-            "workflow_type": result_state["workflow_type"],
+            "workflow_id": workflow_id,
+            "workflow_type": workflow_type,
             "user_id": result_state["user_id"],
             "status": "completed",
-            "result": result_state.get("output_data", {}),
-            "execution_time": (datetime.utcnow() - result_state["execution_start"]).total_seconds(),
-            "nodes_executed": len(result_state["visited_nodes"]),
+            "result": output_data,
+            "execution_time": execution_time,
+            "nodes_executed": nodes_executed,
             "metrics": result_state.get("metrics", {}),
             "completed_at": datetime.utcnow().isoformat()
         }

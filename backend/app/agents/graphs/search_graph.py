@@ -9,7 +9,7 @@ from typing import Dict, Any
 from datetime import datetime
 
 from .base import BaseWorkflow, WorkflowState, WorkflowError
-from app.core.websocket import websocket_manager
+from app.core.infrastructure.websocket import websocket_manager
 
 logger = logging.getLogger(__name__)
 
@@ -59,14 +59,14 @@ class SearchGraph(BaseWorkflow):
         user_id = state.get("user_id", "unknown")
         workflow_id = state.get("trace_id", "unknown")
         
-        print(f"🔍 [QUERY ANALYZER] Analyzing search query: '{query}' for user: {user_id}")
-        print(f"🔍 [QUERY ANALYZER] State keys: {list(state.keys())}")
+        print(f"[QUERY ANALYZER] Analyzing search query: '{query}' for user: {user_id}")
+        print(f"[QUERY ANALYZER] State keys: {list(state.keys())}")
         
         # Emit node start event
         await websocket_manager.emit_node_update(workflow_id, "query_analyzer", "executing")
         
         if not query:
-            print("❌ [QUERY ANALYZER] Empty query provided")
+            print("Empty query provided")
             state["error"] = "Empty search query"
             state["next_node"] = "error_handler"
             await websocket_manager.emit_node_update(workflow_id, "query_analyzer", "failed", {"error": "Empty search query"})
@@ -84,9 +84,9 @@ class SearchGraph(BaseWorkflow):
                 "analysis_timestamp": datetime.utcnow().isoformat()
             }
             
-            print(f"🔍 [QUERY ANALYZER] Query optimized: '{cleaned_query}'")
-            print(f"🔍 [QUERY ANALYZER] Set search_data: {state['search_data']}")
-            print(f"🔍 [QUERY ANALYZER] Returning state with keys: {list(state.keys())}")
+            print(f"[QUERY ANALYZER] Query optimized: '{cleaned_query}'")
+            print(f"[QUERY ANALYZER] Set search_data: {state['search_data']}")
+            print(f"[QUERY ANALYZER] Returning state with keys: {list(state.keys())}")
             
             # Emit node completion event
             await websocket_manager.emit_node_update(workflow_id, "query_analyzer", "completed", {
@@ -113,7 +113,7 @@ class SearchGraph(BaseWorkflow):
         user_id = state.get("user_id", "unknown")
         workflow_id = state.get("trace_id", "unknown")
         
-        print(f"🔍 [WEB SEARCH] Searching for: '{query}'")
+        print(f"[WEB SEARCH] Searching for: '{query}'")
         
         # Emit node start and tool execution events
         await websocket_manager.emit_node_update(workflow_id, "web_search", "executing")
@@ -144,7 +144,7 @@ class SearchGraph(BaseWorkflow):
                 state["search_data"]["search_successful"] = True
                 state["search_data"]["execution_time"] = search_result.execution_time
                 
-                print(f"🔍 [WEB SEARCH] Found {len(search_result.data.get('results', []))} results")
+                print(f"[WEB SEARCH] Found {len(search_result.data.get('results', []))} results")
                 
                 # Emit tool completion and node completion events
                 await websocket_manager.emit_tool_update(
@@ -162,7 +162,7 @@ class SearchGraph(BaseWorkflow):
             else:
                 state["search_data"]["search_successful"] = False
                 state["search_data"]["search_error"] = search_result.error
-                print(f"❌ [WEB SEARCH] Search failed: {search_result.error}")
+                print(f"Search failed: {search_result.error}")
                 
                 # Emit tool and node failure events
                 await websocket_manager.emit_tool_update(workflow_id, "WebSearchTool", "failed", search_result.error)
@@ -188,10 +188,10 @@ class SearchGraph(BaseWorkflow):
         workflow_id = state.get("trace_id", "unknown")
         
         # Debug: Log the trace_id to see what's happening
-        print(f"🔍 [DEBUG] Result synthesizer - trace_id from state: {state.get('trace_id')}")
-        print(f"🔍 [DEBUG] Result synthesizer - workflow_id being used: {workflow_id}")
+        print(f"[DEBUG] Result synthesizer - trace_id from state: {state.get('trace_id')}")
+        print(f"[DEBUG] Result synthesizer - workflow_id being used: {workflow_id}")
         
-        print(f"🔍 [RESULT SYNTHESIZER] Processing results for: '{original_query}'")
+        print(f"[RESULT SYNTHESIZER] Processing results for: '{original_query}'")
         
         # Emit node start event
         await websocket_manager.emit_node_update(workflow_id, "result_synthesizer", "executing")
@@ -245,11 +245,11 @@ class SearchGraph(BaseWorkflow):
                 "success": True
             }
             
-            print(f"🔍 [RESULT SYNTHESIZER] Synthesized response with {len(formatted_results)} results")
+            print(f"[RESULT SYNTHESIZER] Synthesized response with {len(formatted_results)} results")
             
             # Emit search results via WebSocket
-            print(f"🔍 [WEBSOCKET] Emitting search results for workflow {workflow_id}")
-            print(f"🔍 [WEBSOCKET] Results: {len(formatted_results)} items, synthesis: {len(synthesis_message)} chars")
+            print(f"[WEBSOCKET] Emitting search results for workflow {workflow_id}")
+            print(f"[WEBSOCKET] Results: {len(formatted_results)} items, synthesis: {len(synthesis_message)} chars")
             
             await websocket_manager.emit_search_results(workflow_id, {
                 "search_results": formatted_results,
@@ -261,7 +261,7 @@ class SearchGraph(BaseWorkflow):
                 "success": True
             })
             
-            print(f"🔍 [WEBSOCKET] Search results emitted successfully")
+            print(f"[WEBSOCKET] Search results emitted successfully")
             
             # Emit node completion event
             await websocket_manager.emit_node_update(workflow_id, "result_synthesizer", "completed", {
@@ -285,7 +285,7 @@ class SearchGraph(BaseWorkflow):
         
         workflow_id = state.get("trace_id", "unknown")
         
-        print(f"🔍 [RESULT PROCESSOR] Finalizing search results")
+        print(f"[RESULT PROCESSOR] Finalizing search results")
         
         # Emit node start event
         await websocket_manager.emit_node_update(workflow_id, "result_processor", "executing")
@@ -316,7 +316,7 @@ class SearchGraph(BaseWorkflow):
         query = state.get("input_data", {}).get("query", "unknown query")
         workflow_id = state.get("trace_id", "unknown")
         
-        print(f"❌ [ERROR HANDLER] Handling search error: {error}")
+        print(f"[ERROR HANDLER] Handling search error: {error}")
         
         # Emit error events
         await websocket_manager.emit_node_update(workflow_id, "error_handler", "executing")
@@ -384,7 +384,7 @@ class SearchGraph(BaseWorkflow):
             response = llm.invoke(prompt)
             return response.content.strip()
         except Exception as e:
-            print(f"❌ [SYNTHESIS] LLM synthesis failed: {e}")
+            print(f"Synthesis failed: {e}")
             # Fallback to simple answer if available
             if answer:
                 return f"Based on my search: {answer}"

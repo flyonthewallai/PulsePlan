@@ -8,7 +8,7 @@ import logging
 from langgraph.graph import END
 
 from .base import BaseWorkflow, WorkflowType, WorkflowState, WorkflowError
-from app.core.websocket import websocket_manager
+from app.core.infrastructure.websocket import websocket_manager
 
 logger = logging.getLogger(__name__)
 
@@ -222,8 +222,8 @@ class EmailGraph(BaseWorkflow):
             return result
             
         except Exception as e:
-            print(f"❌ [EMAIL CLASSIFICATION] Failed to classify sender: {str(e)}")
-            print(f"❌ [EMAIL CLASSIFICATION] Raw response: {response.content if 'response' in locals() else 'No response'}")
+            print(f"Failed to classify sender: {str(e)}")
+            print(f"Raw response: {response.content if 'response' in locals() else 'No response'}")
             
             # Safe fallback - extract basic info from query
             if "connergroth03@gmail.com" in query.lower():
@@ -594,7 +594,7 @@ class EmailGraph(BaseWorkflow):
                 state["email_data"] = result.data.get("messages", []) if result.data else []
                 
                 await websocket_manager.emit_tool_update(workflow_id, "EmailReadTool", "completed", {
-                    "emails_found": len(state["email_data"]),
+                    "emails_found": len(state.get("email_data", [])),
                     "provider": provider
                 })
             else:
@@ -730,7 +730,7 @@ class EmailGraph(BaseWorkflow):
             state["output_data"]["metadata"] = {
                 "workflow_type": "email",
                 "execution_time": (datetime.utcnow() - state["execution_start"]).total_seconds(),
-                "nodes_visited": len(state["visited_nodes"])
+                "nodes_visited": len(state.get("visited_nodes", []))
             }
             
             # Emit email_results WebSocket event for frontend consumption

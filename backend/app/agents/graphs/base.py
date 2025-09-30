@@ -11,7 +11,7 @@ from langgraph.graph import StateGraph, END
 
 
 class WorkflowType(str, Enum):
-    NATURAL_LANGUAGE = "natural_language"
+    # NATURAL_LANGUAGE removed - handled by unified agent system
     CALENDAR = "calendar"
     TASK = "task"
     DATABASE = "database"
@@ -238,7 +238,7 @@ class BaseWorkflow(ABC):
         state["output_data"]["metadata"] = {
             "workflow_type": state["workflow_type"],
             "execution_time": (datetime.utcnow() - state["execution_start"]).total_seconds(),
-            "nodes_visited": len(state["visited_nodes"])
+            "nodes_visited": len(state.get("visited_nodes", []))
         }
         
         return state

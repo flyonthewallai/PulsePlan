@@ -1,1 +1,3 @@
-# Services package for agent system
+"""
+Agent services package for intelligent task operations.
+"""

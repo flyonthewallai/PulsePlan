@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 import uvicorn
 import logging
 
-from app.config.settings import settings
-from app.config.supabase import supabase_client
+from app.config.core.settings import settings
+from app.config.database.supabase import supabase_client
 from app.config.redis import redis_client
 from app.security.encryption import encryption_service
 
@@ -139,3 +139,4 @@ if __name__ == "__main__":
         reload=settings.ENVIRONMENT == "development",
         access_log=True
     )
+
