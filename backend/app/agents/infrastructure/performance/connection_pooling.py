@@ -122,11 +122,11 @@ class SupabaseConnectionPool:
             # Test pool with a simple query
             await self._test_pool_health()
             
-            logger.info(f"✅ Supabase connection pool initialized successfully")
+            logger.info(f"Supabase connection pool initialized successfully")
             return self.pool
             
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Supabase connection pool: {e}")
+            logger.error(f"Failed to initialize Supabase connection pool: {e}")
             raise
     
     async def _init_connection(self, connection: asyncpg.Connection):
@@ -367,7 +367,7 @@ class SupabaseConnectionPool:
         if self.pool:
             await self.pool.close()
             self.closed_connections += self.created_connections
-            logger.info(f"✅ Supabase connection pool closed (handled {self.total_acquired} connections)")
+            logger.info(f"Supabase connection pool closed (handled {self.total_acquired} connections)")
 
 
 # Global connection pool instance

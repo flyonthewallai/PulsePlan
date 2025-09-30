@@ -46,7 +46,7 @@ async def demo_basic_workflow_execution():
             }
         )
         
-        print(f"✅ Workflow completed successfully!")
+        print(f"Workflow completed successfully!")
         print(f"   Workflow ID: {result.get('workflow_id')}")
         print(f"   Execution Time: {result.get('execution_time', 0):.2f}s")
         print(f"   Nodes Executed: {result.get('nodes_executed', 0)}")
@@ -54,7 +54,7 @@ async def demo_basic_workflow_execution():
         return result["workflow_id"]
         
     except Exception as e:
-        print(f"❌ Workflow failed: {str(e)}")
+        print(f"Workflow failed: {str(e)}")
         return None
 
 
@@ -76,17 +76,17 @@ async def demo_workflow_recovery():
         )
         
         workflow_id = result["workflow_id"]
-        print(f"✅ Workflow unexpectedly succeeded: {workflow_id}")
+        print(f"Workflow unexpectedly succeeded: {workflow_id}")
         
     except Exception as e:
-        print(f"⚠️  Workflow failed as expected: {str(e)}")
+        print(f"Workflow failed as expected: {str(e)}")
         
         # Try to find and recover failed workflows
         print("Attempting batch recovery...")
         recovered_ids = await agent_orchestrator.batch_recover_failed_workflows(max_workflows=5)
         
         if recovered_ids:
-            print(f"✅ Successfully recovered {len(recovered_ids)} workflows:")
+            print(f"Successfully recovered {len(recovered_ids)} workflows:")
             for wf_id in recovered_ids:
                 print(f"   - {wf_id}")
         else:
@@ -108,7 +108,7 @@ async def demo_checkpoint_and_resume():
         )
         
         workflow_id = result["workflow_id"]
-        print(f"✅ Workflow started: {workflow_id}")
+        print(f"Workflow started: {workflow_id}")
         
         # Create a checkpoint
         checkpoint_created = await agent_orchestrator.create_checkpoint(
@@ -117,7 +117,7 @@ async def demo_checkpoint_and_resume():
         )
         
         if checkpoint_created:
-            print(f"✅ Checkpoint created for workflow {workflow_id}")
+            print(f"Checkpoint created for workflow {workflow_id}")
             
             # Demonstrate suspension and resumption
             suspended = await agent_orchestrator.suspend_workflow(
@@ -135,14 +135,14 @@ async def demo_checkpoint_and_resume():
                 if resumed:
                     print(f"▶️  Workflow {workflow_id} resumed")
                 else:
-                    print(f"❌ Failed to resume workflow {workflow_id}")
+                    print(f"Failed to resume workflow {workflow_id}")
             else:
-                print(f"❌ Failed to suspend workflow {workflow_id}")
+                print(f"Failed to suspend workflow {workflow_id}")
         else:
-            print(f"❌ Failed to create checkpoint for workflow {workflow_id}")
+            print(f"Failed to create checkpoint for workflow {workflow_id}")
             
     except Exception as e:
-        print(f"❌ Demo failed: {str(e)}")
+        print(f"Demo failed: {str(e)}")
 
 
 async def demo_custom_recovery_handler():
@@ -151,7 +151,7 @@ async def demo_custom_recovery_handler():
     
     async def custom_task_recovery_handler(workflow_id: str, state: Dict[str, Any]) -> bool:
         """Custom recovery handler for task workflows"""
-        print(f"🔧 Custom recovery handler called for workflow {workflow_id}")
+        print(f"Custom recovery handler called for workflow {workflow_id}")
         
         # Simulate custom recovery logic
         error_info = state.get("error", {})
@@ -175,7 +175,7 @@ async def demo_custom_recovery_handler():
         "backoff_multiplier": 1.5
     })
     
-    print("✅ Custom recovery handler and policy registered for task workflows")
+    print("Custom recovery handler and policy registered for task workflows")
 
 
 async def demo_metrics_and_monitoring():
@@ -185,7 +185,7 @@ async def demo_metrics_and_monitoring():
     # Get comprehensive metrics
     metrics = agent_orchestrator.get_workflow_metrics()
     
-    print("📊 Current Workflow Metrics:")
+    print("Current Workflow Metrics:")
     print("   Orchestrator:")
     orchestrator_metrics = metrics.get("orchestrator", {})
     print(f"     - Total Executions: {orchestrator_metrics.get('execution_metrics', {}).get('total_executions', 0)}")
@@ -220,7 +220,7 @@ async def demo_metrics_and_monitoring():
 
 async def main():
     """Main demonstration function"""
-    print("🚀 Enhanced Workflow Architecture Demonstration")
+    print("Enhanced Workflow Architecture Demonstration")
     print("=" * 60)
     
     try:
@@ -235,8 +235,8 @@ async def main():
         await demo_metrics_and_monitoring()
         
         print("\n" + "=" * 60)
-        print("✅ Demonstration completed successfully!")
-        print("🎯 Key features demonstrated:")
+        print("Demonstration completed successfully!")
+        print("Key features demonstrated:")
         print("   - Isolated workflow execution with resource limits")
         print("   - Automatic error boundary protection")
         print("   - State management with checkpoints")
@@ -245,7 +245,7 @@ async def main():
         print("   - Comprehensive metrics and monitoring")
         
     except Exception as e:
-        print(f"\n❌ Demonstration failed: {str(e)}")
+        print(f"\nDemonstration failed: {str(e)}")
         logger.exception("Demo error")
 
 

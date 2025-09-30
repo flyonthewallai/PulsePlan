@@ -219,7 +219,7 @@ class LLMProposal(BaseVersionedModel):
     operation_type: WorkflowOperation = Field(..., description="Proposed operation")
     parameters: Dict[str, Any] = Field(default_factory=dict, description="Extracted parameters")
     confidence: float = Field(..., ge=0.0, le=1.0, description="LLM confidence score")
-    reasoning: str = Field(..., min_length=1, description="LLM reasoning for the proposal")
+    reasoning: str = Field(..., min_length=1, description="Brief LLM reasoning for the proposal (max 10 words)")
     
     # Context analysis
     missing_context: List[str] = Field(default_factory=list, description="Missing required context")

@@ -17,8 +17,8 @@ from .health_checks import (
     HealthCheckManager, DatabaseHealthCheck, RedisHealthCheck,
     LLMServiceHealthCheck, CircuitBreakerHealthCheck, MemoryHealthCheck
 )
-from ...config.redis_upstash import get_redis_client, test_redis_connection
-from ...config.production_config import get_config, ProductionConfig
+from app.config.cache.upstash_rest import UpstashRestClient
+from app.config.core.settings import get_settings as get_config, Settings as ProductionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +51,14 @@ class ProductionInfrastructureManager:
         # Test Redis connection
         connection_test = await test_redis_connection()
         if connection_test["status"] == "connected":
-            logger.info(f"✅ Upstash Redis connection established (ping: {connection_test['ping_duration_ms']}ms)")
+            logger.info(f"Upstash Redis connection established (ping: {connection_test['ping_duration_ms']}ms)")
         else:
-            logger.error(f"❌ Upstash Redis connection failed: {connection_test.get('error', 'Unknown error')}")
+            logger.error(f"Upstash Redis connection failed: {connection_test.get('error', 'Unknown error')}")
             raise ConnectionError(f"Redis connection failed: {connection_test.get('error')}")
         
         # Initialize Rate Limiter with environment config
         self.rate_limiter = ProductionRateLimiter(self.redis_client, self.config)
-        logger.info("✅ Rate limiter initialized with environment configuration")
+        logger.info("Rate limiter initialized with environment configuration")
         
         # Initialize Security Components with environment config
         security_config = self.config.security
@@ -75,7 +75,7 @@ class ProductionInfrastructureManager:
             self.security_validator,
             self.payload_signer
         )
-        logger.info("✅ Security components initialized with environment configuration")
+        logger.info("Security components initialized with environment configuration")
         
         # Initialize Error Handling Components with environment config
         retry_config = self.config.retry
@@ -87,16 +87,16 @@ class ProductionInfrastructureManager:
         )
         
         self.error_surfacer = ErrorSurfacer()
-        logger.info("✅ Error handling components initialized")
+        logger.info("Error handling components initialized")
         
         # Initialize Health Check Manager
         await self._setup_health_checks()
-        logger.info("✅ Health check system initialized")
+        logger.info("Health check system initialized")
         
         # Update circuit breakers with environment configuration
         await self._configure_circuit_breakers()
         
-        logger.info("🚀 Production infrastructure fully initialized")
+        logger.info("Production infrastructure fully initialized")
     
     async def _setup_health_checks(self):
         """Setup health check system"""
@@ -183,7 +183,7 @@ class ProductionInfrastructureManager:
             )
         )
         
-        logger.info("✅ Circuit breakers configured with environment settings")
+        logger.info("Circuit breakers configured with environment settings")
     
     async def validate_and_rate_limit_request(
         self,
@@ -306,9 +306,9 @@ class ProductionInfrastructureManager:
         """Gracefully shutdown all components"""
         if self.redis_client:
             await self.redis_client.close()
-            logger.info("✅ Redis connection closed")
+            logger.info("Redis connection closed")
         
-        logger.info("🔌 Production infrastructure shutdown complete")
+        logger.info("Production infrastructure shutdown complete")
 
 
 # Global infrastructure manager instance

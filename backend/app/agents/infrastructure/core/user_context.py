@@ -10,8 +10,8 @@ from dataclasses import dataclass, asdict
 from pydantic import BaseModel
 import uuid
 
-from app.config.redis_upstash import get_redis_client
-from app.config.supabase import get_supabase
+from app.config.cache.redis_client import get_redis_client
+from app.config.database.supabase import get_supabase
 from app.memory import get_vector_memory_service, get_chat_memory_service
 
 logger = logging.getLogger(__name__)
@@ -83,24 +83,20 @@ class UserContextService:
         await self._ensure_services()
         
         try:
-            # Get basic profile from profiles table
-            profile_response = self.supabase.table("profiles").select("*").eq("id", user_id).execute()
-            profile_data = profile_response.data[0] if profile_response.data else {}
-            
-            # Get additional user data from users table
+            # Get user data from users table only
             user_response = self.supabase.table("users").select("*").eq("id", user_id).execute()
             user_data = user_response.data[0] if user_response.data else {}
-            
+
             # Check for agent context in user_preferences table
             agent_context = await self._get_agent_context(user_id)
-            
+
             return UserProfileData(
                 user_id=user_id,
-                name=profile_data.get("full_name") or user_data.get("name"),
+                name=user_data.get("full_name") or user_data.get("name"),
                 email=user_data.get("email"),
-                city=profile_data.get("city") or user_data.get("city"),
-                timezone=profile_data.get("timezone") or user_data.get("timezone", "UTC"),
-                preferences=profile_data.get("preferences", {}),
+                city=user_data.get("city"),
+                timezone=user_data.get("timezone", "UTC"),
+                preferences=user_data.get("preferences", {}),
                 agent_description=agent_context.get("description"),
                 agent_instructions=agent_context.get("instructions"),
                 agent_persona=agent_context.get("persona"),
@@ -494,3 +490,4 @@ async def get_user_context_service() -> UserContextService:
         _user_context_service = UserContextService()
     
     return _user_context_service
+
