@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(/C:\\Users\\Conner Groth\\Projects\\PulsePlan/**)",
+      "Find(/C:\\Users\\Conner Groth\\Projects\\PulsePlan/**)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Read(//c/Users/**)",
+      "Bash(cd:*)",
+      "Bash(curl:*)",
+      "mcp__supabase__list_tables",
+      "Bash(python -m pytest app/scheduler/testing/test_slo_gates.py -v)",
+      "Bash(python -m pytest app/scheduler/testing/test_slo_gates.py::TestSLOGate::test_slo_gate_initialization -v)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
+}
