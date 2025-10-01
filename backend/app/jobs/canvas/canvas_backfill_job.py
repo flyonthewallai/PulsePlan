@@ -548,6 +548,18 @@ class CanvasBackfillJob:
                 batch_size = 50
                 for i in range(0, len(task_records), batch_size):
                     batch = task_records[i:i + batch_size]
+                    # Normalize keys across batch to satisfy PostgREST 'All object keys must match'
+                    try:
+                        all_keys = set()
+                        for obj in batch:
+                            all_keys.update(obj.keys())
+                        normalized_batch = []
+                        for obj in batch:
+                            normalized_obj = {key: obj.get(key, None) for key in all_keys}
+                            normalized_batch.append(normalized_obj)
+                        batch = normalized_batch
+                    except Exception:
+                        pass
                     try:
                         logger.debug(f"Upserting batch {i//batch_size + 1}: {len(batch)} tasks")
                         # Log first task in batch for debugging
@@ -620,7 +632,7 @@ class CanvasBackfillJob:
             submission_types = assignment_data.get("submission_types", [])
             task_type = "assignment"
             if "online_quiz" in submission_types:
-                task_type = "quiz"  
+                task_type = "quiz"
             elif "discussion_topic" in submission_types:
                 task_type = "task"
 
@@ -640,7 +652,8 @@ class CanvasBackfillJob:
                 "description": assignment_data.get("description", ""),
                 "task_type": task_type,
                 "course_id": course_id,  # Link to courses table
-                "subject": assignment_data.get("course_name", ""),  # Keep as fallback for now
+                # schema uses 'course' (text) not 'subject'
+                "course": assignment_data.get("course_name", ""),
                 "due_date": due_date,
                 "estimated_minutes": estimated_minutes,
 
@@ -721,16 +734,17 @@ class CanvasBackfillJob:
     async def _set_cursor(self, user_id: str, cursor_type: str, cursor_value: str):
         """Set external cursor for progress tracking"""
         try:
-            cursor = ExternalCursorModel(
-                user_id=user_id,
-                source="canvas",
-                cursor_type=cursor_type,
-                cursor_value=cursor_value,
-                updated_at=datetime.utcnow()
-            )
+            # Align with schema.sql: external_cursor has updated_at only (no created_at)
+            cursor_record = {
+                "user_id": user_id,
+                "source": "canvas",
+                "cursor_type": cursor_type,
+                "cursor_value": cursor_value,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
 
             self.supabase.table("external_cursor").upsert(
-                cursor.to_supabase_insert(),
+                cursor_record,
                 on_conflict="user_id,source,cursor_type"
             ).execute()
 

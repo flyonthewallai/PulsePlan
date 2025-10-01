@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebSocket } from '../contexts/WebSocketContext'
-import { supabaseClient } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabase'
 import { TODO_CACHE_KEYS } from './cacheKeys'
 
 // Track pending todo mutations to prevent race conditions
@@ -23,12 +23,12 @@ export const useTodoUpdates = () => {
     // Set up Supabase real-time subscription for todos
     
     const setupSubscription = async () => {
-      const { data: { user } } = await supabaseClient.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         return
       }
       
-      const channel = supabaseClient
+      const channel = supabase
         .channel('todos-changes')
         .on(
           'postgres_changes',
@@ -60,7 +60,7 @@ export const useTodoUpdates = () => {
 
     return () => {
       if (channel) {
-        supabaseClient.removeChannel(channel)
+        supabase.removeChannel(channel)
       }
     }
   }, [queryClient])

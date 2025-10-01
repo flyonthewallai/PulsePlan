@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebSocket } from '../contexts/WebSocketContext'
 import { TASK_CACHE_KEYS, TODO_CACHE_KEYS } from './cacheKeys'
-import { supabaseClient } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabase'
 import { pendingTodoMutations } from './useTodoUpdates'
 
 // Track pending task mutations to prevent race conditions
@@ -22,7 +22,7 @@ export const useTaskUpdates = () => {
   
   useEffect(() => {
     // Set up Supabase real-time subscription for tasks
-    const channel = supabaseClient
+    const channel = supabase
       .channel('tasks-changes')
       .on(
         'postgres_changes',
@@ -43,7 +43,7 @@ export const useTaskUpdates = () => {
       .subscribe()
 
     return () => {
-      supabaseClient.removeChannel(channel)
+      supabase.removeChannel(channel)
     }
   }, [queryClient])
   

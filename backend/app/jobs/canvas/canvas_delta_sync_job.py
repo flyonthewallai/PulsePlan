@@ -382,7 +382,8 @@ class CanvasDeltaSyncJob:
         return {
             "title": assignment_data.get("name", "Untitled Assignment"),
             "description": assignment_data.get("description", ""),
-            "subject": assignment_data.get("course_name", ""),
+            # schema uses 'course' (text) not 'subject'
+            "course": assignment_data.get("course_name", ""),
             "due_date": due_date,
             "estimated_minutes": estimated_minutes,
             "external_updated_at": canvas_updated.isoformat(),
@@ -424,7 +425,8 @@ class CanvasDeltaSyncJob:
             "title": assignment_data.get("name", "Untitled Assignment"),
             "description": assignment_data.get("description", ""),
             "task_type": task_type,
-            "subject": assignment_data.get("course_name", ""),
+            # schema uses 'course' (text) not 'subject'
+            "course": assignment_data.get("course_name", ""),
             "due_date": due_date,
             "estimated_minutes": estimated_minutes,
             "external_source": "canvas",

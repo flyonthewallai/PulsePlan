@@ -14,7 +14,7 @@ export const useTasks = (params?: {
   // Normalize params to ensure consistent query keys
   const normalizedParams = params || undefined
   const queryKey = [...TASK_CACHE_KEYS.TASKS, normalizedParams]
-  
+
   return useQuery({
     queryKey,
     queryFn: () => api.tasks.list(params),

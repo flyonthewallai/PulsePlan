@@ -36,6 +36,8 @@ import { useProfile } from '@/contexts/ProfileContext';
 import { signOut, supabase } from '@/lib/supabase-rn';
 import SubscriptionModal from '@/components/SubscriptionModal';
 import PremiumMemberModal from '@/components/PremiumMemberModal';
+import { CanvasService, CanvasIntegrationStatus } from '@/services/canvasService';
+import { useFocusEffect } from '@react-navigation/native';
 
 const SettingsSection = ({ title, children }: { title: string; children: React.ReactNode }) => {
     const { currentTheme } = useTheme();
@@ -100,12 +102,14 @@ const SettingsRow = ({
 export default function SettingsScreen() {
   const router = useRouter();
   const { currentTheme } = useTheme();
-  const { user, refreshAuth, subscriptionPlan } = useAuth();
+  const { user, refreshAuth, subscriptionPlan, session } = useAuth();
   const { profileData, updateLocation, getLocationData } = useProfile();
   const [isSubscriptionModalVisible, setIsSubscriptionModalVisible] = useState(false);
   const [isPremiumMemberModalVisible, setIsPremiumMemberModalVisible] = useState(false);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
   const [userName, setUserName] = useState('');
+  const [canvasStatus, setCanvasStatus] = useState<CanvasIntegrationStatus | null>(null);
+  const [isLoadingCanvasStatus, setIsLoadingCanvasStatus] = useState(false);
 
   // Load user name from Supabase
   useEffect(() => {
@@ -134,6 +138,35 @@ export default function SettingsScreen() {
 
     loadUserName();
   }, [user?.id]);
+
+  // Load Canvas integration status
+  const loadCanvasStatus = async () => {
+    if (!session?.access_token) return;
+    
+    try {
+      setIsLoadingCanvasStatus(true);
+      const status = await CanvasService.getIntegrationStatus(session.access_token);
+      setCanvasStatus(status);
+    } catch (error) {
+      console.error('Error loading Canvas status:', error);
+      setCanvasStatus(null);
+    } finally {
+      setIsLoadingCanvasStatus(false);
+    }
+  };
+
+  // Load Canvas status on mount and when screen comes into focus
+  useEffect(() => {
+    loadCanvasStatus();
+  }, [session?.access_token]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (session?.access_token) {
+        loadCanvasStatus();
+      }
+    }, [session?.access_token])
+  );
 
   // Get current timezone
   const getCurrentTimezone = () => {
@@ -324,7 +357,13 @@ export default function SettingsScreen() {
           <SettingsRow 
             icon={<CachedImage imageKey="canvas" style={{ width: 20, height: 20 }} />} 
             title="Canvas" 
-            value="Not Connected" 
+            value={
+              isLoadingCanvasStatus 
+                ? "Loading..." 
+                : canvasStatus?.connected 
+                  ? `Connected (${canvasStatus.totalCanvasTasks} assignments)` 
+                  : "Not Connected"
+            } 
             onPress={() => router.push('/(settings)/integrations/canvas')} 
           />
           <SettingsRow 

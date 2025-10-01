@@ -1,7 +1,7 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthGate } from '../features/auth/AuthGate'
-import { LoginPage } from '../features/auth/LoginPage'
+import { AuthPage } from '../pages/AuthPage'
 import { HomePage } from '../pages/HomePage'
 import { CalendarPage } from '../pages/CalendarPage'
 import { StreaksPage } from '../pages/StreaksPage'
@@ -10,6 +10,7 @@ import { TodosPage } from '../pages/TodosPage'
 import { IntegrationsPage } from '../pages/IntegrationsPage'
 import { OAuthSuccessPage } from '../pages/OAuthSuccessPage'
 import { OAuthErrorPage } from '../pages/OAuthErrorPage'
+import { AuthCallbackPage } from '../pages/AuthCallbackPage'
 import { AppShell } from '../components/layout/AppShell'
 
 function ProtectedRoutes() {
@@ -31,7 +32,8 @@ function ProtectedRoutes() {
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/auth/*" element={<LoginPage />} />
+      <Route path="/auth/*" element={<AuthPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/oauth/success" element={<OAuthSuccessPage />} />
       <Route path="/oauth/error" element={<OAuthErrorPage />} />
       <Route

@@ -65,121 +65,138 @@ export const WeekGrid: React.FC<WeekGridProps> = ({
   return (
     <div
       ref={actualGridRef}
-      className={cn('relative bg-neutral-900 rounded-lg border border-neutral-700', className)}
+      className={cn('relative bg-neutral-900', className)}
       style={{
-        height: totalHeight + 60, // Extra space for header
+        height: totalHeight + 60 + 48, // Extra space for header + all-day row
       }}
     >
-      {/* Header with day labels */}
-      <div ref={headerRef} className="sticky top-0 z-20 bg-neutral-800 border-b border-neutral-700 rounded-t-lg">
-        <div className="grid grid-cols-8 h-16">
-          {/* Time column header */}
-          <div ref={gutterRef} className="flex items-center justify-center text-neutral-400 text-sm font-medium border-r border-neutral-700">
-            Time
-          </div>
+      {/* Header with day labels - Dates next to weekdays */}
+      <div ref={headerRef} className="sticky top-0 z-20 bg-neutral-900 flex">
+        {/* Time column header - empty space */}
+        <div ref={gutterRef} className="flex items-center justify-center text-gray-500 text-xs font-medium" style={{ width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT }}>
           
-          {/* Day headers */}
-          {weekDays.map((day) => {
-            const isToday = format(day, 'yyyy-MM-dd') === todayDateString;
-            
-            return (
-              <div
-                key={day.toISOString()}
-                className={cn(
-                  'flex flex-col items-center justify-center border-r border-neutral-700 last:border-r-0',
-                  'transition-colors duration-200',
-                  isToday 
-                    ? 'bg-neutral-600/20 text-white' 
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-700/30'
-                )}
-              >
-                <div className={cn(
-                  'text-xs font-medium uppercase tracking-wide mb-1',
-                  isToday ? 'text-blue-400' : 'text-neutral-400'
-                )}>
-                  {format(day, 'EEE')}
-                </div>
-                <div className={cn(
-                  'text-lg font-semibold',
-                  isToday 
-                    ? 'text-white bg-blue-500 w-7 h-7 rounded-full flex items-center justify-center' 
-                    : ''
-                )}>
-                  {format(day, 'd')}
-                </div>
-              </div>
-            );
-          })}
         </div>
-      </div>
-
-      {/* Main grid content */}
-      <div className="relative">
-        {/* Time slots grid */}
-        <div className="grid grid-cols-8">
-          {/* Hour labels column */}
-          <div className="relative border-r border-neutral-700">
-            {timeSlots.map((slot, index) => {
-              const isHourStart = slot.getMinutes() === 0;
+        
+        {/* Day headers with dates inline */}
+        <div className="flex-1 border-l border-r border-b border-white/5">
+          <div className="grid h-14" style={{ gridTemplateColumns: `repeat(7, ${dayWidth}px)` }}>
+            {weekDays.map((day) => {
+              const isToday = format(day, 'yyyy-MM-dd') === todayDateString;
               
               return (
                 <div
-                  key={index}
+                  key={day.toISOString()}
                   className={cn(
-                    'relative border-b border-neutral-800/50 text-neutral-400 text-xs',
-                    'flex items-start justify-end pr-3 pt-1'
+                    'flex items-center justify-center border-r border-white/5 last:border-r-0',
+                    'transition-colors duration-200'
                   )}
-                  style={{ height: slotHeight }}
                 >
-                  {isHourStart && (
-                    <span className="font-medium">
-                      {format(slot, 'ha')}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      'text-xs font-semibold uppercase tracking-wider',
+                      isToday ? 'text-blue-400' : 'text-gray-500'
+                    )}>
+                      {format(day, 'EEE')}
+                    </div>
+                    <div className={cn(
+                      'text-sm font-semibold',
+                      isToday 
+                        ? 'text-white bg-blue-500 w-6 h-6 rounded-full flex items-center justify-center' 
+                        : 'text-white'
+                    )}>
+                      {format(day, 'd')}
+                    </div>
+                  </div>
                 </div>
               );
             })}
           </div>
+        </div>
+      </div>
 
-          {/* Day columns */}
-          {weekDays.map((day, dayIndex) => {
-            const isToday = format(day, 'yyyy-MM-dd') === todayDateString;
-            
-            return (
+      {/* All-day row */}
+      <div className="flex">
+        {/* All-day label column */}
+        <div className="flex items-center justify-end pr-3 text-gray-500 text-xs font-medium" style={{ width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT }}>
+          all-day
+        </div>
+        {/* All-day event columns */}
+        <div className="flex-1 border-l border-r border-b border-white/5 h-12 bg-neutral-900/50">
+          <div className="grid h-full" style={{ gridTemplateColumns: `repeat(7, ${dayWidth}px)` }}>
+            {weekDays.map((day) => (
               <div
                 key={day.toISOString()}
-                ref={(el) => {
-                  if (el && dayColumnsRef) {
-                    dayColumnsRef.current[dayIndex] = el;
-                  }
-                }}
-                className={cn(
-                  'relative border-r border-neutral-700 last:border-r-0',
-                  isToday && 'bg-neutral-800/30'
-                )}
+                className="border-r border-white/5 last:border-r-0 p-1"
               >
-                {timeSlots.map((slot, slotIndex) => {
-                  const isHourStart = slot.getMinutes() === 0;
-                  
-                  return (
-                    <div
-                      key={slotIndex}
-                      className={cn(
-                        'border-b',
-                        isHourStart 
-                          ? 'border-neutral-700/60' 
-                          : 'border-neutral-800/30'
-                      )}
-                      style={{ height: slotHeight }}
-                      data-day-index={dayIndex}
-                      data-slot-index={slotIndex}
-                      data-time={format(slot, 'HH:mm')}
-                    />
-                  );
-                })}
+                {/* All-day events would go here */}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Main grid content - Clean & Minimal */}
+      <div className="relative flex">
+        {/* Hour labels column - aligned with grid lines */}
+        <div className="relative" style={{ width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT, height: totalHeight }}>
+          {timeSlots.filter((slot) => slot.getMinutes() === 0).map((slot, hourIndex) => {
+            return (
+              <div
+                key={hourIndex}
+                className="absolute text-gray-500 text-xs font-medium flex items-start justify-end pr-3"
+                style={{ 
+                  top: hourIndex * hourHeight - 6, // Position text slightly above the line
+                  width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT
+                }}
+              >
+                {format(slot, 'ha')}
               </div>
             );
           })}
+        </div>
+
+        {/* Day columns with grid lines */}
+        <div className="flex-1 relative border-l border-r border-white/5">
+          <div className="grid h-full" style={{ gridTemplateColumns: `repeat(7, ${dayWidth}px)` }}>
+            {weekDays.map((day, dayIndex) => {
+              const isToday = format(day, 'yyyy-MM-dd') === todayDateString;
+              
+              return (
+                <div
+                  key={day.toISOString()}
+                  ref={(el) => {
+                    if (el && dayColumnsRef) {
+                      dayColumnsRef.current[dayIndex] = el;
+                    }
+                  }}
+                  className={cn(
+                    'relative border-r border-white/5 last:border-r-0 transition-colors',
+                    isToday && 'bg-white/[0.02]'
+                  )}
+                >
+                  {timeSlots.map((slot, slotIndex) => {
+                    const isHourStart = slot.getMinutes() === 0;
+                    
+                    return (
+                      <div
+                        key={slotIndex}
+                        className={cn(
+                          'border-b hover:bg-white/[0.02] transition-colors',
+                          isHourStart 
+                            ? 'border-white/10' 
+                            : 'border-white/5'
+                        )}
+                        style={{ height: slotHeight }}
+                        data-day-index={dayIndex}
+                        data-slot-index={slotIndex}
+                        data-time={format(slot, 'HH:mm')}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Current time indicator */}
@@ -215,7 +232,7 @@ const CurrentTimeIndicator: React.FC<{
   if (todayIndex === -1) return null;
 
   const currentY = GridMath.timeToY(currentDate, startHour);
-  const leftOffset = 60 + (todayIndex * dayWidth); // 60px for hour labels
+  const leftOffset = CALENDAR_CONSTANTS.GRID_MARGIN_LEFT + (todayIndex * dayWidth);
 
   return (
     <>

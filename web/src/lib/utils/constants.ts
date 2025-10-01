@@ -12,7 +12,7 @@ export const colors = {
     high: '#FF5757',
     medium: '#FFC043',
     low: '#4CD964',
-    default: '#8E6FFF',
+    default: '#3B82F6', // Blue-500 for minimal calendar design
   },
   success: '#4CD964',
   warning: '#FFC043',
@@ -71,7 +71,7 @@ export const CALENDAR_CONSTANTS = {
   HOURS_IN_DAY: 24,
   MINUTES_IN_HOUR: 60,
   DEFAULT_SLOT_DURATION: 30, // minutes
-  GRID_HOUR_HEIGHT: 60, // pixels per hour
+  GRID_HOUR_HEIGHT: 120, // pixels per hour (taller blocks to match reference)
   GRID_MARGIN_LEFT: 60, // pixels for hour labels
   GRID_DAY_WIDTH: 160, // pixels per day column
   MIN_EVENT_HEIGHT: 20, // minimum height for an event

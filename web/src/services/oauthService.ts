@@ -1,5 +1,5 @@
-import { supabaseClient } from '../lib/supabaseClient'
-import { ENV } from '../lib/utils/constants'
+import { supabase } from '../lib/supabase'
+import { API_BASE_URL } from '../config/api'
 
 export interface OAuthConnection {
   provider: 'google' | 'microsoft'
@@ -19,10 +19,10 @@ export type OAuthProvider = 'google' | 'microsoft'
 export type OAuthService = 'calendar' | 'gmail' | 'contacts' | 'outlook'
 
 class OAuthServiceClass {
-  private apiUrl = ENV.API_URL || 'http://localhost:8000'
+  private apiUrl = API_BASE_URL
 
   private async getAuthenticatedUser() {
-    const { data: { user } } = await supabaseClient.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       throw new Error('User not authenticated')
     }
@@ -30,7 +30,7 @@ class OAuthServiceClass {
   }
 
   private async getAuthHeaders() {
-    const { data: { session } } = await supabaseClient.auth.getSession()
+    const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) {
       throw new Error('No valid session')
     }
@@ -62,7 +62,7 @@ class OAuthServiceClass {
     try {
       const headers = await this.getAuthHeaders()
 
-      const response = await fetch(`${this.apiUrl}/api/v1/oauth/connections`, {
+      const response = await fetch(`${this.apiUrl}/api/v1/auth/oauth/connections`, {
         headers
       })
 
@@ -82,7 +82,7 @@ class OAuthServiceClass {
     try {
       const headers = await this.getAuthHeaders()
 
-      const response = await fetch(`${this.apiUrl}/api/v1/oauth/connections/${provider}`, {
+      const response = await fetch(`${this.apiUrl}/api/v1/auth/oauth/connections/${provider}`, {
         method: 'DELETE',
         headers
       })
@@ -176,4 +176,3 @@ class OAuthServiceClass {
 const oauthServiceInstance = new OAuthServiceClass()
 
 export { oauthServiceInstance as oauthService }
-export type { OAuthConnection, OAuthInitiateResponse, OAuthProvider, OAuthService }

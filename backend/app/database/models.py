@@ -93,23 +93,12 @@ class IntegrationStatus(str, Enum):
     ERROR = "error"
 
 
-# Standard course colors for consistent theming
+# Standard course colors - matches color picker palette (darker, blue-tinted rainbow spectrum)
 STANDARD_COURSE_COLORS = [
-    "#FF6B6B",  # Red
-    "#4ECDC4",  # Teal
-    "#45B7D1",  # Blue
-    "#96CEB4",  # Green
-    "#FECA57",  # Yellow
-    "#FF9FF3",  # Pink
-    "#54A0FF",  # Light Blue
-    "#5F27CD",  # Purple
-    "#00D2D3",  # Cyan
-    "#FF9F43",  # Orange
-    "#10AC84",  # Dark Green
-    "#EE5A24",  # Dark Orange
-    "#0097E6",  # Dark Blue
-    "#8C7AE6",  # Light Purple
-    "#2F3640",  # Dark Gray
+    '#B91C1C', '#DC2626', '#BE185D', '#EC4899',  # Reds & Pinks
+    '#D97706', '#F59E0B', '#CA8A04', '#A3A3A3',  # Oranges & Yellows
+    '#166534', '#059669', '#0D9488', '#0F766E',  # Greens & Teals
+    '#0369A1', '#1E40AF', '#3730A3', '#6B21A8',  # Blues & Purples
 ]
 
 

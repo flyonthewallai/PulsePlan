@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { API_BASE_URL } from '../config/api';
-import { supabaseClient } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 
 interface WebSocketContextType {
   socket: Socket | null;
@@ -53,7 +53,7 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
       
       // Get Supabase session token for authentication
       try {
-        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
           console.error('Error getting Supabase session:', sessionError);

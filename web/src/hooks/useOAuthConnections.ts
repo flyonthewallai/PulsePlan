@@ -14,7 +14,7 @@ export function useOAuthConnections() {
     refetch
   } = useQuery({
     queryKey: OAUTH_CACHE_KEYS.CONNECTIONS,
-    queryFn: oauthService.getOAuthConnections,
+    queryFn: () => oauthService.getOAuthConnections(),
     retry: 2,
     staleTime: 5 * 60 * 1000, // 5 minutes
   })

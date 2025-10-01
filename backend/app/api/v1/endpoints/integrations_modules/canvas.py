@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field, validator
 import asyncio
+from datetime import datetime
 
 from app.core.auth import get_current_user
 from app.services.integrations.canvas_token_service import get_canvas_token_service
@@ -68,7 +69,14 @@ class CanvasSyncResponse(BaseModel):
     message: str
     sync_id: Optional[str] = None
     status: str
-    results: Optional[Dict[str, Any]] = None
+
+
+class CanvasDisconnectResponse(BaseModel):
+    """Response model for Canvas disconnection"""
+    success: bool
+    message: str
+    user_id: str
+    disconnected_at: Optional[str] = None
 
 
 class CanvasIntegrationStatus(BaseModel):
@@ -86,6 +94,7 @@ class CanvasIntegrationStatus(BaseModel):
 @rate_limit("canvas_connect", max_calls=5, window_seconds=300)  # 5 calls per 5 minutes
 async def connect_canvas(
     request: CanvasConnectionRequest,
+    background_tasks: BackgroundTasks,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -96,7 +105,14 @@ async def connect_canvas(
     2. Stores the token securely using envelope encryption
     3. Sets up the Canvas integration record
     """
-    user_id = current_user["id"]
+    # Support both mapping-like and attribute-like CurrentUser implementations
+    # Handle both dict payloads and CurrentUser objects (with user_id attribute)
+    if isinstance(current_user, dict):
+        user_id = current_user.get("id") or current_user.get("user_id")
+    else:
+        user_id = getattr(current_user, "id", None) or getattr(current_user, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized: missing user id")
 
     try:
         logger.info(f"Canvas connection request for user {user_id}")
@@ -119,11 +135,21 @@ async def connect_canvas(
             api_token=request.api_token
         )
 
-        logger.info(f"Canvas integration connected successfully for user {user_id}")
+        # Trigger initial sync after successful connection
+        import uuid
+        sync_id = str(uuid.uuid4())
+        background_tasks.add_task(
+            _execute_full_sync_job,
+            user_id,
+            sync_id,
+            False  # force_restart = False
+        )
+
+        logger.info(f"Canvas integration connected successfully for user {user_id}, initial sync queued with ID: {sync_id}")
 
         return CanvasConnectionResponse(
             success=True,
-            message="Canvas integration connected successfully",
+            message="Canvas integration connected successfully. Initial sync has been started.",
             user_id=user_id,
             canvas_url=request.canvas_url,
             status="connected",
@@ -137,6 +163,66 @@ async def connect_canvas(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to connect Canvas integration: {str(e)}"
+        )
+
+
+@router.delete("/disconnect", response_model=CanvasDisconnectResponse)
+@rate_limit("canvas_disconnect", max_calls=5, window_seconds=300)  # 5 calls per 5 minutes
+async def disconnect_canvas(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Disconnect Canvas integration for the current user
+
+    This endpoint:
+    1. Removes the stored Canvas API token
+    2. Clears the integration record
+    3. Optionally removes synced Canvas assignments
+    """
+    # Support both mapping-like and attribute-like CurrentUser implementations
+    if isinstance(current_user, dict):
+        user_id = current_user.get("id") or current_user.get("user_id")
+    else:
+        user_id = getattr(current_user, "id", None) or getattr(current_user, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized: missing user id")
+
+    try:
+        logger.info(f"Canvas disconnection request for user {user_id}")
+
+        token_service = get_canvas_token_service()
+
+        # Check if integration exists
+        token_data = await token_service.retrieve_canvas_token(user_id)
+        if not token_data:
+            raise HTTPException(
+                status_code=404,
+                detail="Canvas integration not found. Nothing to disconnect."
+            )
+
+        # Remove the stored token and integration data
+        result = await token_service.delete_canvas_integration(user_id)
+
+        # Optionally remove Canvas assignments (commented out for now to preserve user data)
+        # await _remove_canvas_assignments(user_id)
+
+        disconnected_at = datetime.utcnow().isoformat()
+        logger.info(f"Canvas integration disconnected successfully for user {user_id}")
+
+        return CanvasDisconnectResponse(
+            success=True,
+            message="Canvas integration disconnected successfully",
+            user_id=user_id,
+            disconnected_at=disconnected_at
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Canvas disconnection failed for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to disconnect Canvas integration: {str(e)}"
         )
 
 
@@ -155,7 +241,12 @@ async def sync_canvas(
     2. Queues the appropriate sync job (full backfill or delta sync)
     3. Returns immediately with a job ID
     """
-    user_id = current_user["id"]
+    if isinstance(current_user, dict):
+        user_id = current_user.get("id") or current_user.get("user_id")
+    else:
+        user_id = getattr(current_user, "id", None) or getattr(current_user, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized: missing user id")
 
     try:
         logger.info(f"Canvas sync request ({request.sync_type}) for user {user_id}")
@@ -232,7 +323,12 @@ async def get_canvas_status(
     - Error status if any
     - Assignment count
     """
-    user_id = current_user["id"]
+    if isinstance(current_user, dict):
+        user_id = current_user.get("id") or current_user.get("user_id")
+    else:
+        user_id = getattr(current_user, "id", None) or getattr(current_user, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized: missing user id")
 
     try:
         token_service = get_canvas_token_service()
@@ -246,18 +342,18 @@ async def get_canvas_status(
             )
 
         # Get additional integration info
-        from ....config.supabase import get_supabase_client
-        supabase = get_supabase_client()
+        from app.config.database.supabase import get_supabase
+        supabase = get_supabase()
 
         # Get integration record
-        response = await supabase.table("integration_canvas").select("*").eq(
+        response = supabase.table("integration_canvas").select("*").eq(
             "user_id", user_id
         ).single().execute()
 
         integration_data = response.data if response.data else {}
 
         # Get assignment count
-        tasks_response = await supabase.table("tasks").select("id").eq(
+        tasks_response = supabase.table("tasks").select("id").eq(
             "user_id", user_id
         ).eq("external_source", "canvas").execute()
 
@@ -433,11 +529,39 @@ async def _execute_full_sync_job(user_id: str, sync_id: str, force_restart: bool
 
         logger.info(f"Full Canvas sync job {sync_id} completed for user {user_id}: {result['status']}")
 
-        # You could store the result in a jobs table for later retrieval
-        # or send a notification to the user
+        # Emit WebSocket event to notify frontend
+        try:
+            from app.core.infrastructure.websocket import websocket_manager as ws_manager
+            await ws_manager.emit_to_user(
+                user_id,
+                'canvas_sync',
+                {
+                    'status': result['status'],
+                    'sync_id': sync_id,
+                    'assignments_upserted': result.get('assignments_upserted', 0),
+                    'courses_processed': result.get('courses_processed', 0),
+                    'message': f"Synced {result.get('assignments_upserted', 0)} assignments from {result.get('courses_processed', 0)} courses"
+                }
+            )
+        except Exception as ws_error:
+            logger.error(f"Failed to emit WebSocket event for Canvas sync {sync_id}: {ws_error}")
 
     except Exception as e:
         logger.error(f"Full Canvas sync job {sync_id} failed for user {user_id}: {e}")
+        # Emit failure event
+        try:
+            from app.core.infrastructure.websocket import websocket_manager as ws_manager
+            await ws_manager.emit_to_user(
+                user_id,
+                'canvas_sync',
+                {
+                    'status': 'error',
+                    'sync_id': sync_id,
+                    'message': str(e)
+                }
+            )
+        except Exception:
+            pass
 
 
 async def _execute_delta_sync_job(user_id: str, sync_id: str):

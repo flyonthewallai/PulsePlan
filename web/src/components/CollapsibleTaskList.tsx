@@ -7,6 +7,11 @@ interface Task {
   status: string
   priority: string
   due_date?: string
+  // Optional color sources
+  color?: string
+  courses?: {
+    color?: string
+  }
 }
 
 interface CollapsibleTaskListProps {
@@ -37,6 +42,10 @@ export function CollapsibleTaskList({ tasks, taskCount, onTaskToggle }: Collapsi
       case 'low': return '#4CD964'
       default: return '#8E6FFF'
     }
+  }
+
+  const getTaskDisplayColor = (task: Task) => {
+    return task.courses?.color || task.color || getPriorityColor(task.priority)
   }
 
   const formatDate = (dateString: string) => {
@@ -108,7 +117,7 @@ export function CollapsibleTaskList({ tasks, taskCount, onTaskToggle }: Collapsi
                 key={task.id || index} 
                 className="flex items-start gap-3 p-3 bg-neutral-700/50 rounded-lg hover:bg-neutral-700/60 transition-colors duration-150"
               >
-                 {/* Circular checkbox with priority color */}
+                 {/* Circular checkbox with course color fallback to priority */}
                  <button
                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors duration-150 ${
                      task.status === 'completed'
@@ -117,7 +126,7 @@ export function CollapsibleTaskList({ tasks, taskCount, onTaskToggle }: Collapsi
                    }`}
                    style={{
                      backgroundColor: task.status === 'completed' ? '#10B981' : 'transparent',
-                     borderColor: task.status === 'completed' ? '#10B981' : getPriorityColor(task.priority)
+                    borderColor: task.status === 'completed' ? '#10B981' : getTaskDisplayColor(task)
                    }}
                    onClick={() => handleTaskToggle(task.id)}
                  >

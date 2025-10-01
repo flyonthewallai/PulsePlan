@@ -12,24 +12,28 @@ PulsePlan is an intelligent academic planning assistant powered by LangGraph age
 ## ✨ Key Features
 
 ### 🤖 **LangGraph AI Agent System**
+
 - **Multi-Agent Architecture** – Specialized agents for different workflows (chat, scheduling, briefings)
 - **Conversational AI** – Natural language task management and scheduling assistance
 - **Context-Aware Intelligence** – Agents understand your preferences, patterns, and constraints
 - **Tool-Based Execution** – 15+ specialized tools for comprehensive productivity management
 
 ### 📚 **Academic Integration**
+
 - **Canvas LMS Sync** – Automated assignment, course, and grade synchronization
 - **Calendar Intelligence** – Google Calendar and Microsoft Outlook bidirectional sync
 - **Smart Scheduling** – AI-powered time-blocking with conflict resolution
 - **Assignment Analytics** – Deadline tracking and priority management
 
 ### 💡 **Intelligent Features**
+
 - **Memory System** – Semantic memory with vector storage for personalized assistance
-- **Weekly Pulse** – AI-generated productivity insights and performance analytics  
+- **Weekly Pulse** – AI-generated productivity insights and performance analytics
 - **Automated Jobs** – Nightly Canvas sync and data processing workflows
 - **Preference Management** – Structured user constraints and scheduling rules
 
 ### 🔧 **Advanced Capabilities**
+
 - **Real-Time Processing** – WebSocket connections for live updates
 - **Caching Strategy** – Multi-layer Redis caching for optimal performance
 - **Background Jobs** – Automated synchronization and data processing
@@ -46,7 +50,7 @@ PulsePlan uses LangGraph to orchestrate specialized agents for different workflo
 ```python
 # Core Agent Graphs
 ├── ChatGraph          # Conversational AI interactions
-├── TaskGraph          # Task management and CRUD operations  
+├── TaskGraph          # Task management and CRUD operations
 ├── SchedulingGraph     # Intelligent scheduling and optimization
 ├── CalendarGraph       # Calendar integration and sync
 └── BriefingGraph       # Data aggregation and insights
@@ -55,28 +59,34 @@ PulsePlan uses LangGraph to orchestrate specialized agents for different workflo
 ### **Agent Tools Ecosystem**
 
 **📋 Task Management**
+
 - `TaskCRUDTool` – Create, read, update, delete tasks
 - `TaskSchedulingTool` – Intelligent task scheduling with AI optimization
 
-**📅 Calendar Integration**  
+**📅 Calendar Integration**
+
 - `GoogleCalendarTool` – Google Calendar operations and sync
 - `MicrosoftCalendarTool` – Outlook calendar integration
 
 **📧 Communication**
+
 - `EmailManagerTool` – Smart email routing and management
 - `GmailUserTool` / `OutlookUserTool` – Provider-specific email handling
 - `SystemEmailTool` – Automated system notifications
 
 **🎓 Academic Integration**
+
 - `CanvasLMSTool` – Manual Canvas sync requests
 - `WeeklyPulseTool` – Productivity analytics and insights generation
 
 **🧠 Memory & Intelligence**
+
 - `MemoryTool` – Semantic memory search and storage
 - `PreferencesTool` – User constraints and preference management
 - `ContactsManagerTool` – Google Contacts integration
 
 **🔍 Information & Research**
+
 - `WebSearchTool` – Tavily API-powered web search
 - `NewsSearchTool` / `ResearchTool` – Specialized information retrieval
 - `DataAggregatorTool` / `ContentSynthesizerTool` – Content processing
@@ -89,7 +99,7 @@ User Query → Agent Router → Specialized Graph → Tool Execution → Respons
 ```
 
 - **Dynamic Tool Selection** – Agents choose appropriate tools based on context
-- **Cross-Agent Communication** – Graphs can delegate to other specialized agents  
+- **Cross-Agent Communication** – Graphs can delegate to other specialized agents
 - **State Management** – Persistent conversation state and user context
 - **Error Recovery** – Graceful handling of API failures and edge cases
 
@@ -116,7 +126,7 @@ PulsePlan/
 │   └── tests/               # Comprehensive test suite
 ├── src/                     # React Native mobile app (Expo)
 │   ├── app/                # App router and screens
-│   ├── components/         # Reusable UI components  
+│   ├── components/         # Reusable UI components
 │   ├── contexts/          # State management
 │   ├── hooks/            # Custom React hooks
 │   └── services/        # API integration layer
@@ -127,22 +137,22 @@ PulsePlan/
 
 ## 🔠 Tech Stack
 
-| Layer              | Technology                                    |
-| ------------------ | --------------------------------------------- |
-| **AI Agents**      | LangGraph + OpenAI GPT-4o + Google Gemini     |
-| **Backend API**    | Python FastAPI + Pydantic + asyncio           |
-| **Agent Tools**    | Custom tool ecosystem (15+ specialized tools) |
-| **Scheduling Engine** | OR-Tools CP-SAT + Constraint Programming + ML |
-| **Memory System**  | Dual-layer: pgvector + Redis + OpenAI Embeddings |
-| **Learning Models** | Contextual Bandits + Logistic Regression      |
-| **Frontend**       | React Native (Expo 53) + TypeScript           |
-| **Database**       | Supabase (PostgreSQL) + Row Level Security    |
-| **Caching**        | Redis + Multi-layer caching strategy          |
-| **Authentication** | Supabase Auth + JWT + OAuth2                  |
-| **Background Jobs**| Python asyncio + APScheduler                  |
-| **Real-time**      | WebSockets + Server-Sent Events               |
-| **Integrations**   | Canvas LMS + Google APIs + Microsoft Graph    |
-| **Deployment**     | Docker + Kubernetes ready                     |
+| Layer                 | Technology                                       |
+| --------------------- | ------------------------------------------------ |
+| **AI Agents**         | LangGraph + OpenAI GPT-4o + Google Gemini        |
+| **Backend API**       | Python FastAPI + Pydantic + asyncio              |
+| **Agent Tools**       | Custom tool ecosystem (15+ specialized tools)    |
+| **Scheduling Engine** | OR-Tools CP-SAT + Constraint Programming + ML    |
+| **Memory System**     | Dual-layer: pgvector + Redis + OpenAI Embeddings |
+| **Learning Models**   | Contextual Bandits + Logistic Regression         |
+| **Frontend**          | React Native (Expo 53) + TypeScript              |
+| **Database**          | Supabase (PostgreSQL) + Row Level Security       |
+| **Caching**           | Redis + Multi-layer caching strategy             |
+| **Authentication**    | Supabase Auth + JWT + OAuth2                     |
+| **Background Jobs**   | Python asyncio + APScheduler                     |
+| **Real-time**         | WebSockets + Server-Sent Events                  |
+| **Integrations**      | Canvas LMS + Google APIs + Microsoft Graph       |
+| **Deployment**        | Docker + Kubernetes ready                        |
 
 ---
 
@@ -184,7 +194,7 @@ python main.py
 ### Frontend Setup (React Native)
 
 ```bash
-# 1. Frontend dependencies  
+# 1. Frontend dependencies
 cd ../src
 npm install
 
@@ -213,7 +223,7 @@ docker run -p 8000:8000 pulseplan-backend
 ### **Available Agents**
 
 1. **ChatGraph** - Conversational AI for general queries
-2. **TaskGraph** - Task management and CRUD operations  
+2. **TaskGraph** - Task management and CRUD operations
 3. **SchedulingGraph** - Intelligent scheduling with optimization
 4. **CalendarGraph** - Calendar sync and event management
 5. **BriefingGraph** - Data aggregation and insight generation
@@ -221,24 +231,28 @@ docker run -p 8000:8000 pulseplan-backend
 ### **Agent Tool Categories**
 
 **Academic Integration (4 tools)**
+
 - Canvas LMS sync and assignment management
 - Weekly productivity pulse generation
 - Academic calendar integration
 - Grade and course tracking
 
-**Calendar & Scheduling (6 tools)**  
+**Calendar & Scheduling (6 tools)**
+
 - Multi-provider calendar sync (Google, Microsoft)
 - Intelligent task scheduling
 - Event conflict resolution
 - Time-blocking optimization
 
 **Communication (4 tools)**
+
 - Smart email routing and management
 - Multi-provider email integration
 - System notification handling
 - Contact management
 
 **Intelligence & Memory (3 tools)**
+
 - Semantic memory with vector search
 - User preference management
 - Web search and research capabilities
@@ -260,12 +274,14 @@ docker run -p 8000:8000 pulseplan-backend
 PulsePlan features a sophisticated scheduling system built on OR-Tools constraint programming:
 
 **Core Algorithm Components:**
+
 - **CP-SAT Solver** – Google's constraint satisfaction solver for optimal task assignment
 - **Time Discretization** – Converts continuous time to discrete 15-30 minute slots
 - **Constraint Modeling** – Hard constraints (deadlines, conflicts) vs soft constraints (preferences)
 - **Multi-Objective Optimization** – Balances completion probability, user satisfaction, and efficiency
 
 **Machine Learning Integration:**
+
 - **Completion Prediction Model** – Logistic regression predicts task completion likelihood
 - **Contextual Bandits** – Thompson Sampling for adaptive penalty weight tuning
 - **Feature Engineering** – Time of day, task characteristics, user patterns, historical data
@@ -274,6 +290,7 @@ PulsePlan features a sophisticated scheduling system built on OR-Tools constrain
 ### **Scheduling Constraints**
 
 **Hard Constraints (Must Be Satisfied):**
+
 - Temporal conflicts with existing calendar events
 - Deadline adherence for all academic assignments
 - Block size limits (minimum/maximum work periods)
@@ -281,6 +298,7 @@ PulsePlan features a sophisticated scheduling system built on OR-Tools constrain
 - Daily/weekly effort capacity limits
 
 **Soft Constraints (Optimized via Penalties):**
+
 - Time preferences alignment with user's optimal hours
 - Context switching minimization
 - Work block fragmentation reduction
@@ -301,14 +319,16 @@ PulsePlan features a sophisticated scheduling system built on OR-Tools constrain
 ### **Semantic Memory System**
 
 **Vector Database (pgvector + PostgreSQL):**
+
 - **Multi-Namespace Storage** – Organized by content type (tasks, assignments, interactions)
 - **Semantic Search** – OpenAI embeddings with cosine similarity
 - **Context Retrieval** – MMR (Maximal Marginal Relevance) reranking for diversity
 - **Auto-Ingestion Pipeline** – Automated processing of academic data
 
 **Ephemeral Chat Memory (Redis):**
+
 - **Session-Based Storage** – Recent conversation context per user
-- **TTL Management** – Automatic cleanup of expired conversations  
+- **TTL Management** – Automatic cleanup of expired conversations
 - **Fast Access** – Sub-millisecond retrieval for active sessions
 - **Token Budget Management** – Efficient context window utilization
 
@@ -328,7 +348,7 @@ PulsePlan features a sophisticated scheduling system built on OR-Tools constrain
 ### **Automated Jobs**
 
 - **Nightly Canvas Sync** – Automated assignment and course synchronization with batch processing
-- **Calendar Refresh** – OAuth token refresh and calendar event updates  
+- **Calendar Refresh** – OAuth token refresh and calendar event updates
 - **Memory Processing** – Semantic indexing, embedding generation, and namespace management
 - **Analytics Generation** – Weekly pulse analytics and productivity insights
 - **Learning Model Updates** – Completion prediction and bandit model training
@@ -340,7 +360,7 @@ PulsePlan features a sophisticated scheduling system built on OR-Tools constrain
 ```python
 # Configurable job schedules
 CANVAS_SYNC_SCHEDULE = "0 2 * * *"        # Daily at 2 AM
-WEEKLY_PULSE_SCHEDULE = "0 6 * * 1"       # Monday at 6 AM  
+WEEKLY_PULSE_SCHEDULE = "0 6 * * 1"       # Monday at 6 AM
 CALENDAR_SYNC_SCHEDULE = "*/30 * * * *"    # Every 30 minutes
 MODEL_UPDATE_SCHEDULE = "0 4 * * *"       # Daily at 4 AM
 PROFILE_SNAPSHOT_SCHEDULE = "0 3 * * 0"   # Weekly on Sunday at 3 AM
@@ -360,7 +380,7 @@ PROFILE_SNAPSHOT_SCHEDULE = "0 3 * * 0"   # Weekly on Sunday at 3 AM
 ### **Memory Categories**
 
 - **Tasks & Assignments** – Academic work and deadlines
-- **Calendar Events** – Meetings and scheduled activities  
+- **Calendar Events** – Meetings and scheduled activities
 - **User Interactions** – Chat history and preferences
 - **Academic Data** – Course information and grades
 - **Productivity Insights** – Performance patterns and analytics
@@ -372,39 +392,45 @@ PROFILE_SNAPSHOT_SCHEDULE = "0 3 * * 0"   # Weekly on Sunday at 3 AM
 ### **Core Services**
 
 **Authentication & Security:**
+
 - **Multi-Provider OAuth** – Google, Microsoft, Canvas LMS integration
-- **JWT Token Management** – Automated refresh and secure storage  
+- **JWT Token Management** – Automated refresh and secure storage
 - **Encrypted Token Vault** – AES-256 encryption for API credentials
 - **Row Level Security** – Database-level access control with Supabase
 - **Rate Limiting** – Request throttling and abuse protection
 
 **Integration Services:**
+
 - **Calendar Sync Service** – Bidirectional Google/Microsoft Calendar integration
 - **Canvas Service** – Automated LMS synchronization with error handling
 - **Token Service** – OAuth token lifecycle management and refresh
 - **Preferences Service** – User constraint and preference management
 
 **Data Processing:**
+
 - **Email Service** – Smart routing between user/agent email handling
-- **Cache Service** – Multi-layer Redis caching with intelligent invalidation  
+- **Cache Service** – Multi-layer Redis caching with intelligent invalidation
 - **Embedding Service** – OpenAI embedding generation for semantic search
 - **Summarization Service** – Periodic content summarization for memory optimization
 
 ### **Advanced Features**
 
 **Observability & Monitoring:**
+
 - **Health Checks** – Comprehensive system health monitoring with alerts
 - **Structured Logging** – Correlation IDs and contextual log data
 - **Performance Metrics** – Request timing, success rates, and resource usage
 - **Sentry Integration** – Automated error tracking and performance monitoring
 
 **Scalability & Performance:**
+
 - **Async Architecture** – Full asyncio support for concurrent operations
 - **Connection Pooling** – Optimized database and Redis connections
-- **Background Workers** – Dedicated task processing with queue management  
+- **Background Workers** – Dedicated task processing with queue management
 - **Horizontal Scaling** – Stateless design for multi-instance deployment
 
 **API Architecture:**
+
 - **FastAPI Framework** – High-performance async web framework
 - **Pydantic Validation** – Comprehensive input/output validation and serialization
 - **OpenAPI Documentation** – Automatic API documentation generation
@@ -413,12 +439,14 @@ PROFILE_SNAPSHOT_SCHEDULE = "0 3 * * 0"   # Weekly on Sunday at 3 AM
 ### **Security Hardening**
 
 **Data Protection:**
+
 - **Encryption at Rest** – Sensitive data encrypted in database
 - **Token Encryption** – All OAuth tokens encrypted with user-specific keys
 - **Secure Headers** – HSTS, CSP, and other security headers
 - **Input Sanitization** – Comprehensive XSS and injection prevention
 
 **Access Control:**
+
 - **Role-Based Permissions** – Granular access control system
 - **API Key Management** – Service-to-service authentication
 - **Session Management** – Secure session handling with Redis
@@ -448,11 +476,13 @@ PROFILE_SNAPSHOT_SCHEDULE = "0 3 * * 0"   # Weekly on Sunday at 3 AM
 ## 📈 Performance & Monitoring
 
 ### **Caching Strategy**
+
 - **Multi-Layer Caching** – Redis + in-memory LRU cache
 - **Intelligent Invalidation** – Smart cache updates on data changes
 - **90%+ Cache Hit Rate** – Optimized query performance
 
 ### **Observability**
+
 - **Structured Logging** – Comprehensive request/response tracking
 - **Health Monitoring** – System health checks and alerts
 - **Performance Metrics** – Agent execution time and success rates
@@ -463,17 +493,20 @@ PROFILE_SNAPSHOT_SCHEDULE = "0 3 * * 0"   # Weekly on Sunday at 3 AM
 ## 🔧 API Endpoints
 
 ### **Agent Interactions**
+
 - `POST /api/v1/agents/chat` – Conversational AI interface
 - `POST /api/v1/agents/task` – Task management operations
 - `POST /api/v1/agents/schedule` – Scheduling requests
 - `GET /api/v1/agents/status` – Agent system health
 
 ### **Integration Management**
+
 - `POST /api/v1/integrations/canvas/sync` – Manual Canvas sync
 - `GET /api/v1/integrations/calendar/events` – Calendar data
 - `POST /api/v1/integrations/oauth/connect` – OAuth setup
 
 ### **Analytics & Insights**
+
 - `GET /api/v1/analytics/weekly-pulse` – Productivity insights
 - `GET /api/v1/analytics/performance` – Performance metrics
 - `POST /api/v1/analytics/generate` – Custom report generation
@@ -498,7 +531,7 @@ PROFILE_SNAPSHOT_SCHEDULE = "0 3 * * 0"   # Weekly on Sunday at 3 AM
 # Docker deployment
 docker-compose -f docker-compose.prod.yml up -d
 
-# Kubernetes deployment  
+# Kubernetes deployment
 kubectl apply -f k8s/
 
 # Environment-specific configs
@@ -508,7 +541,7 @@ cp .env.production .env
 ### **Environment Configuration**
 
 - **Development** – Local development with hot reload
-- **Staging** – Pre-production testing environment  
+- **Staging** – Pre-production testing environment
 - **Production** – Optimized production deployment with monitoring
 
 ---
@@ -550,4 +583,4 @@ PulsePlan is built by **Fly on the Wall** – creating AI-powered products with 
 
 ---
 
-*Built with ❤️ for students who want their schedule to find its rhythm.*
+_Built with ❤️ for students who want their schedule to find its rhythm._

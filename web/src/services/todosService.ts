@@ -1,4 +1,4 @@
-import { supabaseClient } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabase'
 
 export interface Todo {
   id: string
@@ -51,12 +51,12 @@ export interface TodoFilters {
 class TodosService {
   async getTodos(filters: TodoFilters = {}): Promise<{ data: Todo[] | null; error: string | null }> {
     try {
-      const { data: { user } } = await supabaseClient.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         return { data: null, error: 'User not authenticated' }
       }
 
-      let query = supabaseClient
+      let query = supabase
         .from('todos')
         .select('*')
         .eq('user_id', user.id)
@@ -92,12 +92,12 @@ class TodosService {
 
   async createTodo(todoData: CreateTodoData): Promise<{ data: Todo | null; error: string | null }> {
     try {
-      const { data: { user } } = await supabaseClient.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         return { data: null, error: 'User not authenticated' }
       }
 
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from('todos')
         .insert({
           user_id: user.id,
@@ -124,7 +124,7 @@ class TodosService {
 
   async updateTodo(id: string, updates: UpdateTodoData): Promise<{ data: Todo | null; error: string | null }> {
     try {
-      const { data: { user } } = await supabaseClient.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         return { data: null, error: 'User not authenticated' }
       }
@@ -138,7 +138,7 @@ class TodosService {
         updateData.completed_at = null
       }
 
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from('todos')
         .update(updateData)
         .eq('id', id)
@@ -160,12 +160,12 @@ class TodosService {
 
   async deleteTodo(id: string): Promise<{ error: string | null }> {
     try {
-      const { data: { user } } = await supabaseClient.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         return { error: 'User not authenticated' }
       }
 
-      const { error } = await supabaseClient
+      const { error } = await supabase
         .from('todos')
         .delete()
         .eq('id', id)

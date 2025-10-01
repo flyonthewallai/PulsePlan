@@ -169,12 +169,12 @@ export function TasksCard() {
     if (task.courses?.color) {
       return task.courses.color
     }
-    
+
     // Fallback to direct color field (for backward compatibility)
     if (task.color) {
       return task.color
     }
-    
+
     // Fallback to priority-based colors
     switch (task.priority) {
       case 'high': return '#EF4444'
@@ -631,7 +631,7 @@ export function TasksCard() {
             {showModal ? (
               <>
                 {/* Header */}
-                <div className="p-6">
+                <div className="p-6 border-b border-gray-700/50">
                   {/* Top row: Title and Close button */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">

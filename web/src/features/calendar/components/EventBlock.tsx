@@ -8,7 +8,7 @@ import { cn } from '../../../lib/utils';
 import type { CalendarEvent } from '@/types';
 import type { EventLayout } from '../calendar-logic/overlaps';
 import { GridMath } from '../calendar-logic/gridMath';
-import { colors } from '../../../lib/utils/constants';
+import { colors, CALENDAR_CONSTANTS } from '../../../lib/utils/constants';
 
 // Local type definition for PanInfo since it's not exported in newer framer-motion versions
 interface PanInfo {
@@ -226,8 +226,8 @@ export const EventBlock: React.FC<EventBlockProps> = ({
         className
       )}
       style={{
-        left: layout.x + 60, // Offset for hour labels
-        top: layout.y + 60, // Offset for header
+        left: layout.x + CALENDAR_CONSTANTS.GRID_MARGIN_LEFT, // Offset for time label column
+        top: layout.y + 60 + 48, // Offset for header + all-day row
         width: layout.width,
         height: layout.height,
         backgroundColor: `${priorityColor}15`,

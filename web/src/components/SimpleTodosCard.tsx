@@ -405,7 +405,7 @@ export function SimpleTodosCard() {
             {showModal ? (
               <>
                 {/* Header */}
-                <div className="p-6">
+                <div className="p-6 border-b border-gray-700/50">
                   {/* Top row: Title and Close button */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">

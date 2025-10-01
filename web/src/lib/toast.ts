@@ -3,7 +3,7 @@ interface ToastState {
     id: string
     title: string
     description?: string
-    type: 'success' | 'error' | 'warning' | 'info'
+    type: 'success' | 'error' | 'warning' | 'info' | 'loading'
     duration?: number
   }>
 }
@@ -17,6 +17,22 @@ const updateState = (newState: ToastState) => {
 }
 
 export const toast = {
+  loading: (title: string, description?: string, duration = 8000) => {
+    const id = Math.random().toString(36).substring(2, 9)
+    const newToast = { id, title, description, type: 'loading' as const, duration }
+    
+    updateState({
+      toasts: [...state.toasts, newToast]
+    })
+    
+    setTimeout(() => {
+      updateState({
+        toasts: state.toasts.filter(t => t.id !== id)
+      })
+    }, duration)
+    
+    return id
+  },
   success: (title: string, description?: string, duration = 5000) => {
     const id = Math.random().toString(36).substring(2, 9)
     const newToast = { id, title, description, type: 'success' as const, duration }

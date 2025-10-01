@@ -204,39 +204,68 @@ export function WeeklyCalendar({
 
   // Selection rendering handled by SelectionLayer
 
-  // Robust client -> grid coords using scroller scroll and dynamic header height
+  // Convert client coordinates to grid coordinates
   const clientToGridCoords = useCallback((clientX: number, clientY: number) => {
     if (!scrollerRef.current) return null;
+    
     const scroller = scrollerRef.current;
     const rect = scroller.getBoundingClientRect();
-    const headerHeight = headerRef.current?.getBoundingClientRect().height ?? 64;
-
-    // Position within scrollable content area (top-left of content is 0,0 at start of grid rows)
-    const contentX = clientX - rect.left + scroller.scrollLeft - GRID_MARGIN_LEFT;
-    const contentY = clientY - rect.top + scroller.scrollTop - headerHeight;
-
-    // Guard: outside selectable area
-    if (contentX < 0) return null;
-
-    const dayWidth = CALENDAR_CONSTANTS.GRID_DAY_WIDTH;
-    const dayIndex = Math.max(0, Math.min(6, Math.floor(contentX / dayWidth)));
-    const xInDay = contentX - dayIndex * dayWidth;
-
-    if (xInDay < 0) return null;
-
+    
+    // Constants for layout measurements
+    const HEADER_HEIGHT = 56; // h-14 in header
+    const ALL_DAY_ROW_HEIGHT = 48; // h-12 for all-day row
+    const TIME_COLUMN_WIDTH = CALENDAR_CONSTANTS.GRID_MARGIN_LEFT; // 60px
+    const DAY_COLUMN_WIDTH = CALENDAR_CONSTANTS.GRID_DAY_WIDTH; // 160px
+    const HOUR_HEIGHT = CALENDAR_CONSTANTS.GRID_HOUR_HEIGHT; // 120px
+    const MINUTES_PER_PIXEL = 60 / HOUR_HEIGHT; // 0.5 minutes per pixel
+    
+    // Calculate position relative to the calendar container
+    const relativeX = clientX - rect.left + scroller.scrollLeft;
+    const relativeY = clientY - rect.top + scroller.scrollTop;
+    
+    // Calculate position within the day columns area (excluding time column)
+    const dayAreaX = relativeX - TIME_COLUMN_WIDTH;
+    
+    // Calculate position within the time grid (excluding header and all-day row)
+    const gridY = relativeY - HEADER_HEIGHT - ALL_DAY_ROW_HEIGHT;
+    
+    // Guard: click is outside the day columns
+    if (dayAreaX < 0 || gridY < 0) return null;
+    
+    // Calculate which day column (0-6)
+    const dayIndex = Math.floor(dayAreaX / DAY_COLUMN_WIDTH);
+    if (dayIndex < 0 || dayIndex > 6) return null;
+    
+    // Calculate X position within the specific day column
+    const xInDay = dayAreaX % DAY_COLUMN_WIDTH;
+    
+    // Calculate the time in minutes from START_HOUR
+    const minutesFromStart = gridY * MINUTES_PER_PIXEL;
+    
+    // Snap to nearest 15-minute interval
+    const snappedMinutes = Math.round(minutesFromStart / 15) * 15;
+    
+    // Convert back to Y pixel position (for rendering)
+    const snappedY = snappedMinutes / MINUTES_PER_PIXEL;
+    
     if (debugEnabled) {
       setDebugInfo({
         clientX,
         clientY,
         x: xInDay,
-        y: contentY,
+        y: snappedY,
         dayIndex,
-        headerHeight,
+        headerHeight: HEADER_HEIGHT + ALL_DAY_ROW_HEIGHT,
         scrollTop: scroller.scrollTop,
       });
     }
-
-    return { x: xInDay, y: Math.max(0, contentY), dayIndex, headerHeight };
+    
+    return { 
+      x: xInDay, 
+      y: snappedY, 
+      dayIndex, 
+      headerHeight: HEADER_HEIGHT + ALL_DAY_ROW_HEIGHT 
+    };
   }, [debugEnabled]);
 
   // Toggle debug via keyboard: Ctrl/Cmd+Shift+D
@@ -358,60 +387,64 @@ export function WeeklyCalendar({
   // Don't block calendar display on loading/error states
 
   return (
-    <div className={cn('w-full max-w-full', className)}>
-      {/* Header with navigation */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold text-white">
+    <div className={cn('w-full h-full flex flex-col', className)}>
+      {/* Minimal Header with navigation */}
+      <div className="flex items-center justify-between mb-8 px-2">
+        <div className="flex items-center gap-6">
+          <h1 className="text-3xl font-semibold text-white tracking-tight">
             {format(currentDate, 'MMMM yyyy')}
-          </h2>
+          </h1>
           
-          <div className="flex items-center gap-1 bg-neutral-800 rounded-lg p-1">
+          <div className="flex items-center gap-2">
             <button
               onClick={handlePreviousWeek}
-              className="p-2 hover:bg-neutral-700 rounded-md transition-colors text-neutral-300 hover:text-white"
+              className="p-2 hover:bg-white/5 rounded-lg transition-all text-gray-400 hover:text-white"
+              aria-label="Previous week"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={20} />
             </button>
             
             <button
               onClick={handleToday}
-              className="px-3 py-2 hover:bg-neutral-700 rounded-md transition-colors text-neutral-300 hover:text-white text-sm font-medium"
+              className="px-4 py-2 hover:bg-white/5 rounded-lg transition-all text-gray-400 hover:text-white text-sm font-medium"
             >
               Today
             </button>
             
             <button
               onClick={handleNextWeek}
-              className="p-2 hover:bg-neutral-700 rounded-md transition-colors text-neutral-300 hover:text-white"
+              className="p-2 hover:bg-white/5 rounded-lg transition-all text-gray-400 hover:text-white"
+              aria-label="Next week"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={20} />
             </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleNewEventClick}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium"
-          >
-            <Plus size={16} />
-            New Event
-          </button>
-        </div>
+        <button
+          onClick={handleNewEventClick}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-100 text-black rounded-lg transition-all text-sm font-medium"
+        >
+          <Plus size={16} />
+          New Event
+        </button>
       </div>
 
-      {/* Calendar grid */}
+      {/* Calendar grid - Minimal styling */}
       <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div 
           ref={scrollerRef}
-          className="relative overflow-auto"
+          className="relative overflow-auto flex-1 rounded-xl"
           data-calendar-container
           tabIndex={0}
           role="grid"
           aria-label={`Calendar for week of ${format(weekStart, 'MMMM d, yyyy')}`}
           aria-rowcount={48}
           aria-colcount={7}
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(156, 163, 175, 0.3) transparent'
+          }}
         >
           {/* Selection overlay - transparent layer for pointer events */}
           <div
@@ -556,9 +589,9 @@ export function WeeklyCalendar({
         </div>
       </DndContext>
 
-      {/* Week indicator */}
-      <div className="mt-4 text-center text-sm text-neutral-400">
-        Week of {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d, yyyy')}
+      {/* Week indicator - minimal */}
+      <div className="mt-6 text-center text-sm text-gray-500 font-medium">
+        {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d, yyyy')}
       </div>
 
       {/* Modals */}

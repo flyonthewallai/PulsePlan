@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, Info, X, Loader2 } from 'lucide-react'
 import { toast } from '../../lib/toast'
 import { cn } from '../../lib/utils'
 
@@ -7,7 +7,7 @@ interface ToastProps {
   id: string
   title: string
   description?: string
-  type: 'success' | 'error' | 'warning' | 'info'
+  type: 'success' | 'error' | 'warning' | 'info' | 'loading'
   onDismiss: (id: string) => void
 }
 
@@ -17,13 +17,16 @@ const ToastItem = ({ id, title, description, type, onDismiss }: ToastProps) => {
     error: XCircle,
     warning: AlertTriangle,
     info: Info,
+    loading: Loader2,
   }
 
+  // Solid backgrounds, white text to match sync banners
   const colors = {
-    success: 'border-success bg-success/10 text-success',
-    error: 'border-error bg-error text-white',
-    warning: 'border-warning bg-warning/10 text-warning',
-    info: 'border-primary bg-primary/10 text-primary',
+    success: 'bg-green-600 border-green-500 text-white',
+    error: 'bg-red-600 border-red-500 text-white',
+    warning: 'bg-yellow-600 border-yellow-500 text-white',
+    info: 'bg-blue-600 border-blue-500 text-white',
+    loading: 'bg-blue-600 border-blue-500 text-white',
   }
 
   const Icon = icons[type]
@@ -33,7 +36,7 @@ const ToastItem = ({ id, title, description, type, onDismiss }: ToastProps) => {
       'flex items-start gap-3 p-4 rounded-lg border shadow-lg max-w-sm',
       colors[type]
     )}>
-      <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+      <Icon className={cn('w-5 h-5 flex-shrink-0 mt-0.5', type === 'loading' && 'animate-spin')} />
       
       <div className="flex-1 min-w-0">
         <div className="font-medium text-sm">{title}</div>

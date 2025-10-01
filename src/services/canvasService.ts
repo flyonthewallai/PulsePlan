@@ -95,6 +95,35 @@ export class CanvasService {
   }
 
   /**
+   * Connect Canvas using API key
+   */
+  static async connectWithAPIKey(authToken: string, canvasUrl: string, apiToken: string): Promise<{ success: boolean; message: string; user_id: string; canvas_url: string; status: string; stored_at: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/canvas/connect`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          canvas_url: canvasUrl,
+          api_token: apiToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error connecting Canvas with API key:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Test Canvas API connection
    */
   static async testConnection(): Promise<{ success: boolean; message: string; timestamp: string }> {

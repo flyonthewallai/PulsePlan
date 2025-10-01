@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { Clock, Plus } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { CALENDAR_CONSTANTS } from '../../../lib/utils/constants';
 import type { SelectionState } from '../calendar-logic/selection';
 import { SelectionManager } from '../calendar-logic/selection';
 
@@ -49,8 +50,8 @@ export const SelectionLayer: React.FC<SelectionLayerProps> = ({
           className
         )}
         style={{
-          left: visualBounds.left + 60, // Offset for hour labels
-          top: visualBounds.top + 64,   // Offset for header (64px)
+          left: visualBounds.left + CALENDAR_CONSTANTS.GRID_MARGIN_LEFT, // Offset for time label column
+          top: visualBounds.top + 60 + 48,   // Offset for header (60px) + all-day row (48px)
           width: visualBounds.width,
           height: visualBounds.height,
         }}

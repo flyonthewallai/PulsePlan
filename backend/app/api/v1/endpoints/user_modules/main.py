@@ -9,6 +9,7 @@ from .users import router as users_router
 from .contacts import router as contacts_router
 from .preferences import router as preferences_router
 from .subscriptions import router as subscriptions_router
+from .courses import router as courses_router
 
 # Create main user management router
 router = APIRouter()
@@ -18,3 +19,4 @@ router.include_router(users_router, prefix="/users", tags=["users"])
 router.include_router(contacts_router, prefix="/contacts", tags=["contacts"])
 router.include_router(preferences_router, prefix="/preferences", tags=["user-preferences"])
 router.include_router(subscriptions_router, prefix="/subscriptions", tags=["subscriptions"])
+router.include_router(courses_router, prefix="/courses", tags=["courses"])

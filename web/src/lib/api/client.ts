@@ -1,5 +1,5 @@
-import { ENV } from '../utils/constants'
-import { supabaseClient } from '../supabaseClient'
+import { API_BASE_URL } from '../../config/api'
+import { supabase } from '../supabase'
 
 class ApiClient {
   private baseUrl: string
@@ -17,7 +17,7 @@ class ApiClient {
   private resetTimeout = 30000 // 30 seconds
 
   constructor() {
-    this.baseUrl = ENV.API_BASE_URL
+    this.baseUrl = API_BASE_URL
   }
 
   private createTimeoutSignal(timeout: number): AbortSignal {
@@ -62,7 +62,7 @@ class ApiClient {
 
   private async getAuthToken(): Promise<string | null> {
     try {
-      const { data: { session } } = await supabaseClient.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
       return session?.access_token || null
     } catch (error) {
       console.error('Error getting auth token:', error)
@@ -113,9 +113,7 @@ class ApiClient {
       }
 
       const data = await response.json()
-      
-      // Debug logging
-      
+
       // Record success for circuit breaker
       this.recordSuccess()
       

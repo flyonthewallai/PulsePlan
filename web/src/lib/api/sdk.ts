@@ -31,10 +31,10 @@ export const tasksApi = {
     if (params?.endDate) searchParams.append('endDate', params.endDate);
     if (params?.status) searchParams.append('status', params.status);
     if (params?.priority) searchParams.append('priority', params.priority);
-    
+
     const query = searchParams.toString();
     const endpoint = query ? `${API_ENDPOINTS.TASKS_LIST}?${query}` : API_ENDPOINTS.TASKS_LIST;
-    
+
     const response = await apiClient.get<{tasks: Task[], count: number}>(endpoint);
     if (response.error) {
       throw new Error(response.error);

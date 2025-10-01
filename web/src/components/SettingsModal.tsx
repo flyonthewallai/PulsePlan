@@ -1,40 +1,60 @@
-import React, { useState } from 'react'
-import { 
-  X, 
-  User, 
-  Settings, 
-  Bell, 
-  Calendar, 
-  Database, 
-  Cloud, 
-  Link, 
+import React, { useState, useEffect } from 'react'
+import {
+  X,
+  User,
+  Settings,
+  Bell,
+  Calendar,
+  Database,
+  Cloud,
+  Link,
   HelpCircle,
   ExternalLink,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Mail,
   School,
   Clock,
   Star,
-  Lock
+  Lock,
+  BookOpen,
+  RefreshCw
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
+import { CourseColorPicker } from './CourseColorPicker'
+import { coursesApi, type Course } from '../services/coursesService'
+import { useProfile, useUpdateProfile } from '../hooks/useProfile'
 
 interface SettingsModalProps {
   isOpen: boolean
   onClose: () => void
 }
 
-type SettingsSection = 'profile' | 'appearance' | 'briefings' | 'hobbies' | 'reminders' | 'study' | 'subjects' | 'weekly-pulse'
+type SettingsSection = 'profile' | 'appearance' | 'briefings' | 'hobbies' | 'reminders' | 'study' | 'courses' | 'weekly-pulse'
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile')
+
+  // Profile data with React Query
+  const { data: profile, isLoading: profileLoading } = useProfile()
+  const updateProfileMutation = useUpdateProfile()
+
+  // Local state for form inputs
   const [fullName, setFullName] = useState('')
   const [school, setSchool] = useState('')
   const [academicYear, setAcademicYear] = useState('')
-  const [email, setEmail] = useState('user@example.com')
-  
+
+  // Sync form state with profile data
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || '')
+      setSchool(profile.school || '')
+      setAcademicYear(profile.academic_year || '')
+    }
+  }, [profile])
+
   // Briefings settings
   const [isBriefingsEnabled, setIsBriefingsEnabled] = useState(true)
   const [deliveryTime, setDeliveryTime] = useState('7:00 AM')
@@ -42,6 +62,81 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [suggestionsContent, setSuggestionsContent] = useState('Provide AI-powered recommendations for optimizing my day, including schedule adjustments and productivity tips.')
   const [motivationContent, setMotivationContent] = useState('Include a brief motivational message or academic tip to start my day with focus and energy.')
   const [remindersContent, setRemindersContent] = useState('Highlight important deadlines, upcoming assignments, and tasks that need my attention today.')
+
+  // Courses settings
+  const [courses, setCourses] = useState<Course[]>([])
+  const [coursesLoading, setCoursesLoading] = useState(false)
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
+
+  // Fetch courses when courses section is active
+  useEffect(() => {
+    if (isOpen && activeSection === 'courses') {
+      fetchCourses()
+    }
+  }, [isOpen, activeSection])
+
+  const saveProfile = async () => {
+    try {
+      await updateProfileMutation.mutateAsync({
+        full_name: fullName,
+        school: school,
+        academic_year: academicYear,
+      })
+      console.log('Profile updated successfully')
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      alert('Failed to update profile. Please try again.')
+    }
+  }
+
+  const fetchCourses = async () => {
+    try {
+      setCoursesLoading(true)
+      const data = await coursesApi.list()
+      setCourses(data)
+    } catch (error) {
+      console.error('Failed to fetch courses:', error)
+    } finally {
+      setCoursesLoading(false)
+    }
+  }
+
+  const handleCoursePress = (course: Course) => {
+    setSelectedCourse(course)
+    setShowColorPicker(true)
+  }
+
+  const handleColorSelect = async (color: string) => {
+    if (!selectedCourse) return
+
+    try {
+      await coursesApi.updateColor(selectedCourse.id, color)
+      // Update local state
+      setCourses(courses.map(c =>
+        c.id === selectedCourse.id ? { ...c, color } : c
+      ))
+    } catch (error) {
+      console.error('Failed to update course color:', error)
+    }
+  }
+
+  const formatCourseCode = (courseCode: string): string => {
+    // Extract text and first 4 numbers from course code (same as TasksCard)
+    const match = courseCode.match(/^([A-Za-z]+)\s*(\d{4})/)
+    if (match) {
+      return `${match[1]} ${match[2]}`
+    }
+
+    // Try 3-digit numbers
+    const match3 = courseCode.match(/^([A-Za-z]+)\s*(\d{3})/)
+    if (match3) {
+      return `${match3[1]} ${match3[2]}`
+    }
+
+    // If no match, return as-is
+    return courseCode
+  }
 
   if (!isOpen) return null
 
@@ -52,7 +147,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     { id: 'hobbies' as SettingsSection, label: 'Hobbies', icon: Star },
     { id: 'reminders' as SettingsSection, label: 'Reminders', icon: Clock },
     { id: 'study' as SettingsSection, label: 'Study', icon: School },
-    { id: 'subjects' as SettingsSection, label: 'Subjects', icon: Database },
+    { id: 'courses' as SettingsSection, label: 'Courses', icon: BookOpen },
     { id: 'weekly-pulse' as SettingsSection, label: 'Weekly Pulse', icon: Calendar },
   ]
 
@@ -83,8 +178,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <p className="text-xs text-gray-400 mb-1">Email</p>
                     <input
                       type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      value={profile?.email || ''}
                       className="w-full bg-transparent text-white text-base focus:outline-none opacity-50"
                       disabled
                     />
@@ -123,6 +217,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <button
+                onClick={saveProfile}
+                disabled={updateProfileMutation.isPending || profileLoading}
+                className="px-4 py-1.5 bg-white hover:bg-gray-100 disabled:bg-gray-200 disabled:cursor-not-allowed text-black font-medium rounded-md transition-colors text-sm"
+              >
+                {updateProfileMutation.isPending ? 'Saving...' : 'Save Profile'}
+              </button>
             </div>
           </div>
         )
@@ -250,6 +355,58 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
         )
 
+      case 'courses':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Courses</h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  Manage your courses and customize their colors. These will be used to organize your assignments and schedule.
+                </p>
+              </div>
+              <button
+                onClick={fetchCourses}
+                className="p-2 hover:bg-neutral-700 rounded-lg transition-colors"
+                title="Refresh courses"
+              >
+                <RefreshCw size={20} className="text-gray-400" />
+              </button>
+            </div>
+
+            {coursesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <p className="text-gray-400">Loading courses...</p>
+              </div>
+            ) : courses.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <p className="text-gray-400">No courses found. Sync your Canvas account to import courses.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {courses.map((course) => (
+                  <button
+                    key={course.id}
+                    onClick={() => handleCoursePress(course)}
+                    className="w-full bg-neutral-800 rounded-xl p-4 flex items-center justify-between hover:bg-neutral-700 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-6 h-6 rounded-full"
+                        style={{ backgroundColor: course.color }}
+                      />
+                      <span className="text-base font-semibold text-white">
+                        {course.canvas_course_code ? formatCourseCode(course.canvas_course_code) : course.name}
+                      </span>
+                    </div>
+                    <ChevronRight size={20} className="text-gray-400" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+
       default:
         return (
           <div className="space-y-6">
@@ -338,6 +495,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
         </div>
       </div>
+
+      {/* Course Color Picker */}
+      <CourseColorPicker
+        visible={showColorPicker}
+        onClose={() => setShowColorPicker(false)}
+        onSelectColor={handleColorSelect}
+        currentColor={selectedCourse?.color || '#6366F1'}
+        courseName={selectedCourse?.canvas_course_code || selectedCourse?.name || ''}
+      />
     </div>
   )
 }

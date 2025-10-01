@@ -246,13 +246,13 @@ async def handle_google_oauth_callback(
         user_info = await oauth_service.get_user_info(token_data["access_token"])
         
         # Store tokens securely using token service
-        from app.services.token_service import get_token_service
-        from app.models.oauth_tokens import OAuthTokenCreate
+        from app.services.auth.token_service import get_token_service
+        from app.models.auth.oauth_tokens import OAuthTokenCreate
         
         token_service = get_token_service()
         
         # Create connection data for secure storage
-        from app.models.oauth_tokens import Provider
+        from app.models.auth.oauth_tokens import Provider
         expires_at = datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 3600))
         connection_data = OAuthTokenCreate(
             provider=Provider.GOOGLE,  
@@ -355,13 +355,13 @@ async def handle_microsoft_oauth_callback(
         user_info = await oauth_service.get_user_info(token_data["access_token"])
         
         # Store tokens securely using token service
-        from app.services.token_service import get_token_service
-        from app.models.oauth_tokens import OAuthTokenCreate
+        from app.services.auth.token_service import get_token_service
+        from app.models.auth.oauth_tokens import OAuthTokenCreate
         
         token_service = get_token_service()
         
         # Create connection data for secure storage
-        from app.models.oauth_tokens import Provider
+        from app.models.auth.oauth_tokens import Provider
         expires_at = datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 3600))
         connection_data = OAuthTokenCreate(
             provider=Provider.MICROSOFT,  
@@ -410,7 +410,7 @@ async def get_oauth_connections(
     Get all OAuth connections for the current user via secure token service
     """
     try:
-        from app.services.token_service import get_token_service
+        from app.services.auth.token_service import get_token_service
         
         token_service = get_token_service()
         
@@ -469,7 +469,7 @@ async def disconnect_oauth_provider(
         )
     
     try:
-        from app.services.token_service import get_token_service
+        from app.services.auth.token_service import get_token_service
         
         token_service = get_token_service()
         

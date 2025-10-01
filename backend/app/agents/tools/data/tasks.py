@@ -378,11 +378,13 @@ class TaskDatabaseTool(TaskTool):
         try:
             from app.config.database.supabase import get_supabase
             supabase = get_supabase()
-            
+
             user_id = context["user_id"]
-            
-            # Build query
-            query = supabase.table("tasks").select("*").eq("user_id", user_id)
+
+            # Build query with course information (compact format to avoid encoding issues)
+            select_query = "*,courses(id,name,color,icon,canvas_course_code)"
+
+            query = supabase.table("tasks").select(select_query).eq("user_id", user_id)
             
             # Apply filters
             if filters.get("status"):
@@ -410,7 +412,7 @@ class TaskDatabaseTool(TaskTool):
             
             response = query.execute()
             tasks = response.data or []
-            
+
             return ToolResult(
                 success=True,
                 data={

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { supabaseClient } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 import { useWebSocket } from '../contexts/WebSocketContext';
 
 export function useAuthWebSocket() {
@@ -9,7 +9,7 @@ export function useAuthWebSocket() {
     // Get initial session
     const getInitialSession = async () => {
       console.log('🔍 Getting initial Supabase session...');
-      const { data: { session }, error } = await supabaseClient.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error) {
         console.error('❌ Error getting session:', error);
@@ -28,7 +28,7 @@ export function useAuthWebSocket() {
     getInitialSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('Auth state changed:', event, session?.user?.id);
         if (session?.user?.id) {

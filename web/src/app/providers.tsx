@@ -1,7 +1,7 @@
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
-import { supabaseClient } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 import { ThemeProvider } from './theme-provider';
 import { Toaster } from '../components/ui/toaster';
 import { ErrorBoundary } from './error-boundary';
@@ -110,7 +110,7 @@ export function Providers({ children }: ProvidersProps) {
     <ErrorBoundary>
       <BrowserRouter>
         <SessionContextProvider
-          supabaseClient={supabaseClient}
+          supabaseClient={supabase}
           initialSession={null}
         >
           <QueryClientProvider client={queryClient}>

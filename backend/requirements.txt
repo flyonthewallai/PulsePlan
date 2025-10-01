@@ -8,7 +8,7 @@ supabase==2.0.2
 asyncpg==0.29.0
 
 # Validation and serialization
-pydantic==2.5.0
+pydantic==2.7.4
 pydantic-settings==2.1.0
 
 # Security and authentication
@@ -27,18 +27,18 @@ pytz==2023.3
 resend==0.8.0
 
 # HTTP client
-httpx==0.25.2
+httpx==0.24.1
 
 # WebSocket support
 python-socketio==5.10.0
 
 # LangGraph and AI workflows
 langgraph==0.0.62
-langchain-core==0.3.18
+langchain-core==0.2.16
 langchain-openai==0.1.7
 
 # Monitoring and observability
-sentry-sdk[fastapi]==1.48.0
+sentry-sdk[fastapi]==2.39.0
 structlog==23.2.0
 
 # AWS (for future KMS integration)
@@ -48,6 +48,11 @@ botocore==1.35.0
 # Environment and utilities
 python-dotenv==1.0.0
 typing-extensions==4.8.0
+
+# Additional dependencies for PulsePlan
+aiohttp==3.12.15
+numpy==2.3.3
+scikit-learn==1.7.2
 
 # Development and testing
 pytest==7.4.3
