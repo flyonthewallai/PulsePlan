@@ -1,6 +1,6 @@
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SessionContextProvider } from '@supabase/auth-helpers-react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { ThemeProvider } from './theme-provider';
 import { Toaster } from '../components/ui/toaster';
@@ -9,6 +9,67 @@ import { TaskSuccessProvider } from '../contexts/TaskSuccessContext';
 import { TaskSuccessOverlay } from '../components/TaskSuccessOverlay';
 import { WebSocketProvider } from '../contexts/WebSocketContext';
 import type { ReactNode } from 'react';
+import type { Session, User } from '@supabase/supabase-js';
+
+// Create Session Context
+interface SessionContextType {
+  session: Session | null;
+  user: User | null;
+  isLoading: boolean;
+}
+
+const SessionContext = createContext<SessionContextType>({
+  session: null,
+  user: null,
+  isLoading: true,
+});
+
+const useSession = () => {
+  const context = useContext(SessionContext);
+  if (context === undefined) {
+    throw new Error('useSession must be used within a SessionProvider');
+  }
+  return context;
+};
+
+interface SessionProviderProps {
+  children: ReactNode;
+}
+
+function SessionProvider({ children }: SessionProviderProps) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setIsLoading(false);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const value = {
+    session,
+    user: session?.user ?? null,
+    isLoading,
+  };
+
+  return (
+    <SessionContext.Provider value={value}>
+      {children}
+    </SessionContext.Provider>
+  );
+}
 
 // Create a client instance with optimized settings
 const queryClient = new QueryClient({
@@ -109,10 +170,7 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <SessionContextProvider
-          supabaseClient={supabase}
-          initialSession={null}
-        >
+        <SessionProvider>
           <QueryClientProvider client={queryClient}>
             <ThemeProvider
               attribute="class"
@@ -129,11 +187,11 @@ export function Providers({ children }: ProvidersProps) {
               </WebSocketProvider>
             </ThemeProvider>
           </QueryClientProvider>
-        </SessionContextProvider>
+        </SessionProvider>
       </BrowserRouter>
     </ErrorBoundary>
   );
 }
 
-export { queryClient };
+export { queryClient, useSession };
 export default Providers;
