@@ -137,13 +137,8 @@ export function AuthPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showEmailForm, setShowEmailForm] = useState(false)
 
-  // Debug configuration on mount
+  // Validate configuration on mount
   useEffect(() => {
-    console.log('AuthPage mounted')
-    console.log('Supabase URL:', config.supabase.url)
-    console.log('Supabase Anon Key:', config.supabase.anonKey ? 'Present' : 'Missing')
-    console.log('API Base URL:', config.api.baseUrl)
-    
     if (!config.supabase.url || !config.supabase.anonKey) {
       setError('Supabase configuration is missing. Please check your environment variables.')
     }
@@ -168,18 +163,13 @@ export function AuthPage() {
   })
 
   const handleLogin = async (data: LoginFormData) => {
-    console.log('Login attempt started:', data.email)
     setLoading(true)
     setError(null)
     
     try {
-      console.log('Calling signIn function...')
       const { error } = await signIn(data.email, data.password)
-      console.log('SignIn result:', { error })
       if (error) throw error
-      console.log('Login successful!')
     } catch (err) {
-      console.error('Login error:', err)
       setError(err instanceof Error ? err.message : 'Failed to sign in')
     } finally {
       setLoading(false)
@@ -187,30 +177,23 @@ export function AuthPage() {
   }
 
   const handleSignup = async (data: SignupFormData) => {
-    console.log('Signup attempt started:', data.email)
     setLoading(true)
     setError(null)
     
     try {
-      console.log('Calling signUp function...')
       const { data: signupData, error } = await signUp(data.email, data.password, data.fullName)
-      console.log('SignUp result:', { data: signupData, error })
       
       if (error) throw error
       
       // Check if user was created successfully
       if (signupData?.user) {
-        console.log('User created successfully, signing in...')
-        
         // Check if user needs email confirmation
         if (signupData.user.email_confirmed_at) {
           // User is already confirmed, sign them in immediately
           const { error: signInError } = await signIn(data.email, data.password)
           if (signInError) {
-            console.error('Auto sign-in failed:', signInError)
             setError('Account created but failed to sign in automatically. Please try signing in manually.')
           } else {
-            console.log('Auto sign-in successful!')
             setSuccess('Account created successfully! You are now signed in.')
           }
         } else {
@@ -218,10 +201,8 @@ export function AuthPage() {
           // (this works if email confirmation is disabled in Supabase settings)
           const { error: signInError } = await signIn(data.email, data.password)
           if (signInError) {
-            console.log('Email confirmation required, but trying anyway...')
             setSuccess('Account created! Please check your email to confirm your account, then sign in.')
           } else {
-            console.log('Auto sign-in successful despite email confirmation!')
             setSuccess('Account created successfully! You are now signed in.')
           }
         }
@@ -229,7 +210,6 @@ export function AuthPage() {
         setSuccess('Account created successfully! Please sign in.')
       }
     } catch (err) {
-      console.error('Signup error:', err)
       setError(err instanceof Error ? err.message : 'Failed to sign up')
     } finally {
       setLoading(false)

@@ -49,28 +49,28 @@ interface ErrorFallbackProps {
 
 function DefaultErrorFallback({ error, retry }: ErrorFallbackProps) {
   return (
-    <div className="flex flex-col items-center justify-center p-8 text-center">
-      <div className="w-16 h-16 bg-error rounded-full flex items-center justify-center mb-4">
-        <AlertTriangle className="w-8 h-8 text-white" />
+    <div className="min-h-screen w-full flex items-center justify-center px-6">
+      <div className="w-full max-w-xl bg-neutral-900/60 border border-white/10 rounded-2xl shadow-xl p-6 text-center backdrop-blur-sm">
+        <div className="mx-auto mb-4 w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+          <AlertTriangle className="w-6 h-6 text-amber-400" />
+        </div>
+
+        <h2 className="text-lg font-semibold text-white mb-2">Something went wrong</h2>
+
+        <p className="text-sm text-gray-400 mb-3 line-clamp-3">
+          {error?.message || 'An unexpected error occurred. Please try again.'}
+        </p>
+
+        {retry && (
+          <button
+            onClick={retry}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg bg-white text-black hover:bg-gray-100 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try again
+          </button>
+        )}
       </div>
-      
-      <h2 className="text-xl font-semibold text-textPrimary mb-2">
-        Something went wrong
-      </h2>
-      
-      <p className="text-textSecondary mb-4 max-w-md">
-        {error?.message || 'An unexpected error occurred. Please try again.'}
-      </p>
-      
-      {retry && (
-        <button
-          onClick={retry}
-          className="btn-primary flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Try Again
-        </button>
-      )}
     </div>
   )
 }

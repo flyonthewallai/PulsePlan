@@ -46,6 +46,8 @@ export function CanvasAPIConnectionModal({ isOpen, onClose, onConnected }: Props
     }
   }
 
+  if (!isOpen) return null;
+
   return (
     <div
       className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 transition-all duration-300 ${
@@ -54,31 +56,40 @@ export function CanvasAPIConnectionModal({ isOpen, onClose, onConnected }: Props
       onClick={handleBackdrop}
     >
       <div
-        className={`bg-neutral-800 border border-gray-700/50 w-full max-w-xl rounded-2xl max-h-[85vh] flex flex-col transition-all duration-300 ${
+        className={`border border-gray-700/50 w-full max-w-xl rounded-2xl max-h-[80vh] flex flex-col transition-all duration-300 ${
           isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
         }`}
+        style={{ backgroundColor: '#181818' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700/50">
-          <div className="flex items-center gap-2">
-            <img src="/canvas.png" alt="Canvas" className="w-5 h-5" />
-            <h2 className="text-white font-semibold">Canvas</h2>
+        {isOpen ? (
+          <>
+            {/* Header */}
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-neutral-700 flex items-center justify-center overflow-hidden">
+              <img 
+                src="/canvas.png" 
+                alt="Canvas" 
+                className="w-6 h-6 object-contain"
+              />
+            </div>
+            <h2 className="text-2xl font-bold text-white">Canvas</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+            className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/60"
             disabled={isConnecting}
             aria-label="Close"
           >
-            <X className="w-5 h-5 text-gray-400" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-4 overflow-y-auto">
           {/* Instructions */}
-          <div className="bg-neutral-800/60 border border-gray-700/50 rounded-xl p-4 mb-4">
+          <div className="border border-gray-700/50 rounded-xl p-4 mb-4" style={{ backgroundColor: '#181818' }}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-white font-medium">How to get your Canvas API key</h3>
               <button
@@ -99,7 +110,7 @@ export function CanvasAPIConnectionModal({ isOpen, onClose, onConnected }: Props
           </div>
 
           {/* Inputs */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
               <label className="block text-sm text-gray-300 mb-1">Canvas Domain</label>
               <input
@@ -107,7 +118,7 @@ export function CanvasAPIConnectionModal({ isOpen, onClose, onConnected }: Props
                 placeholder="https://your-school.instructure.com"
                 value={canvasDomain}
                 onChange={(e) => setCanvasDomain(e.target.value)}
-                className="w-full bg-neutral-900 text-white border border-gray-700 rounded-lg px-3 py-2 placeholder:text-gray-500 focus:outline-none focus:border-gray-600"
+                className="w-full bg-neutral-800/40 text-white border border-gray-700/50 rounded-lg px-3 py-2 placeholder:text-gray-400 focus:outline-none focus:border-gray-500"
                 disabled={isConnecting}
               />
             </div>
@@ -118,7 +129,7 @@ export function CanvasAPIConnectionModal({ isOpen, onClose, onConnected }: Props
                 placeholder="Paste your Canvas API token"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                className="w-full bg-neutral-900 text-white border border-gray-700 rounded-lg px-3 py-2 placeholder:text-gray-500 focus:outline-none focus:border-gray-600"
+                className="w-full bg-neutral-800/40 text-white border border-gray-700/50 rounded-lg px-3 py-2 placeholder:text-gray-400 focus:outline-none focus:border-gray-500"
                 disabled={isConnecting}
               />
             </div>
@@ -129,7 +140,7 @@ export function CanvasAPIConnectionModal({ isOpen, onClose, onConnected }: Props
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-700/50 flex justify-end">
+        <div className="p-4 flex justify-end">
           <button
             onClick={handleConnect}
             disabled={isConnecting}
@@ -141,19 +152,18 @@ export function CanvasAPIConnectionModal({ isOpen, onClose, onConnected }: Props
             {isConnecting ? 'Connecting...' : 'Connect'}
           </button>
         </div>
-      </div>
 
-      {/* Video Demo Modal */}
-      {showVideoModal && (
+        {/* Video Demo Modal */}
+        {showVideoModal && (
         <div
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowVideoModal(false)
           }}
         >
-          <div className="bg-neutral-800 border border-gray-700/50 w-full max-w-2xl rounded-2xl max-h-[85vh] flex flex-col">
+          <div className="border border-gray-700/50 w-full max-w-2xl rounded-2xl max-h-[85vh] flex flex-col" style={{ backgroundColor: '#181818' }}>
             {/* Video Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-700/50">
+            <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-2">
                 <Play className="w-5 h-5 text-gray-400" />
                 <h3 className="text-white font-semibold">Canvas API Key Demo</h3>
@@ -161,17 +171,17 @@ export function CanvasAPIConnectionModal({ isOpen, onClose, onConnected }: Props
               <button
                 type="button"
                 onClick={() => setShowVideoModal(false)}
-                className="p-1 hover:text-white transition-colors"
+                className="p-1 transition-colors"
                 aria-label="Close"
               >
-                <X className="w-5 h-5 text-gray-400" />
+                <X className="w-5 h-5 text-gray-400 hover:text-white" />
               </button>
             </div>
 
             {/* Video Content */}
             <div className="p-4 flex-1 flex items-center justify-center">
               <div className="text-center">
-                <div className="w-16 h-16 bg-neutral-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-neutral-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Play className="w-8 h-8 text-gray-400" />
                 </div>
                 <h4 className="text-white font-medium mb-2">Demo Video Coming Soon</h4>
@@ -189,7 +199,10 @@ export function CanvasAPIConnectionModal({ isOpen, onClose, onConnected }: Props
             </div>
           </div>
         </div>
-      )}
+        )}
+          </>
+        ) : null}
+      </div>
     </div>
   )
 }

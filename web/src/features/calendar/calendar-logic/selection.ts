@@ -85,14 +85,14 @@ export class SelectionManager {
   }
 
   // End selection and return final bounds
-  static endSelection(selection: SelectionState): SelectionBounds | null {
+  static endSelection(selection: SelectionState, startHour: number = 6): SelectionBounds | null {
     if (!selection.isSelecting || !selection.startTime || !selection.endTime || selection.dayIndex === undefined) {
       return null;
     }
 
-    // Calculate visual bounds
-    const startY = GridMath.timeToY(selection.startTime);
-    const endY = GridMath.timeToY(selection.endTime);
+    // Calculate visual bounds (relative to startHour)
+    const startY = GridMath.timeToY(selection.startTime, startHour);
+    const endY = GridMath.timeToY(selection.endTime, startHour);
     
     const top = Math.min(startY, endY);
     const height = Math.max(Math.abs(endY - startY), this.MIN_SELECTION_HEIGHT);
@@ -137,7 +137,7 @@ export class SelectionManager {
   }
 
   // Get visual bounds for current selection (for rendering selection rectangle)
-  static getSelectionVisualBounds(selection: SelectionState): {
+  static getSelectionVisualBounds(selection: SelectionState, columnWidth: number = 160): {
     left: number;
     top: number;
     width: number;
@@ -147,15 +147,19 @@ export class SelectionManager {
       return null;
     }
 
+    const ALL_DAY_ROW_HEIGHT = 48; // Match CALENDAR_CONSTANTS.ALL_DAY_ROW_HEIGHT
+    const TIME_GUTTER_WIDTH = 60; // Match CALENDAR_CONSTANTS.GRID_MARGIN_LEFT
+    
     const startY = GridMath.timeToY(selection.startTime, 6);
     const endY = GridMath.timeToY(selection.endTime, 6);
     
-    const top = Math.min(startY, endY);
+    // Add ALL_DAY_ROW_HEIGHT offset to match event positioning
+    const top = ALL_DAY_ROW_HEIGHT + Math.min(startY, endY);
     const height = Math.max(Math.abs(endY - startY), this.MIN_SELECTION_HEIGHT);
     
-    const dayWidth = 160; // GRID_DAY_WIDTH from constants
-    const left = selection.dayIndex * dayWidth;
-    const width = dayWidth - 4;
+    // Add TIME_GUTTER_WIDTH offset to match event positioning
+    const left = TIME_GUTTER_WIDTH + (selection.dayIndex * columnWidth);
+    const width = columnWidth - 4; // 4px margin for visual clarity
 
     return {
       left: Math.round(left + 2), // Small offset for visual clarity

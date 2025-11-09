@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { format, addDays, startOfWeek } from 'date-fns';
 import { cn } from '../../../lib/utils';
 import { GridMath } from '../calendar-logic/gridMath';
@@ -12,8 +12,6 @@ interface WeekGridProps {
   className?: string;
   children?: React.ReactNode;
   gridInnerRef?: React.RefObject<HTMLDivElement | null>;
-  headerRef?: React.RefObject<HTMLDivElement | null>;
-  gutterRef?: React.RefObject<HTMLDivElement | null>;
   dayColumnsRef?: React.MutableRefObject<HTMLDivElement[]>;
 }
 
@@ -25,8 +23,6 @@ export const WeekGrid: React.FC<WeekGridProps> = ({
   className,
   children,
   gridInnerRef,
-  headerRef,
-  gutterRef,
   dayColumnsRef,
 }) => {
   // Calculate week days (Monday to Sunday)
@@ -59,54 +55,45 @@ export const WeekGrid: React.FC<WeekGridProps> = ({
   const hourHeight = CALENDAR_CONSTANTS.GRID_HOUR_HEIGHT;
   const slotHeight = hourHeight / (60 / slotInterval);
   const totalHeight = (endHour - startHour) * hourHeight;
-  const dayWidth = CALENDAR_CONSTANTS.GRID_DAY_WIDTH;
+  const minDayWidth = CALENDAR_CONSTANTS.GRID_DAY_WIDTH;
 
 
   return (
     <div
       ref={actualGridRef}
-      className={cn('relative bg-neutral-900', className)}
+      className={cn('relative w-full', className)}
       style={{
-        height: totalHeight + 60 + 48, // Extra space for header + all-day row
+        height: totalHeight + 48, // Extra space for all-day row (header moved to parent)
+        minHeight: totalHeight + 48,
+        minWidth: `${CALENDAR_CONSTANTS.GRID_MARGIN_LEFT + 7 * minDayWidth}px`,
+        backgroundColor: '#111111'
       }}
     >
-      {/* Header with day labels - Dates next to weekdays */}
-      <div ref={headerRef} className="sticky top-0 z-20 bg-neutral-900 flex">
-        {/* Time column header - empty space */}
-        <div ref={gutterRef} className="flex items-center justify-center text-gray-500 text-xs font-medium" style={{ width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT }}>
-          
+      {/* All-day row - sits directly below day header divider */}
+      <div className="flex">
+        {/* All-day label column */}
+        <div className="flex items-center justify-end pr-3 text-xs font-medium" style={{ width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT, backgroundColor: '#111111', color: 'rgba(229, 229, 229, 0.7)' }}>
+          all-day
         </div>
-        
-        {/* Day headers with dates inline */}
-        <div className="flex-1 border-l border-r border-b border-white/5">
-          <div className="grid h-14" style={{ gridTemplateColumns: `repeat(7, ${dayWidth}px)` }}>
-            {weekDays.map((day) => {
+        {/* All-day event columns */}
+        <div className="flex-1 h-12">
+          <div className="grid h-full" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+            {weekDays.map((day, index) => {
               const isToday = format(day, 'yyyy-MM-dd') === todayDateString;
-              
               return (
                 <div
                   key={day.toISOString()}
                   className={cn(
-                    'flex items-center justify-center border-r border-white/5 last:border-r-0',
-                    'transition-colors duration-200'
+                    'border-b p-1',
+                    isToday ? 'bg-white/[0.02]' : ''
                   )}
+                  style={{
+                    backgroundColor: isToday ? undefined : '#111111',
+                    borderRight: index < 6 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                    borderBottomColor: 'rgba(255, 255, 255, 0.05)'
+                  }}
                 >
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      'text-xs font-semibold uppercase tracking-wider',
-                      isToday ? 'text-blue-400' : 'text-gray-500'
-                    )}>
-                      {format(day, 'EEE')}
-                    </div>
-                    <div className={cn(
-                      'text-sm font-semibold',
-                      isToday 
-                        ? 'text-white bg-blue-500 w-6 h-6 rounded-full flex items-center justify-center' 
-                        : 'text-white'
-                    )}>
-                      {format(day, 'd')}
-                    </div>
-                  </div>
+                  {/* All-day events would go here */}
                 </div>
               );
             })}
@@ -114,39 +101,19 @@ export const WeekGrid: React.FC<WeekGridProps> = ({
         </div>
       </div>
 
-      {/* All-day row */}
-      <div className="flex">
-        {/* All-day label column */}
-        <div className="flex items-center justify-end pr-3 text-gray-500 text-xs font-medium" style={{ width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT }}>
-          all-day
-        </div>
-        {/* All-day event columns */}
-        <div className="flex-1 border-l border-r border-b border-white/5 h-12 bg-neutral-900/50">
-          <div className="grid h-full" style={{ gridTemplateColumns: `repeat(7, ${dayWidth}px)` }}>
-            {weekDays.map((day) => (
-              <div
-                key={day.toISOString()}
-                className="border-r border-white/5 last:border-r-0 p-1"
-              >
-                {/* All-day events would go here */}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Main grid content - Clean & Minimal */}
-      <div className="relative flex">
-        {/* Hour labels column - aligned with grid lines */}
-        <div className="relative" style={{ width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT, height: totalHeight }}>
+      {/* Main grid content - Notion Style */}
+      <div className="relative flex" style={{ backgroundColor: '#111111' }}>
+        {/* Hour labels column - right-aligned */}
+        <div className="relative" style={{ width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT, height: totalHeight, backgroundColor: '#111111' }}>
           {timeSlots.filter((slot) => slot.getMinutes() === 0).map((slot, hourIndex) => {
             return (
               <div
                 key={hourIndex}
-                className="absolute text-gray-500 text-xs font-medium flex items-start justify-end pr-3"
+                className="absolute text-xs font-medium flex items-start justify-end pr-3"
                 style={{ 
-                  top: hourIndex * hourHeight - 6, // Position text slightly above the line
-                  width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT
+                  top: hourIndex * hourHeight - 6,
+                  width: CALENDAR_CONSTANTS.GRID_MARGIN_LEFT,
+                  color: 'rgba(229, 229, 229, 0.7)'
                 }}
               >
                 {format(slot, 'ha')}
@@ -155,9 +122,9 @@ export const WeekGrid: React.FC<WeekGridProps> = ({
           })}
         </div>
 
-        {/* Day columns with grid lines */}
-        <div className="flex-1 relative border-l border-r border-white/5">
-          <div className="grid h-full" style={{ gridTemplateColumns: `repeat(7, ${dayWidth}px)` }}>
+        {/* Day columns with subtle grid lines */}
+        <div className="flex-1 relative">
+          <div className="grid h-full" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
             {weekDays.map((day, dayIndex) => {
               const isToday = format(day, 'yyyy-MM-dd') === todayDateString;
               
@@ -170,9 +137,13 @@ export const WeekGrid: React.FC<WeekGridProps> = ({
                     }
                   }}
                   className={cn(
-                    'relative border-r border-white/5 last:border-r-0 transition-colors',
+                    'relative transition-colors overflow-hidden',
                     isToday && 'bg-white/[0.02]'
                   )}
+                  style={{ 
+                    borderRight: dayIndex < 6 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                    backgroundColor: isToday ? undefined : '#111111'
+                  }}
                 >
                   {timeSlots.map((slot, slotIndex) => {
                     const isHourStart = slot.getMinutes() === 0;
@@ -180,13 +151,11 @@ export const WeekGrid: React.FC<WeekGridProps> = ({
                     return (
                       <div
                         key={slotIndex}
-                        className={cn(
-                          'border-b hover:bg-white/[0.02] transition-colors',
-                          isHourStart 
-                            ? 'border-white/10' 
-                            : 'border-white/5'
-                        )}
-                        style={{ height: slotHeight }}
+                        className="border-b hover:brightness-110 transition-all"
+                        style={{ 
+                          height: slotHeight,
+                          borderColor: isHourStart ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.05)'
+                        }}
                         data-day-index={dayIndex}
                         data-slot-index={slotIndex}
                         data-time={format(slot, 'HH:mm')}
@@ -205,7 +174,7 @@ export const WeekGrid: React.FC<WeekGridProps> = ({
             currentDate={today}
             startHour={startHour}
             weekDays={weekDays}
-            dayWidth={dayWidth}
+            gridRef={actualGridRef}
           />
         )}
 
@@ -223,8 +192,25 @@ const CurrentTimeIndicator: React.FC<{
   currentDate: Date;
   startHour: number;
   weekDays: Date[];
-  dayWidth: number;
-}> = ({ currentDate, startHour, weekDays, dayWidth }) => {
+  gridRef: React.RefObject<HTMLDivElement | null>;
+}> = ({ currentDate, startHour, weekDays, gridRef }) => {
+  const [dayWidth, setDayWidth] = React.useState<number>(CALENDAR_CONSTANTS.GRID_DAY_WIDTH);
+  
+  React.useEffect(() => {
+    const calculateDayWidth = () => {
+      if (gridRef.current) {
+        const gridWidth = gridRef.current.offsetWidth;
+        const availableWidth = gridWidth - CALENDAR_CONSTANTS.GRID_MARGIN_LEFT;
+        const calculatedWidth = availableWidth / 7;
+        setDayWidth(calculatedWidth);
+      }
+    };
+    
+    calculateDayWidth();
+    window.addEventListener('resize', calculateDayWidth);
+    return () => window.removeEventListener('resize', calculateDayWidth);
+  }, [gridRef]);
+
   const todayIndex = weekDays.findIndex(
     day => format(day, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd')
   );

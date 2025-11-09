@@ -11,14 +11,16 @@ interface SelectionLayerProps {
   selection: SelectionState;
   className?: string;
   onCreateEvent?: (startTime: Date, endTime: Date, dayIndex: number) => void;
+  columnWidth?: number;
 }
 
 export const SelectionLayer: React.FC<SelectionLayerProps> = ({
   selection,
   className,
   onCreateEvent,
+  columnWidth = 160,
 }) => {
-  const visualBounds = SelectionManager.getSelectionVisualBounds(selection);
+  const visualBounds = SelectionManager.getSelectionVisualBounds(selection, columnWidth);
   
   if (!visualBounds || !selection.isSelecting) {
     return null;
@@ -26,100 +28,65 @@ export const SelectionLayer: React.FC<SelectionLayerProps> = ({
 
   const duration = SelectionManager.getSelectionDuration(selection);
   const timeString = SelectionManager.getSelectionTimeString(selection);
-  const isValid = SelectionManager.isValidSelection(selection);
-
-  const handleCreateClick = () => {
-    if (isValid && selection.startTime && selection.endTime && selection.dayIndex !== undefined) {
-      onCreateEvent?.(selection.startTime, selection.endTime, selection.dayIndex);
-    }
-  };
 
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.15 }}
+        exit={{ opacity: 0, scale: 0.98 }}
+        transition={{ duration: 0.2 }}
         className={cn(
-          'absolute pointer-events-none z-50 rounded-lg border-2 border-dashed',
+          'absolute pointer-events-none z-50 rounded-lg border-l-4 shadow-lg',
           'flex flex-col justify-between overflow-hidden',
-          isValid 
-            ? 'bg-blue-500/20 border-blue-400' 
-            : 'bg-yellow-500/20 border-yellow-400',
+          'bg-blue-500/30 border-blue-500 backdrop-blur-sm',
           className
         )}
         style={{
-          left: visualBounds.left + CALENDAR_CONSTANTS.GRID_MARGIN_LEFT, // Offset for time label column
-          top: visualBounds.top + 60 + 48,   // Offset for header (60px) + all-day row (48px)
+          // Selection uses the same coordinate system as events
+          // visualBounds already calculates relative to time gutter start
+          left: visualBounds.left,
+          top: visualBounds.top,
           width: visualBounds.width,
           height: visualBounds.height,
         }}
       >
+        {/* Subtle gradient overlay matching event blocks */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+
         {/* Selection content */}
-        <div className="flex-1 p-2 flex flex-col justify-center">
-          {/* Time indicator */}
-          <div className="flex items-center justify-center gap-2 text-sm font-medium">
-            <Clock size={14} />
-            <span className={isValid ? 'text-blue-200' : 'text-yellow-200'}>
+        <div className="relative flex-1 p-2 flex flex-col justify-center">
+          {/* Time indicator - matching event block style */}
+          <div className="flex items-center gap-2 text-sm font-medium text-white">
+            <Clock size={14} className="opacity-90" />
+            <span>
               {timeString}
             </span>
           </div>
-          
+
           {/* Duration */}
           {duration > 0 && (
-            <div className={cn(
-              'text-xs text-center mt-1',
-              isValid ? 'text-blue-300' : 'text-yellow-300'
-            )}>
+            <div className="text-xs text-white/80 mt-1">
               {duration} minutes
-            </div>
-          )}
-
-          {/* Create button for valid selections */}
-          {isValid && visualBounds.height > 60 && (
-            <motion.button
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mt-2 mx-auto px-3 py-1.5 bg-blue-500 text-white text-xs rounded-md
-                       hover:bg-blue-600 transition-colors pointer-events-auto
-                       flex items-center gap-1"
-              onClick={handleCreateClick}
-            >
-              <Plus size={12} />
-              Create Event
-            </motion.button>
-          )}
-
-          {/* Warning for invalid selections */}
-          {!isValid && visualBounds.height > 40 && (
-            <div className="text-xs text-yellow-300 text-center mt-1">
-              Minimum 15 minutes
             </div>
           )}
         </div>
 
-        {/* Animated border pulse */}
+        {/* Subtle animated glow effect */}
         <motion.div
-          className="absolute inset-0 rounded-lg border-2"
+          className="absolute inset-0 rounded-lg pointer-events-none"
+          style={{
+            boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)'
+          }}
           animate={{
-            borderColor: isValid 
-              ? ['rgba(59, 130, 246, 0.5)', 'rgba(59, 130, 246, 1)', 'rgba(59, 130, 246, 0.5)']
-              : ['rgba(234, 179, 8, 0.5)', 'rgba(234, 179, 8, 1)', 'rgba(234, 179, 8, 0.5)']
+            opacity: [0.5, 1, 0.5]
           }}
           transition={{
-            duration: 1.5,
+            duration: 2,
             repeat: Infinity,
             ease: 'easeInOut'
           }}
         />
-
-        {/* Corner resize indicators */}
-        <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" />
-        <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" />
-        <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" />
-        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" />
       </motion.div>
     </AnimatePresence>
   );

@@ -9,6 +9,7 @@ import type { CalendarEvent } from '@/types';
 import type { EventLayout } from '../calendar-logic/overlaps';
 import { GridMath } from '../calendar-logic/gridMath';
 import { colors, CALENDAR_CONSTANTS } from '../../../lib/utils/constants';
+import { calculateEventPosition } from '../calendar-logic/positioning';
 
 // Local type definition for PanInfo since it's not exported in newer framer-motion versions
 interface PanInfo {
@@ -21,6 +22,9 @@ interface PanInfo {
 interface EventBlockProps {
   event: CalendarEvent;
   layout: EventLayout;
+  dayIndex: number;
+  startHour: number;
+  columnWidth?: number; // Dynamic column width
   isSelected?: boolean;
   isDragging?: boolean;
   isResizing?: boolean;
@@ -38,6 +42,9 @@ interface EventBlockProps {
 export const EventBlock: React.FC<EventBlockProps> = ({
   event,
   layout,
+  dayIndex,
+  startHour,
+  columnWidth,
   isSelected = false,
   isDragging = false,
   isResizing = false,
@@ -51,6 +58,32 @@ export const EventBlock: React.FC<EventBlockProps> = ({
   className,
   style,
 }) => {
+  // USE THE NEW POSITIONING SYSTEM - SINGLE SOURCE OF TRUTH
+  const position = React.useMemo(() => {
+    console.log(`🔍 [EventBlock] Computing position for "${event.title}"`, {
+      dayIndex,
+      startHour,
+      eventStart: event.start,
+      eventAllDay: event.allDay,
+      layoutFromProps: layout,
+      columnWidth
+    });
+
+    // For all-day events, extract stack index from layout if available
+    let stackIndex = 0;
+    if (event.allDay && layout) {
+      // The old layout system stored Y position - derive stack index from it
+      // Each all-day event is 24px tall with 4px padding
+      stackIndex = Math.floor((layout.y - 4) / 24);
+    }
+
+    const computed = calculateEventPosition(event, dayIndex, startHour, {
+      stackIndex: event.allDay ? stackIndex : undefined,
+      columnWidth
+    });
+    console.log(`✅ [EventBlock] Computed position for "${event.title}":`, computed);
+    return computed;
+  }, [event, dayIndex, startHour, layout, columnWidth]);
   const eventRef = useRef<HTMLDivElement>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -66,6 +99,10 @@ export const EventBlock: React.FC<EventBlockProps> = ({
     startY: 0,
   });
 
+  // Track pointer down position to distinguish clicks from drags
+  const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
+  const CLICK_THRESHOLD = 5; // pixels - movement less than this is considered a click
+
   // Get priority color
   const priorityColor = React.useMemo(() => {
     if (event.task?.priority) {
@@ -79,7 +116,11 @@ export const EventBlock: React.FC<EventBlockProps> = ({
   const endTime = new Date(event.end);
   const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
 
-  // Draggable setup
+  // Determine if this event is draggable (only non-readonly events)
+  const isReadonly = event.timeblock?.readonly ?? true;
+  const isDraggableEvent = !isReadonly;
+
+  // Draggable setup - only enable for editable events
   const {
     attributes,
     listeners,
@@ -88,6 +129,7 @@ export const EventBlock: React.FC<EventBlockProps> = ({
   } = useDraggable({
     id: event.id,
     data: { event, layout },
+    disabled: isReadonly, // Disable dragging for readonly events
   });
 
   const draggableStyle = transform ? {
@@ -206,9 +248,24 @@ export const EventBlock: React.FC<EventBlockProps> = ({
     });
   };
 
-  // Truncate text for small events
+  // Determine what to show based on event type and size
+  const isAllDay = event.allDay;
   const shouldShowFullText = layout.height > 40;
-  const shouldShowTime = layout.height > 60;
+  const shouldShowTime = !isAllDay && layout.height > 60; // Never show time for all-day events
+
+  // VERIFICATION: Log what we're about to render
+  console.log(`📍 [EventBlock RENDER] "${event.title}" at:`, {
+    position,
+    appliedStyle: {
+      left: position.left,
+      top: position.top,
+      width: position.width,
+      height: position.height
+    },
+    layoutFromProps: layout,
+    eventStart: event.start,
+    eventAllDay: event.allDay
+  });
 
   return (
     <motion.div
@@ -216,23 +273,28 @@ export const EventBlock: React.FC<EventBlockProps> = ({
         setDraggableRef(node);
         eventRef.current = node;
       }}
+      data-event-block // This prevents drag-to-create from triggering on events
       className={cn(
         'absolute select-none cursor-pointer transition-all duration-200',
-        'rounded-lg border-l-4 shadow-sm hover:shadow-md',
-        'flex flex-col justify-between overflow-hidden',
-        isSelected && 'ring-2 ring-blue-400 ring-offset-1 ring-offset-neutral-900',
-        isDragging && 'shadow-lg scale-105 rotate-1',
-        isResizing && 'shadow-lg',
+        'rounded-lg overflow-hidden',
+        'flex flex-col justify-between',
+        'hover:brightness-110',
+        isSelected && 'ring-2 ring-blue-400',
+        isDragging && 'shadow-xl scale-105 rotate-1',
+        isResizing && 'shadow-xl',
         className
       )}
       style={{
-        left: layout.x + CALENDAR_CONSTANTS.GRID_MARGIN_LEFT, // Offset for time label column
-        top: layout.y + 60 + 48, // Offset for header + all-day row
-        width: layout.width,
-        height: layout.height,
-        backgroundColor: `${priorityColor}15`,
-        borderLeftColor: priorityColor,
-        zIndex: layout.zIndex + (isSelected ? 10 : 0),
+        // USE NEW POSITIONING - GUARANTEED CORRECT
+        left: position.left,
+        top: position.top,
+        width: position.width,
+        height: position.height,
+        backgroundColor: 'rgba(59, 130, 246, 0.7)', // Notion-style translucent blue
+        borderRadius: '0.5rem',
+        zIndex: Math.max(layout.zIndex, 10) + (isSelected ? 10 : 0),
+        pointerEvents: 'auto',
+        boxShadow: isSelected ? '0 4px 12px rgba(59, 130, 246, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.2)',
         ...draggableStyle,
         ...style,
       }}
@@ -242,9 +304,27 @@ export const EventBlock: React.FC<EventBlockProps> = ({
         rotate: isDragging ? 1 : 0,
       }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      onClick={(e) => {
+      onPointerDown={(e) => {
+        e.stopPropagation(); // Stop the drag-to-create overlay from capturing this
+        // Track starting position for click detection
+        pointerDownPos.current = { x: e.clientX, y: e.clientY };
+      }}
+      onPointerUp={(e) => {
         e.stopPropagation();
-        onSelect?.(event);
+
+        // Calculate movement distance
+        if (pointerDownPos.current) {
+          const dx = Math.abs(e.clientX - pointerDownPos.current.x);
+          const dy = Math.abs(e.clientY - pointerDownPos.current.y);
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          // If movement was minimal, treat as click
+          if (distance < CLICK_THRESHOLD) {
+            onSelect?.(event);
+          }
+
+          pointerDownPos.current = null;
+        }
       }}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -252,13 +332,13 @@ export const EventBlock: React.FC<EventBlockProps> = ({
       }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
-      {...attributes}
-      {...listeners}
+      {...(isDraggableEvent ? attributes : {})}
+      {...(isDraggableEvent ? listeners : {})}
     >
-      {/* Resize handle - top */}
+      {/* Resize handle - top (subtle, shows on hover) */}
       <div
-        className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize opacity-0 hover:opacity-100 
-                   bg-gradient-to-b from-white/20 to-transparent z-10"
+        className="absolute top-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 group-hover:opacity-100 
+                   bg-gradient-to-b from-white/10 to-transparent z-10 transition-opacity"
         onMouseDown={(e) => {
           e.stopPropagation();
           handleResizeStart('top', e.clientY);
@@ -266,21 +346,22 @@ export const EventBlock: React.FC<EventBlockProps> = ({
       />
 
       {/* Event content */}
-      <div className="flex-1 p-2 min-h-0">
-        {/* Header with title and actions */}
-        <div className="flex items-start justify-between mb-1">
-          <h3 
-            className="text-sm font-medium text-white truncate flex-1"
-            style={{ color: priorityColor }}
-            title={event.title}
-          >
-            {event.title}
-          </h3>
-          
-          {(isHovering || isSelected) && (
-            <div className="flex items-center gap-1 ml-2">
+      <div className={cn(
+        "flex-1 p-2 min-h-0 flex flex-col",
+        isAllDay ? "justify-center" : "justify-start" // All-day centered, timed from top
+      )}>
+        {/* All-Day Event: Compact single-line layout */}
+        {isAllDay ? (
+          <div className="flex items-center justify-between w-full">
+            <h3
+              className="text-sm font-medium text-white truncate flex-1"
+              title={event.title}
+            >
+              {event.title}
+            </h3>
+            {(isHovering || isSelected) && (
               <button
-                className="w-4 h-4 flex items-center justify-center rounded 
+                className="w-4 h-4 flex items-center justify-center rounded ml-2 shrink-0
                          text-neutral-400 hover:text-white hover:bg-black/20"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -289,53 +370,83 @@ export const EventBlock: React.FC<EventBlockProps> = ({
               >
                 <MoreHorizontal size={12} />
               </button>
-            </div>
-          )}
-        </div>
-
-        {/* Time display */}
-        {shouldShowTime && (
-          <div className="flex items-center gap-1 text-xs text-neutral-300 mb-1">
-            <Clock size={10} />
-            <span>
-              {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
-            </span>
-            <span className="text-neutral-400">({duration}m)</span>
+            )}
           </div>
-        )}
+        ) : (
+          /* Timed Event: Full layout with time and description */
+          <>
+            {/* Header with title and actions */}
+            <div className="flex items-start justify-between gap-1 mb-0.5">
+              <h3
+                className="text-sm font-medium text-white truncate flex-1 leading-tight"
+                title={event.title}
+              >
+                {event.title}
+              </h3>
 
-        {/* Description */}
-        {shouldShowFullText && event.description && (
-          <p className="text-xs text-neutral-300 line-clamp-2">
-            {event.description}
-          </p>
-        )}
+              {(isHovering || isSelected) && (
+                <button
+                  className="w-4 h-4 flex items-center justify-center rounded shrink-0
+                           text-neutral-400 hover:text-white hover:bg-black/20"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Show context menu or quick actions
+                  }}
+                >
+                  <MoreHorizontal size={12} />
+                </button>
+              )}
+            </div>
 
-        {/* Priority indicator for small events */}
-        {!shouldShowFullText && event.task?.priority && (
-          <div 
-            className="w-2 h-2 rounded-full absolute top-1 right-1"
-            style={{ backgroundColor: priorityColor }}
-          />
+            {/* Time display - always visible for timed events */}
+            {!isAllDay && (
+              <div className="flex items-center gap-1 text-xs text-white/90 leading-tight">
+                <Clock size={10} className="shrink-0" />
+                <span className="whitespace-nowrap">
+                  {format(startTime, 'h:mm a')}
+                </span>
+                {shouldShowTime && (
+                  <>
+                    <span className="text-white/60">-</span>
+                    <span className="whitespace-nowrap">{format(endTime, 'h:mm a')}</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Description - only for taller events */}
+            {shouldShowFullText && event.description && (
+              <p className="text-xs text-white/70 line-clamp-2 mt-1 leading-tight">
+                {event.description}
+              </p>
+            )}
+
+            {/* Priority indicator for small events */}
+            {!shouldShowFullText && event.task?.priority && (
+              <div
+                className="w-2 h-2 rounded-full absolute top-1.5 right-1.5"
+                style={{ backgroundColor: priorityColor }}
+              />
+            )}
+          </>
         )}
       </div>
 
-      {/* Resize handle - bottom */}
-      <div
-        className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize opacity-0 hover:opacity-100
-                   bg-gradient-to-t from-white/20 to-transparent z-10"
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          handleResizeStart('bottom', e.clientY);
-        }}
-      />
-
-      {/* Drag handle indicator */}
-      {(isHovering || isDragging) && (
-        <div className="absolute left-1 top-1/2 transform -translate-y-1/2 text-neutral-400">
-          <GripVertical size={12} />
+      {/* Resize handle - bottom (shows drag handle on hover) */}
+      {(isHovering || isSelected) && !isAllDay && (
+        <div
+          className="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize
+                     bg-gradient-to-t from-white/10 to-transparent z-10 transition-opacity
+                     flex items-end justify-center pb-1"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            handleResizeStart('bottom', e.clientY);
+          }}
+        >
+          <div className="w-8 h-1 bg-white/40 rounded-full" />
         </div>
       )}
+
     </motion.div>
   );
 };

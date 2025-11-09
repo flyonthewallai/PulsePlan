@@ -2,16 +2,18 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { format, addDays, startOfWeek, endOfWeek } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 import { WeekGrid } from './components/WeekGrid';
 import { EventBlock } from './components/EventBlock';
-import { NewEventModal } from './components/NewEventModal';
+import { CreateEventTaskModal } from './components/CreateEventTaskModal';
+import { AIEventPrompt } from './components/AIEventPrompt';
 import { EditEventModal } from './components/EditEventModal';
+import { EventDetailsModal } from './components/EventDetailsModal';
 import { SelectionLayer } from './components/SelectionLayer';
 import { SelectionManager } from './calendar-logic/selection';
-import { OverlapCalculator } from './calendar-logic/overlaps';
+import { OverlapCalculator, type EventLayout } from './calendar-logic/overlaps';
 import { CALENDAR_CONSTANTS } from '../../lib/utils/constants';
+import { ErrorBoundary } from '../../components/ui/ErrorBoundary';
 
 import type { CalendarEvent, CreateTaskData } from '@/types';
 import {
@@ -21,28 +23,37 @@ import {
   useDeleteCalendarEvent,
   useDuplicateCalendarEvent,
 } from '../../hooks/useCalendarEvents';
-import { 
-  useScreenReaderAnnouncements 
+import { useTimeblocks } from '../../hooks/useTimeblocks';
+import {
+  useScreenReaderAnnouncements
 } from '../../hooks/useKeyboardNavigation';
 import { cn } from '../../lib/utils';
+import type { Timeblock } from '../../types';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface WeeklyCalendarProps {
   onEventClick?: (event: CalendarEvent) => void;
   onCreateEvent?: (eventData: { start: string; end: string; title?: string }) => void;
   className?: string;
+  currentDate?: Date;
 }
 
-export function WeeklyCalendar({
+function WeeklyCalendarCore({
   onEventClick,
   onCreateEvent,
   className,
+  currentDate = new Date(),
 }: WeeklyCalendarProps) {
+  // Query client for cache invalidation
+  const queryClient = useQueryClient();
+  
   // State management
-  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
   const [showNewEventModal, setShowNewEventModal] = useState(false);
+  const [showAIPrompt, setShowAIPrompt] = useState(false);
   const [showEditEventModal, setShowEditEventModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [newEventData, setNewEventData] = useState<{ start: string; end: string; title?: string } | null>(null);
   
   // Pointer selection state
@@ -53,15 +64,63 @@ export function WeeklyCalendar({
   const selectionOverlayRef = useRef<HTMLDivElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  // Week calculation
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+  // Week calculation - memoize to prevent unnecessary refetches
+  const weekStart = React.useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate]);
+  const weekEnd = React.useMemo(() => endOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate]);
 
-  // Fetch calendar events using custom hook
-  const { data: events = [], isLoading, error } = useCalendarEvents(
-    format(weekStart, 'yyyy-MM-dd'),
-    format(weekEnd, 'yyyy-MM-dd')
-  );
+  // Memoize date strings to prevent query key changes on every render
+  const weekStartStr = React.useMemo(() => format(weekStart, 'yyyy-MM-dd'), [weekStart]);
+  const weekEndStr = React.useMemo(() => format(weekEnd, 'yyyy-MM-dd'), [weekEnd]);
+  const weekStartISO = React.useMemo(() => weekStart.toISOString(), [weekStart]);
+  const weekEndISO = React.useMemo(() => weekEnd.toISOString(), [weekEnd]);
+
+  // Fetch unified timeblocks (tasks + external calendar events + busy blocks)
+  // This is our PRIMARY data source - no need for separate task fetch
+  const { items: timeblocks = [], isLoading: timeblocksLoading, error: timeblocksError } = useTimeblocks({
+    fromISO: weekStartISO,
+    toISO: weekEndISO,
+  });
+
+  // Fetch calendar events using custom hook (tasks only) - ONLY as fallback if timeblocks fail
+  const {
+    data: taskEvents = [],
+    isLoading: tasksLoading,
+    error: tasksError
+  } = useCalendarEvents(weekStartStr, weekEndStr, {
+    enabled: timeblocks.length === 0 && !timeblocksLoading, // Only fetch if timeblocks empty
+  });
+
+  // Convert timeblocks to CalendarEvent format for rendering
+  const timeblockEvents: CalendarEvent[] = timeblocks.map((block: Timeblock) => {
+    // DEBUG: Log all-day status
+    if (block.title.includes('Halloween') || block.title.includes('Daylight')) {
+      console.log(`[Timeblock] ${block.title}:`, {
+        isAllDay: block.isAllDay,
+        start: block.start,
+        end: block.end
+      });
+    }
+
+    return {
+      id: block.id,
+      title: block.title,
+      description: block.description || undefined,
+      start: block.start,
+      end: block.end,
+      allDay: block.isAllDay, // Map isAllDay from timeblock to allDay for CalendarEvent
+      color: block.color || (block.source === 'task' ? '#3b82f6' : block.source === 'calendar' ? '#3b82f6' : '#ef4444'),
+      priority: block.priority || 'medium',
+      task: block.source === 'task' ? taskEvents.find(e => e.id === block.id)?.task : undefined,
+      timeblock: block, // Pass through full timeblock data for metadata modal
+    } as CalendarEvent & { timeblock: Timeblock };
+  });
+
+  // Combine both sources (prefer timeblocks for complete view)
+  const events = timeblockEvents.length > 0 ? timeblockEvents : taskEvents;
+  const isLoading = timeblocksLoading || tasksLoading;
+  // Only show error if both sources fail - be more resilient
+  const error = timeblocksError && tasksError ? timeblocksError : null;
+
 
   // Mutations
   const createEventMutation = useCreateCalendarEvent();
@@ -74,17 +133,44 @@ export function WeeklyCalendar({
 
   // Calendar configuration - match WeekGrid constants
   const START_HOUR = 6;
-  const END_HOUR = 22;
+  const END_HOUR = 24; // Show full day including late evening events
   const SLOT_INTERVAL = 30; // minutes
-  const COLUMN_WIDTH = 160; // pixels from CALENDAR_CONSTANTS.GRID_DAY_WIDTH
+  const MIN_COLUMN_WIDTH = 160; // minimum pixels from CALENDAR_CONSTANTS.GRID_DAY_WIDTH
   const GRID_MARGIN_LEFT = CALENDAR_CONSTANTS.GRID_MARGIN_LEFT; // 60px hour gutter
 
   // Refs for grid elements
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const gridInnerRef = useRef<HTMLDivElement | null>(null);
-  const headerRef = useRef<HTMLDivElement | null>(null);
-  const gutterRef = useRef<HTMLDivElement | null>(null);
   const dayColumnsRef = useRef<HTMLDivElement[]>([]);
+  
+  // Dynamic column width based on actual rendered size
+  const [columnWidth, setColumnWidth] = useState(MIN_COLUMN_WIDTH);
+  
+  // Calculate actual column width from rendered grid
+  useEffect(() => {
+    const calculateColumnWidth = () => {
+      if (gridInnerRef.current) {
+        const gridWidth = gridInnerRef.current.offsetWidth;
+        const availableWidth = gridWidth - GRID_MARGIN_LEFT;
+        const calculatedWidth = Math.max(MIN_COLUMN_WIDTH, availableWidth / 7);
+        setColumnWidth(calculatedWidth);
+      }
+    };
+    
+    calculateColumnWidth();
+    window.addEventListener('resize', calculateColumnWidth);
+    
+    // Use ResizeObserver for more accurate tracking
+    const resizeObserver = new ResizeObserver(calculateColumnWidth);
+    if (gridInnerRef.current) {
+      resizeObserver.observe(gridInnerRef.current);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', calculateColumnWidth);
+      resizeObserver.disconnect();
+    };
+  }, [GRID_MARGIN_LEFT, MIN_COLUMN_WIDTH]);
 
   // Debug state
   const [debugEnabled, setDebugEnabled] = useState<boolean>(() => {
@@ -111,53 +197,109 @@ export function WeeklyCalendar({
   const eventLayouts = React.useMemo(() => {
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
     const layouts = new Map();
-    
-    weekDays.forEach((day) => {
+
+    weekDays.forEach((day, dayIndex) => {
+      // Format day as YYYY-MM-DD for consistent comparison
+      const dayDateStr = format(day, 'yyyy-MM-dd');
+
       const dayEvents = events.filter(event => {
-        const eventDate = new Date(event.start);
-        return format(eventDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd');
+        // For all-day events, extract date from ISO string directly to avoid timezone issues
+        // For regular events, use the local date
+        let eventDateStr: string;
+
+        if (event.allDay && typeof event.start === 'string') {
+          // Extract YYYY-MM-DD from ISO string (e.g., "2025-10-31T00:00:00Z" -> "2025-10-31")
+          eventDateStr = event.start.split('T')[0];
+        } else {
+          // For timed events, use local timezone interpretation
+          const eventStart = new Date(event.start);
+          eventDateStr = format(eventStart, 'yyyy-MM-dd');
+        }
+
+        // Simple string comparison - event is on this day if dates match
+        return eventDateStr === dayDateStr;
       });
-      
+
       if (dayEvents.length > 0) {
-        const dayLayouts = OverlapCalculator.calculateEventLayouts(dayEvents, COLUMN_WIDTH);
-        dayLayouts.forEach(layout => {
-          layouts.set(layout.id, layout);
-        });
+        // Separate all-day events from timed events
+        const timedEvents = dayEvents.filter(e => !e.allDay);
+        const allDayEvents = dayEvents.filter(e => e.allDay);
+
+        // DEBUG: Log event categorization
+        console.log(`[Day ${dayIndex}] Total: ${dayEvents.length}, Timed: ${timedEvents.length}, All-Day: ${allDayEvents.length}`);
+        allDayEvents.forEach(e => console.log(`  All-Day: ${e.title}, allDay=${e.allDay}`));
+
+        // Process timed events (go in the time grid)
+        if (timedEvents.length > 0) {
+          const dayLayouts = OverlapCalculator.calculateEventLayouts(timedEvents, columnWidth, START_HOUR);
+
+          // Apply day offset to each layout's X position
+          dayLayouts.forEach(layout => {
+            // Adjust X position to place event in correct day column
+            const adjustedLayout = {
+              ...layout,
+              x: layout.x + (dayIndex * columnWidth),
+            };
+            layouts.set(layout.id, adjustedLayout);
+          });
+        }
+
+        // Process all-day events (go in the all-day row)
+        if (allDayEvents.length > 0) {
+          const EVENT_HEIGHT = 32; // Must match positioning.ts
+          const VERTICAL_GAP = 4;
+
+          allDayEvents.forEach((event, index) => {
+            const allDayLayout: EventLayout = {
+              id: event.id,
+              event,
+              x: GRID_MARGIN_LEFT + (dayIndex * columnWidth), // Account for time gutter
+              y: (index * (EVENT_HEIGHT + VERTICAL_GAP)) + 4, // Stack with proper spacing
+              width: columnWidth - 8, // Account for p-1 padding (4px each side)
+              height: EVENT_HEIGHT, // Increased height for better visibility
+              laneIndex: 0,
+              laneCount: 1,
+              zIndex: 10, // Higher z-index so they appear above time grid
+            };
+            console.log(`[All-Day Layout] Setting ${event.title} to y=${allDayLayout.y}px (height=${EVENT_HEIGHT}px)`);
+
+            // Check if this ID already exists
+            if (layouts.has(allDayLayout.id)) {
+              console.warn(`⚠️ OVERWRITING layout for ${event.title}! Old:`, layouts.get(allDayLayout.id));
+            }
+
+            layouts.set(allDayLayout.id, allDayLayout);
+
+            console.log(`[All-Day Layout] After set, y=${layouts.get(allDayLayout.id)?.y}px`);
+          });
+        }
       }
     });
-    
+
     return layouts;
-  }, [events, weekStart]);
+  }, [events, weekStart, columnWidth, GRID_MARGIN_LEFT, START_HOUR]);
 
-  // Navigation handlers
-  const handlePreviousWeek = useCallback(() => {
-    setCurrentDate(prev => addDays(prev, -7));
-  }, []);
-
-  const handleNextWeek = useCallback(() => {
-    setCurrentDate(prev => addDays(prev, 7));
-  }, []);
-
-  const handleToday = useCallback(() => {
-    setCurrentDate(new Date());
-  }, []);
+  // Navigation handlers removed - now handled in CalendarPage
 
   // Event mutation handlers
-  const handleCreateEvent = useCallback(async (eventData: CreateTaskData) => {
-    const startIso = eventData.dueDate;
-    const durationMinutes = Math.max(eventData.estimatedDuration || 30, 15);
-    const endIso = new Date(new Date(startIso).getTime() + durationMinutes * 60 * 1000).toISOString();
+  const handleCreateEvent = useCallback(async (eventData: any) => {
+    // Handle both old CreateTaskData format and new EventTaskData format
+    const startIso = eventData.start || eventData.dueDate;
+    const endIso = eventData.end || new Date(new Date(startIso).getTime() + (eventData.estimatedDuration || 60) * 60 * 1000).toISOString();
 
-    const { title, ...rest } = eventData;
+    const { title, description, priority, subject, allDay } = eventData;
     await createEventMutation.mutateAsync({
       start: startIso,
       end: endIso,
       title,
-      ...rest,
+      description,
+      priority,
+      subject,
+      allDay,
     });
     setShowNewEventModal(false);
     setNewEventData(null);
-    announce(`Event "${eventData.title}" created successfully`);
+    announce(`Event "${title}" created successfully`);
   }, [createEventMutation, announce]);
 
   const handleUpdateEvent = useCallback(async (eventId: string, updates: Partial<CalendarEvent>) => {
@@ -179,23 +321,12 @@ export function WeeklyCalendar({
     await duplicateEventMutation.mutateAsync(event);
   }, [duplicateEventMutation]);
 
-  const handleNewEventClick = useCallback(() => {
-    const now = new Date();
-    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
-    
-    setNewEventData({
-      start: now.toISOString(),
-      end: oneHourLater.toISOString(),
-      title: 'New Event',
-    });
-    setShowNewEventModal(true);
-  }, []);
-
   // Event handlers
   const handleEventSelect = useCallback((event: CalendarEvent) => {
     setSelectedEvent(event);
-    onEventClick?.(event);
-  }, [onEventClick]);
+    setShowDetailsModal(true);
+    // Don't call onEventClick here - let the details modal handle it
+  }, []);
 
   const handleEventEdit = useCallback((event: CalendarEvent) => {
     setSelectedEvent(event);
@@ -207,15 +338,14 @@ export function WeeklyCalendar({
   // Convert client coordinates to grid coordinates
   const clientToGridCoords = useCallback((clientX: number, clientY: number) => {
     if (!scrollerRef.current) return null;
-    
+
     const scroller = scrollerRef.current;
     const rect = scroller.getBoundingClientRect();
-    
-    // Constants for layout measurements
-    const HEADER_HEIGHT = 56; // h-14 in header
-    const ALL_DAY_ROW_HEIGHT = 48; // h-12 for all-day row
+
+    // Use constants from centralized config
+    const ALL_DAY_ROW_HEIGHT = CALENDAR_CONSTANTS.ALL_DAY_ROW_HEIGHT; // 48px
     const TIME_COLUMN_WIDTH = CALENDAR_CONSTANTS.GRID_MARGIN_LEFT; // 60px
-    const DAY_COLUMN_WIDTH = CALENDAR_CONSTANTS.GRID_DAY_WIDTH; // 160px
+    const DAY_COLUMN_WIDTH = columnWidth; // Use dynamic column width
     const HOUR_HEIGHT = CALENDAR_CONSTANTS.GRID_HOUR_HEIGHT; // 120px
     const MINUTES_PER_PIXEL = 60 / HOUR_HEIGHT; // 0.5 minutes per pixel
     
@@ -226,8 +356,9 @@ export function WeeklyCalendar({
     // Calculate position within the day columns area (excluding time column)
     const dayAreaX = relativeX - TIME_COLUMN_WIDTH;
     
-    // Calculate position within the time grid (excluding header and all-day row)
-    const gridY = relativeY - HEADER_HEIGHT - ALL_DAY_ROW_HEIGHT;
+    // Calculate position within the time grid (excluding all-day row)
+    // Note: The header is now outside the scroller, so we only need to subtract the all-day row
+    const gridY = relativeY - ALL_DAY_ROW_HEIGHT;
     
     // Guard: click is outside the day columns
     if (dayAreaX < 0 || gridY < 0) return null;
@@ -239,13 +370,15 @@ export function WeeklyCalendar({
     // Calculate X position within the specific day column
     const xInDay = dayAreaX % DAY_COLUMN_WIDTH;
     
-    // Calculate the time in minutes from START_HOUR
+    // Calculate the time in minutes from START_HOUR (not from midnight)
+    // gridY is pixels from top of time grid, which starts at START_HOUR
     const minutesFromStart = gridY * MINUTES_PER_PIXEL;
-    
+
     // Snap to nearest 15-minute interval
     const snappedMinutes = Math.round(minutesFromStart / 15) * 15;
-    
+
     // Convert back to Y pixel position (for rendering)
+    // This Y is relative to START_HOUR, matching how events are positioned
     const snappedY = snappedMinutes / MINUTES_PER_PIXEL;
     
     if (debugEnabled) {
@@ -255,7 +388,7 @@ export function WeeklyCalendar({
         x: xInDay,
         y: snappedY,
         dayIndex,
-        headerHeight: HEADER_HEIGHT + ALL_DAY_ROW_HEIGHT,
+        headerHeight: ALL_DAY_ROW_HEIGHT,
         scrollTop: scroller.scrollTop,
       });
     }
@@ -264,9 +397,9 @@ export function WeeklyCalendar({
       x: xInDay, 
       y: snappedY, 
       dayIndex, 
-      headerHeight: HEADER_HEIGHT + ALL_DAY_ROW_HEIGHT 
+      headerHeight: ALL_DAY_ROW_HEIGHT 
     };
-  }, [debugEnabled]);
+  }, [debugEnabled, columnWidth]);
 
   // Toggle debug via keyboard: Ctrl/Cmd+Shift+D
   useEffect(() => {
@@ -305,15 +438,32 @@ export function WeeklyCalendar({
     }
     const coords = clientToGridCoords(e.clientX, e.clientY);
     if (!coords) return;
+
+    // DEBUG: Log click coordinates
+    console.group('🖱️ CLICK DEBUG');
+    console.log('Client coords:', { x: e.clientX, y: e.clientY });
+    console.log('Grid coords:', coords);
+    console.log('Day index:', coords.dayIndex);
+    console.log('Base date:', getBaseDateForDay(coords.dayIndex).toDateString());
+    console.groupEnd();
+
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     const baseDate = getBaseDateForDay(coords.dayIndex);
     const next = SelectionManager.startSelection(coords.x, coords.y, coords.dayIndex, baseDate, START_HOUR);
+
+    // DEBUG: Log selection state
+    console.group('📐 SELECTION START');
+    console.log('Selection state:', next);
+    console.log('Start time:', next.startTime?.toLocaleString());
+    console.log('Start Y:', next.startY);
+    console.groupEnd();
+
     setSelection(next);
     setIsSelecting(true);
     document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
-  }, [getBaseDateForDay, clientToGridCoords]);
+  }, [getBaseDateForDay, clientToGridCoords, START_HOUR]);
 
   const updateSelection = useCallback((e: React.PointerEvent) => {
     if (!isSelecting || !selection.isSelecting || selection.dayIndex === undefined) return;
@@ -344,14 +494,15 @@ export function WeeklyCalendar({
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
-    const finalBounds = SelectionManager.endSelection(selection);
+    const finalBounds = SelectionManager.endSelection(selection, START_HOUR);
     if (finalBounds) {
       const payload = { start: finalBounds.startTime.toISOString(), end: finalBounds.endTime.toISOString(), title: 'New Event' };
       if (onCreateEvent) {
         onCreateEvent(payload);
       } else {
         setNewEventData(payload);
-        setShowNewEventModal(true);
+        // Show AI prompt instead of traditional modal
+        setShowAIPrompt(true);
       }
     }
     setIsSelecting(false);
@@ -383,58 +534,33 @@ export function WeeklyCalendar({
     };
   }, []);
 
+  // Memoize AI prompt handlers to prevent re-renders
+  const handleAIPromptClose = useCallback(() => {
+    setShowAIPrompt(false);
+    setNewEventData(null);
+  }, []);
+
+  const handleAIPromptSubmit = useCallback(async (prompt: string) => {
+    if (!newEventData) return;
+    // Use API service to create event with AI extraction
+    const { apiService } = await import('../../services/apiService');
+    const newEvent = await apiService.createEventWithAI(prompt, {
+      start: newEventData.start,
+      end: newEventData.end,
+    });
+    // Refresh calendar data
+    queryClient.invalidateQueries({ queryKey: ['timeblocks'] });
+  }, [newEventData, queryClient]);
 
   // Don't block calendar display on loading/error states
 
   return (
-    <div className={cn('w-full h-full flex flex-col', className)}>
-      {/* Minimal Header with navigation */}
-      <div className="flex items-center justify-between mb-8 px-2">
-        <div className="flex items-center gap-6">
-          <h1 className="text-3xl font-semibold text-white tracking-tight">
-            {format(currentDate, 'MMMM yyyy')}
-          </h1>
-          
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePreviousWeek}
-              className="p-2 hover:bg-white/5 rounded-lg transition-all text-gray-400 hover:text-white"
-              aria-label="Previous week"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            
-            <button
-              onClick={handleToday}
-              className="px-4 py-2 hover:bg-white/5 rounded-lg transition-all text-gray-400 hover:text-white text-sm font-medium"
-            >
-              Today
-            </button>
-            
-            <button
-              onClick={handleNextWeek}
-              className="p-2 hover:bg-white/5 rounded-lg transition-all text-gray-400 hover:text-white"
-              aria-label="Next week"
-            >
-              <ChevronRight size={20} />
-            </button>
-          </div>
-        </div>
-
-        <button
-          onClick={handleNewEventClick}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-100 text-black rounded-lg transition-all text-sm font-medium"
-        >
-          <Plus size={16} />
-          New Event
-        </button>
-      </div>
-
-      {/* Calendar grid - Minimal styling */}
+    <div className={cn('w-full h-full flex flex-col min-h-0', className)}>
+      {/* Calendar grid - Full page, no header */}
       <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div 
           ref={scrollerRef}
-          className="relative overflow-auto flex-1 rounded-xl"
+          className="relative flex-1"
           data-calendar-container
           tabIndex={0}
           role="grid"
@@ -443,31 +569,36 @@ export function WeeklyCalendar({
           aria-colcount={7}
           style={{
             scrollbarWidth: 'thin',
-            scrollbarColor: 'rgba(156, 163, 175, 0.3) transparent'
+            scrollbarColor: 'rgba(156, 163, 175, 0.3) transparent',
+            overflow: 'visible'
           }}
         >
-          {/* Selection overlay - transparent layer for pointer events */}
+          {/* Full-width background grid layer */}
+          <WeekGrid 
+            currentDate={currentDate}
+            startHour={START_HOUR}
+            endHour={END_HOUR}
+            slotInterval={SLOT_INTERVAL}
+            className="absolute inset-0 pointer-events-none"
+            gridInnerRef={gridInnerRef}
+            dayColumnsRef={dayColumnsRef}
+          />
+          {/* Selection overlay - captures drag-to-create on empty spaces */}
+          {/* Events have higher z-index and stopPropagation to prevent this from triggering */}
           <div
             ref={selectionOverlayRef}
-            className="absolute inset-0 z-30"
-            style={{ pointerEvents: 'auto' }}
+            className="absolute inset-0"
+            style={{
+              pointerEvents: 'auto',
+              zIndex: 1, // Lower than events so events are clickable
+            }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
           />
           
-          <WeekGrid 
-            currentDate={currentDate}
-            startHour={START_HOUR}
-            endHour={END_HOUR}
-            slotInterval={SLOT_INTERVAL}
-            className="overflow-hidden"
-            gridInnerRef={gridInnerRef}
-            headerRef={headerRef}
-            gutterRef={gutterRef}
-            dayColumnsRef={dayColumnsRef}
-          >
+          <div className="relative w-full h-full">
             {/* Show loading indicator if tasks are loading */}
             {isLoading && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-900/50">
@@ -478,11 +609,11 @@ export function WeeklyCalendar({
               </div>
             )}
 
-            {/* Show error notification if tasks failed to load */}
+            {/* Show error notification if both data sources failed */}
             {error && (
               <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
                 <div className="bg-error border border-error text-white px-4 py-2 rounded-lg text-sm">
-                  Tasks failed to load. Calendar functionality may be limited.
+                  Unable to load calendar data. Some events may not be visible.
                 </div>
               </div>
             )}
@@ -492,11 +623,26 @@ export function WeeklyCalendar({
               const layout = eventLayouts.get(event.id);
               if (!layout) return null;
 
+              // Calculate which day this event is on
+              const eventStart = new Date(event.start);
+              const eventDateStr = event.allDay && typeof event.start === 'string'
+                ? event.start.split('T')[0]
+                : format(eventStart, 'yyyy-MM-dd');
+
+              // Find matching day index (0-6)
+              const dayIndex = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+                .findIndex(day => format(day, 'yyyy-MM-dd') === eventDateStr);
+
+              if (dayIndex === -1) return null; // Event not in this week
+
               return (
                 <EventBlock
                   key={event.id}
                   event={event}
                   layout={layout}
+                  dayIndex={dayIndex}
+                  startHour={START_HOUR}
+                  columnWidth={columnWidth}
                   isSelected={selectedEvent?.id === event.id}
                   isDragging={draggedEvent?.id === event.id}
                   onSelect={handleEventSelect}
@@ -523,13 +669,15 @@ export function WeeklyCalendar({
             {/* Selection overlay visualization */}
             <SelectionLayer
               selection={selection}
+              columnWidth={columnWidth}
               onCreateEvent={(startTime, endTime) => {
                 const payload = { start: startTime.toISOString(), end: endTime.toISOString(), title: 'New Event' };
                 if (onCreateEvent) {
                   onCreateEvent(payload);
                 } else {
                   setNewEventData(payload);
-                  setShowNewEventModal(true);
+                  // Show AI prompt instead of traditional modal
+                  setShowAIPrompt(true);
                 }
               }}
             />
@@ -541,7 +689,7 @@ export function WeeklyCalendar({
                 <div
                   style={{
                     position: 'absolute',
-                    left: GRID_MARGIN_LEFT + (debugInfo.dayIndex * CALENDAR_CONSTANTS.GRID_DAY_WIDTH) + debugInfo.x - 4,
+                    left: GRID_MARGIN_LEFT + (debugInfo.dayIndex * columnWidth) + debugInfo.x - 4,
                     top: (debugInfo.headerHeight) + Math.max(0, debugInfo.y) - 4,
                     width: 8,
                     height: 8,
@@ -573,29 +721,34 @@ export function WeeklyCalendar({
                 </div>
               </div>
             )}
-          </WeekGrid>
-
-          {/* Drag overlay */}
-          <DragOverlay>
-            {draggedEvent && eventLayouts.get(draggedEvent.id) && (
-              <EventBlock
-                event={draggedEvent}
-                layout={eventLayouts.get(draggedEvent.id)!}
-                isDragging={true}
-                className="opacity-90"
-              />
-            )}
-          </DragOverlay>
+          </div>
         </div>
+
+        {/* Drag overlay */}
+        <DragOverlay>
+          {draggedEvent && eventLayouts.get(draggedEvent.id) && (
+            <EventBlock
+              event={draggedEvent}
+              layout={eventLayouts.get(draggedEvent.id)!}
+              dayIndex={0}
+              startHour={START_HOUR}
+              columnWidth={columnWidth}
+              isDragging={true}
+              className="opacity-90"
+            />
+          )}
+        </DragOverlay>
       </DndContext>
 
-      {/* Week indicator - minimal */}
-      <div className="mt-6 text-center text-sm text-gray-500 font-medium">
-        {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d, yyyy')}
-      </div>
-
-      {/* Modals */}
-      <NewEventModal
+      {/* Modals and AI Prompt */}
+      <AIEventPrompt
+        isOpen={showAIPrompt}
+        onClose={handleAIPromptClose}
+        onSubmit={handleAIPromptSubmit}
+        timeSlot={newEventData}
+      />
+      
+      <CreateEventTaskModal
         isOpen={showNewEventModal}
         initialData={newEventData ?? undefined}
         onClose={() => {
@@ -603,6 +756,15 @@ export function WeeklyCalendar({
           setNewEventData(null);
         }}
         onCreate={handleCreateEvent}
+      />
+
+      <EventDetailsModal
+        isOpen={showDetailsModal}
+        event={selectedEvent}
+        onClose={() => {
+          setShowDetailsModal(false);
+          setSelectedEvent(null);
+        }}
       />
 
       <EditEventModal
@@ -618,4 +780,13 @@ export function WeeklyCalendar({
       />
     </div>
   );
-} 
+}
+
+// Wrap with ErrorBoundary to prevent calendar crashes from breaking the entire app
+export function WeeklyCalendar(props: WeeklyCalendarProps) {
+  return (
+    <ErrorBoundary>
+      <WeeklyCalendarCore {...props} />
+    </ErrorBoundary>
+  );
+}

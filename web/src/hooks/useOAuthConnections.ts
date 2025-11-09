@@ -14,21 +14,30 @@ export function useOAuthConnections() {
     refetch
   } = useQuery({
     queryKey: OAUTH_CACHE_KEYS.CONNECTIONS,
-    queryFn: () => oauthService.getOAuthConnections(),
+    queryFn: async () => {
+      return await oauthService.getOAuthConnections()
+    },
     retry: 2,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10000, // 10 seconds - prevent constant refetching, rely on WebSocket for updates
+    refetchOnWindowFocus: true, // Still refetch on focus for user-initiated tab switches
   })
 
   const connectMutation = useMutation({
     mutationFn: ({ provider, service }: { provider: OAuthProvider; service?: OAuthService }) =>
       oauthService.connectProvider(provider, service),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: OAUTH_CACHE_KEYS.CONNECTIONS })
+    onSuccess: async () => {
+      // Invalidate and immediately refetch to update connection status
+      // Using refetchType: 'all' ensures even inactive queries are refetched
+      await queryClient.invalidateQueries({
+        queryKey: OAUTH_CACHE_KEYS.CONNECTIONS,
+        refetchType: 'all'
+      })
     },
   })
 
   const disconnectMutation = useMutation({
-    mutationFn: (provider: OAuthProvider) => oauthService.disconnectOAuth(provider),
+    mutationFn: ({ provider, service }: { provider: OAuthProvider; service: OAuthService }) =>
+      oauthService.disconnectOAuth(provider, service),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: OAUTH_CACHE_KEYS.CONNECTIONS })
     },
@@ -38,16 +47,20 @@ export function useOAuthConnections() {
     return await connectMutation.mutateAsync({ provider, service })
   }
 
-  const disconnect = async (provider: OAuthProvider) => {
-    return await disconnectMutation.mutateAsync(provider)
+  const disconnect = async (provider: OAuthProvider, service: OAuthService) => {
+    return await disconnectMutation.mutateAsync({ provider, service })
   }
 
-  const getConnectionStatus = (provider: OAuthProvider): OAuthConnection | undefined => {
+  const getConnectionStatus = (provider: OAuthProvider, service?: OAuthService): OAuthConnection | undefined => {
+    if (service) {
+      return connections.find(conn => conn.provider === provider && conn.service === service)
+    }
+    // If no service specified, return first connection for provider
     return connections.find(conn => conn.provider === provider)
   }
 
-  const isConnected = (provider: OAuthProvider): boolean => {
-    return getConnectionStatus(provider)?.connected ?? false
+  const isConnected = (provider: OAuthProvider, service?: OAuthService): boolean => {
+    return getConnectionStatus(provider, service)?.connected ?? false
   }
 
   return {

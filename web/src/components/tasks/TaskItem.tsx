@@ -38,10 +38,13 @@ export function TaskItem({ task, onEdit }: TaskItemProps) {
 
   return (
     <div className={cn(
-      'flex items-center gap-3 p-3 rounded-lg border transition-all hover:bg-surface/50',
+      'flex items-center gap-3 p-4 rounded-xl transition-all',
       isCompleted ? 'opacity-70' : '',
-      isOverdue ? 'border-error/30 bg-error/5' : 'border-gray-700'
-    )}>
+      isOverdue ? 'border border-error/30' : ''
+    )}
+    style={{ 
+      backgroundColor: isOverdue ? '#2a1a1a' : '#2a2a2a'
+    }}>
       <button
         onClick={handleToggleStatus}
         disabled={toggleTaskStatus.isPending}

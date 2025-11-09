@@ -295,8 +295,20 @@ export function TasksCard() {
       return taskDate > tomorrow && taskDate <= endOfWeek
     })
 
+    // Calculate upcoming tasks (next 7 days, excluding today)
+    const upcomingTasks = allRelevantTasks.filter(task => {
+      if (!task.due_date) return false
+      const taskDate = new Date(task.due_date)
+      return taskDate > today && taskDate <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+    }).sort((a, b) => {
+      const dateA = new Date(a.due_date)
+      const dateB = new Date(b.due_date)
+      return dateA.getTime() - dateB.getTime()
+    }).slice(0, 3) // Show next 3 upcoming tasks
+
     return {
       today: sortedTodaysTasks.map(processTask),
+      upcoming: upcomingTasks.map(processTask),
       counts: {
         todaysTotal: todaysTasks.length,
         currentTotal: allCurrentTasks.length,
@@ -490,7 +502,7 @@ export function TasksCard() {
 
   return (
     <div 
-      className="bg-neutral-800/80 border border-gray-700/50 rounded-xl p-5 cursor-pointer hover:bg-neutral-800 transition-colors"
+      className="bg-neutral-800/40 border border-gray-700/50 rounded-xl p-5 cursor-pointer hover:bg-neutral-800/60 transition-colors h-full flex flex-col"
       onClick={handleCardClick}
     >
       <div className="flex items-center justify-between mb-4 px-1">
@@ -501,20 +513,18 @@ export function TasksCard() {
           <BookOpen size={16} className="text-gray-400" />
         </div>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-3 flex-1 flex flex-col">
         {isLoading ? (
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="w-4 h-4 rounded-full border-2 border-gray-500 flex items-center justify-center mt-0.5">
-                <Loader2 size={10} className="text-gray-400 animate-spin" />
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <div className="w-8 h-8 bg-gray-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Loader2 size={16} className="text-gray-400 animate-spin" />
               </div>
-              <div className="flex-1">
-                <span className="text-sm font-medium text-gray-400">
-                  Loading assignments...
-                </span>
-                <div className="text-xs text-gray-500 mt-1">
-                  Please wait
-                </div>
+              <div className="text-sm font-medium text-gray-400 mb-1">
+                Loading assignments...
+              </div>
+              <div className="text-xs text-gray-400">
+                Please wait
               </div>
             </div>
           </div>
@@ -534,20 +544,20 @@ export function TasksCard() {
               </div>
             </div>
           </div>
-        ) : cardTasks.today.length > 0 || cardTasks.counts.pastTotal > 0 ? (
-          <div className="space-y-3">
-            {/* Show today's assignments only */}
+        ) : cardTasks.today.length > 0 ? (
+          <div className="space-y-2">
+            {/* Show today's assignments */}
             {cardTasks.today.map((task, index) => (
               <div key={task.id} className="flex items-start gap-3 relative">
                 <button
                   className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors duration-150 ${
                     task.isCompleted
-                      ? 'bg-green-500 border-green-500'
+                      ? 'bg-blue-500 border-blue-500'
                       : ''
                   }`}
                   style={{
-                    backgroundColor: task.isCompleted ? '#10B981' : 'transparent',
-                    borderColor: task.isCompleted ? '#10B981' : task.taskColor
+                    backgroundColor: task.isCompleted ? '#3B82F6' : 'transparent',
+                    borderColor: task.isCompleted ? '#3B82F6' : task.taskColor
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -596,6 +606,62 @@ export function TasksCard() {
               </div>
             ))}
           </div>
+        ) : cardTasks.upcoming.length > 0 ? (
+          <div className="space-y-2">
+            {/* Show upcoming assignments when no assignments due today */}
+            {cardTasks.upcoming.map((task, index) => (
+              <div key={task.id} className="flex items-start gap-3 relative">
+                <button
+                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors duration-150 ${
+                    task.isCompleted
+                      ? 'bg-blue-500 border-blue-500'
+                      : ''
+                  }`}
+                  style={{
+                    backgroundColor: task.isCompleted ? '#3B82F6' : 'transparent',
+                    borderColor: task.isCompleted ? '#3B82F6' : task.taskColor
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleToggleTask(task.id)
+                  }}
+                >
+                  {task.isCompleted && (
+                    <span className="text-white text-xs font-semibold">✓</span>
+                  )}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className={task.textClasses}>
+                    {task.title}
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <Calendar size={10} className="text-gray-400" />
+                      <span className="text-xs text-gray-400">
+                        {task.formattedDate}
+                      </span>
+                    </div>
+                    {task.formattedTime && (
+                      <div className="flex items-center gap-1">
+                        <Clock size={10} className="text-gray-400" />
+                        <span className="text-xs text-gray-400">
+                          {task.formattedTime}
+                        </span>
+                      </div>
+                    )}
+                    {task.formattedCourseCode && (
+                      <div className="flex items-center gap-1">
+                        <BookOpen size={10} className="text-gray-400" />
+                        <span className="text-xs text-gray-400">
+                          {task.formattedCourseCode}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="space-y-3">
             <div className="flex items-start gap-3">
@@ -617,308 +683,289 @@ export function TasksCard() {
 
       {/* Persistent Modal - Always Mounted, Visibility Controlled */}
       <div
-        className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 transition-all duration-300 cursor-default ${
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-300 cursor-default ${
           showModal ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={handleModalBackdropClick}
       >
           <div
-            className={`bg-neutral-800 border border-gray-700/50 w-full max-w-2xl rounded-2xl h-[80vh] min-h-[600px] flex flex-col cursor-default transition-all duration-300 ${
+            className={`border border-gray-700/50 w-full max-w-3xl rounded-xl h-[75vh] flex flex-col cursor-default transition-all duration-300 shadow-2xl ${
               showModal ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
             }`}
+            style={{ backgroundColor: '#121212' }}
             onClick={(e) => e.stopPropagation()}
           >
             {showModal ? (
               <>
-                {/* Header */}
-                <div className="p-6 border-b border-gray-700/50">
-                  {/* Top row: Title and Close button */}
+                {/* Header - Matching Card Style */}
+                <div className="p-5 border-b border-gray-700/30">
+                  {/* Title Row */}
                   <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={20} className="text-gray-400" />
-                      <h2 className="text-xl font-semibold text-white">
-                        {timeFilter === 'week' ? 'This Week' : 
-                         timeFilter === 'month' ? new Date().toLocaleDateString('en-US', { month: 'long' }) : 
-                         timeFilter === 'past' ? 'Completed Assignments' :
-                         'All Assignments'}
-                      </h2>
-                    </div>
-                    <button 
+                    <h2 className="text-lg font-semibold text-white tracking-tight">
+                      Assignments
+                    </h2>
+                    <button
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
                         handleModalClose()
                       }}
-                      className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/60"
                       aria-label="Close modal"
                       type="button"
                     >
-                      <X size={24} className="text-gray-400 hover:text-white" />
+                      <X size={18} />
                     </button>
                   </div>
 
-                  {/* Count Display - Context Aware */}
-                  <div className="flex items-baseline justify-center gap-2 mb-6">
-                    {timeFilter === 'week' ? (
-                      // Large numbers for "This Week"
-                      <>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-bold text-white">
-                            {currentTasks.length + pastTasks.length}
-                          </span>
-                          <span className="text-sm text-gray-300">total</span>
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-bold text-white">
-                            {sortedTodaysTasks?.length || 0}
-                          </span>
-                          <span className="text-sm text-gray-300">due today</span>
-                        </div>
-                      </>
-                    ) : (
-                      // Small overview for other filters
-                      <div className="text-sm text-gray-400">
-                        {timeFilter === 'month' && `${new Date().toLocaleDateString('en-US', { month: 'long' })}: ${currentTasks.length} due (${sortedTodaysTasks?.length || 0} today)`}
-                        {timeFilter === 'past' && `Completed: ${pastTasks.length} assignments`}
-                        {timeFilter === 'all' && `All: ${currentTasks.length + pastTasks.length} total (${sortedTodaysTasks?.length || 0} today)`}
-                      </div>
-                    )}
+                  {/* Stats Bar - Clean Inline */}
+                  <div className="flex items-center gap-5 text-sm">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl font-bold text-white tabular-nums">
+                        {sortedTodaysTasks?.length || 0}
+                      </span>
+                      <span className="text-gray-400 font-medium">today</span>
+                    </div>
+                    <div className="h-3 w-px bg-gray-700/50"></div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-lg font-semibold text-white tabular-nums">
+                        {currentTasks.length + pastTasks.length}
+                      </span>
+                      <span className="text-gray-400 font-medium">
+                        {timeFilter === 'week' ? 'this week' :
+                         timeFilter === 'month' ? 'this month' :
+                         timeFilter === 'past' ? 'completed' :
+                         'total'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
+            {/* Controls Bar - Clean Inline Layout */}
+            <div className="px-5 py-3 border-b border-gray-700/30">
+              <div className="flex items-center gap-3">
+                {/* Search Bar */}
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search assignments..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-neutral-900/50 border border-gray-700/50 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors text-sm"
+                  />
+                </div>
+
+                {/* Time Filter Buttons - Sleek Segmented Control */}
+                <div className="relative flex rounded-lg p-1 bg-neutral-900/50 border border-gray-700/50">
+                  <div
+                    className="absolute top-1 bottom-1 bg-white rounded-md transition-all duration-300 ease-out shadow-sm"
+                    style={highlightStyle}
+                  />
+                  <button
+                    ref={weekRef}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setTimeFilter('week')
+                    }}
+                    className={`relative px-3 py-1.5 text-xs font-semibold rounded-md transition-colors duration-200 z-10 ${
+                      timeFilter === 'week'
+                        ? 'text-neutral-900'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Week
+                  </button>
+                  <button
+                    ref={monthRef}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setTimeFilter('month')
+                    }}
+                    className={`relative px-3 py-1.5 text-xs font-semibold rounded-md transition-colors duration-200 z-10 ${
+                      timeFilter === 'month'
+                        ? 'text-neutral-900'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Month
+                  </button>
+                  <button
+                    ref={allRef}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setTimeFilter('all')
+                    }}
+                    className={`relative px-3 py-1.5 text-xs font-semibold rounded-md transition-colors duration-200 z-10 ${
+                      timeFilter === 'all'
+                        ? 'text-neutral-900'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    ref={pastRef}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setTimeFilter('past')
+                    }}
+                    className={`relative px-3 py-1.5 text-xs font-semibold rounded-md transition-colors duration-200 z-10 ${
+                      timeFilter === 'past'
+                        ? 'text-neutral-900'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Past
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Tasks list */}
             <div
-              className="flex-1 overflow-y-auto"
+              className="flex-1 overflow-y-auto px-5 py-3"
               style={{
-                scrollbarWidth: 'auto',
-                scrollbarColor: 'rgba(75, 85, 99, 0.5) transparent'
+                scrollbarWidth: 'thin',
+                scrollbarColor: 'rgba(75, 85, 99, 0.3) transparent'
               }}
             >
               {isLoading ? (
-                <div className="flex items-center justify-center py-20">
+                <div className="flex items-center justify-center py-12">
                   <div className="text-center">
-                    <div className="w-12 h-12 bg-gray-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Loader2 size={24} className="text-gray-400 animate-spin" />
-                    </div>
-                    <div className="text-base font-semibold text-gray-400 mb-2">
+                    <Loader2 size={20} className="text-gray-400 animate-spin mx-auto mb-3" />
+                    <div className="text-sm font-medium text-gray-400">
                       Loading assignments...
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      Please wait
                     </div>
                   </div>
                 </div>
               ) : error ? (
-                <div className="flex items-center justify-center py-20">
+                <div className="flex items-center justify-center py-12">
                   <div className="text-center">
-                    <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <span className="text-red-500 text-xl font-semibold">!</span>
+                    <div className="w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <span className="text-red-400 text-lg">!</span>
                     </div>
-                    <div className="text-base font-semibold text-red-400 mb-2">
+                    <div className="text-sm font-semibold text-red-400 mb-1">
                       Error loading assignments
                     </div>
-                    <div className="text-sm text-gray-400">
+                    <div className="text-xs text-gray-500">
                       {error instanceof Error ? error.message : 'Failed to load assignments'}
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="px-6 pt-2 pb-6">
-                  {/* Search and Toggle Controls */}
-                  {(
-                    <div className="bg-neutral-800 rounded-lg p-5 mb-6">
-                      <div className="flex items-center gap-4">
-                        {/* Search Bar */}
-                        <div className="relative flex-1">
-                          <Search size={16} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                          <input
-                            type="text"
-                            placeholder="Search assignments..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-8 pr-3 py-2 bg-neutral-700 rounded-lg text-white placeholder-gray-400 focus:outline-none text-sm"
-                          />
-                        </div>
-
-                        {/* Time Filter Buttons */}
-                        <div className="relative flex bg-neutral-700 rounded-lg p-1.5">
-                        <div 
-                          className="absolute top-1 bottom-1 bg-white rounded-md transition-all duration-300 ease-out"
-                          style={highlightStyle}
-                        />
-                        <button
-                          ref={weekRef}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setTimeFilter('week')
-                          }}
-                          className={`relative px-2 py-1 text-xs font-medium rounded-md transition-colors duration-200 z-10 ${
-                            timeFilter === 'week'
-                              ? 'text-neutral-900'
-                              : 'text-gray-300 hover:text-white'
-                          }`}
-                        >
-                          Week
-                        </button>
-                        <button
-                          ref={monthRef}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setTimeFilter('month')
-                          }}
-                          className={`relative px-2 py-1 text-xs font-medium rounded-md transition-colors duration-200 z-10 ${
-                            timeFilter === 'month'
-                              ? 'text-neutral-900'
-                              : 'text-gray-300 hover:text-white'
-                          }`}
-                        >
-                          Month
-                        </button>
-                        <button
-                          ref={allRef}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setTimeFilter('all')
-                          }}
-                          className={`relative px-2 py-1 text-xs font-medium rounded-md transition-colors duration-200 z-10 ${
-                            timeFilter === 'all'
-                              ? 'text-neutral-900'
-                              : 'text-gray-300 hover:text-white'
-                          }`}
-                        >
-                          All
-                        </button>
-                        <button
-                          ref={pastRef}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setTimeFilter('past')
-                          }}
-                          className={`relative px-2 py-1 text-xs font-medium rounded-md transition-colors duration-200 z-10 ${
-                            timeFilter === 'past'
-                              ? 'text-neutral-900'
-                              : 'text-gray-300 hover:text-white'
-                          }`}
-                        >
-                          Past
-                        </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                <div>
 
                   {/* Tasks Section */}
                   {(() => {
                     let tasksToShow: EnhancedTask[] = []
                     let showDateDividers = false
-                    
+
                     if (timeFilter === 'past') {
                       tasksToShow = sortedPastTasks
                     } else {
                       tasksToShow = sortedCurrentTasks
                       showDateDividers = true
                     }
-                    
+
                     return tasksToShow.length > 0 && (
-                      <div className="mb-8">
-                        <div className="space-y-3">
-                          {tasksToShow.map((task, index) => {
+                      <div className="space-y-2">
+                        {tasksToShow.map((task, index) => {
                           const currentDate = task.due_date ? new Date(task.due_date).toDateString() : null
-                          const previousDate = index > 0 && tasksToShow[index - 1].due_date 
-                            ? new Date(tasksToShow[index - 1].due_date).toDateString() 
+                          const previousDate = index > 0 && tasksToShow[index - 1].due_date
+                            ? new Date(tasksToShow[index - 1].due_date).toDateString()
                             : null
                           const showDateDivider = showDateDividers && currentDate && currentDate !== previousDate
-                          
+
                           return (
                             <React.Fragment key={task.id}>
                               {showDateDivider && (
-                                <div className="flex items-center gap-2 mb-3 mt-4 first:mt-0">
-                                  <div className="h-px bg-gray-600 flex-1"></div>
-                                  <span className="text-xs font-medium text-gray-500 px-2">
+                                <div className="flex items-center gap-3 py-3 first:pt-0">
+                                  <div className="h-px bg-gray-700/50 flex-1"></div>
+                                  <span className="text-xs font-semibold text-gray-400">
                                     {(() => {
                                       const taskDate = new Date(task.due_date)
                                       const today = new Date()
                                       today.setHours(0, 0, 0, 0)
                                       const tomorrow = new Date(today)
                                       tomorrow.setDate(tomorrow.getDate() + 1)
-                                      
+
                                       if (taskDate.toDateString() === today.toDateString()) {
                                         return 'Today'
                                       } else if (taskDate.toDateString() === tomorrow.toDateString()) {
                                         return 'Tomorrow'
                                       } else {
-                                        return taskDate.toLocaleDateString('en-US', { 
-                                          weekday: 'short', 
-                                          month: 'short', 
-                                          day: 'numeric' 
+                                        return taskDate.toLocaleDateString('en-US', {
+                                          weekday: 'short',
+                                          month: 'short',
+                                          day: 'numeric'
                                         })
                                       }
                                     })()}
                                   </span>
-                                  <div className="h-px bg-gray-600 flex-1"></div>
+                                  <div className="h-px bg-gray-700/50 flex-1"></div>
                                 </div>
                               )}
-                              <div
-                                className="flex items-start gap-3 p-4 bg-neutral-700/50 rounded-lg hover:bg-neutral-700/60 transition-colors duration-150"
-                              >
-                            <button
-                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors duration-150 ${
-                                task.isCompleted
-                                  ? 'bg-green-500 border-green-500' 
-                                  : `border-2 hover:border-opacity-80`
-                              }`}
-                              style={{
-                                backgroundColor: task.isCompleted ? '#10B981' : 'transparent',
-                                borderColor: task.isCompleted ? '#10B981' : task.taskColor
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleToggleTask(task.id)
-                              }}
-                            >
-                              {task.isCompleted && (
-                                <span className="text-white text-xs font-semibold">✓</span>
-                              )}
-                            </button>
-                            <div className="flex-1 min-w-0">
-                              <div className={task.textClasses}>
-                                {task.title}
-                              </div>
-                              <div className="flex items-center gap-3 mt-2 flex-wrap">
-                                <div className="flex items-center gap-1">
-                                  <Calendar size={12} className="text-gray-400" />
-                                  <span className="text-xs font-medium text-gray-400">
-                                    {task.formattedDate}
-                                  </span>
+                              <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-800/40 border border-gray-700/50 hover:bg-neutral-800/50 transition-colors group">
+                                <button
+                                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors duration-150 ${
+                                    task.isCompleted
+                                      ? 'bg-blue-500 border-blue-500'
+                                      : 'border-2'
+                                  }`}
+                                  style={{
+                                    backgroundColor: task.isCompleted ? '#3B82F6' : 'transparent',
+                                    borderColor: task.isCompleted ? '#3B82F6' : task.taskColor
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleToggleTask(task.id)
+                                  }}
+                                >
+                                  {task.isCompleted && (
+                                    <span className="text-white text-xs font-bold">✓</span>
+                                  )}
+                                </button>
+
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className={task.textClasses}>
+                                      {task.title}
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      {task.formattedCourseCode && (
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-800/50">
+                                          <span className="text-xs font-medium text-gray-300">
+                                            {task.formattedCourseCode}
+                                          </span>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center gap-1.5">
+                                        <Calendar size={11} className="text-gray-500" />
+                                        <span className="text-xs text-gray-400">
+                                          {task.formattedDate}
+                                        </span>
+                                      </div>
+                                      {task.formattedTime && (
+                                        <div className="flex items-center gap-1.5">
+                                          <Clock size={11} className="text-gray-500" />
+                                          <span className="text-xs text-gray-400">
+                                            {task.formattedTime}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                                {task.formattedTime && (
-                                  <div className="flex items-center gap-1">
-                                    <Clock size={12} className="text-gray-400" />
-                                    <span className="text-xs font-medium text-gray-400">
-                                      {task.formattedTime}
-                                    </span>
-                                  </div>
-                                )}
-                                {task.formattedCourseCode && (
-                                  <div className="flex items-center gap-1">
-                                    <BookOpen size={12} className="text-gray-400" />
-                                    <span className="text-xs font-medium text-gray-400">
-                                      {task.formattedCourseCode}
-                                    </span>
-                                  </div>
-                                )}
                               </div>
-                            </div>
-                            </div>
                             </React.Fragment>
                           )
                         })}
                       </div>
-                    </div>
                     )
                   })()}
 
@@ -928,53 +975,53 @@ export function TasksCard() {
                     let tasksToShow: EnhancedTask[] = []
                     let message = ''
                     let subMessage = ''
-                    
+
                     // Check if there's an active search query first
                     if (searchQuery.trim()) {
                       if (timeFilter === 'past') {
                         tasksToShow = sortedPastTasks
-                        message = `No results for "${searchQuery}" in completed assignments`
-                        subMessage = 'Try a different search term or check your spelling.'
+                        message = `No results for "${searchQuery}"`
+                        subMessage = 'Try a different search term'
                       } else if (timeFilter === 'week') {
                         tasksToShow = sortedCurrentTasks
-                        message = `No results for "${searchQuery}" this week`
-                        subMessage = 'Try a different search term or check your spelling.'
+                        message = `No results for "${searchQuery}"`
+                        subMessage = 'Try a different search term'
                       } else if (timeFilter === 'month') {
                         tasksToShow = sortedCurrentTasks
-                        message = `No results for "${searchQuery}" this month`
-                        subMessage = 'Try a different search term or check your spelling.'
+                        message = `No results for "${searchQuery}"`
+                        subMessage = 'Try a different search term'
                       } else {
                         tasksToShow = sortedCurrentTasks
                         message = `No results for "${searchQuery}"`
-                        subMessage = 'Try a different search term or check your spelling.'
+                        subMessage = 'Try a different search term'
                       }
                     } else {
                       // No search query - show filter-specific messages
                       if (timeFilter === 'past') {
                         tasksToShow = sortedPastTasks
                         message = 'No completed assignments'
-                        subMessage = 'You\'re all caught up with completed work!'
+                        subMessage = 'All caught up!'
                       } else if (timeFilter === 'week') {
                         tasksToShow = sortedCurrentTasks
                         message = 'No assignments this week'
-                        subMessage = 'You\'re all set for the week ahead!'
+                        subMessage = 'Looking good!'
                       } else if (timeFilter === 'month') {
                         tasksToShow = sortedCurrentTasks
                         message = 'No assignments this month'
-                        subMessage = 'You\'re all set for the month ahead!'
+                        subMessage = 'Looking good!'
                       } else {
                         tasksToShow = sortedCurrentTasks
                         message = 'No assignments'
-                        subMessage = 'All caught up! Great job.'
+                        subMessage = 'All caught up!'
                       }
                     }
-                    
+
                     return tasksToShow.length === 0 && (
-                      <div className="text-center py-20">
-                        <div className="text-base font-semibold text-gray-400 mb-2">
+                      <div className="text-center py-16">
+                        <div className="text-sm font-medium text-gray-400 mb-1">
                           {message}
                         </div>
-                        <div className="text-sm text-gray-400">
+                        <div className="text-xs text-gray-500">
                           {subMessage}
                         </div>
                       </div>

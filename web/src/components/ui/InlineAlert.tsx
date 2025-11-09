@@ -22,7 +22,7 @@ export function InlineAlert({ variant, title, message, className }: InlineAlertP
 
   const styles = {
     success: 'bg-green-600 border-green-500 text-white',
-    error: 'bg-red-600 border-red-500 text-white',
+    error: 'bg-red-700 border-red-600 text-white',
     info: 'bg-blue-600 border-blue-500 text-white',
     warning: 'bg-yellow-600 border-yellow-500 text-white',
   }[variant]
@@ -37,5 +37,7 @@ export function InlineAlert({ variant, title, message, className }: InlineAlertP
     </div>
   )
 }
+
+
 
 

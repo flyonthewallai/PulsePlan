@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
+import { cn } from '../lib/utils'
+import { typography, components, spacing } from '../lib/design-tokens'
 
 interface CourseColorPickerProps {
   visible: boolean
@@ -47,42 +49,44 @@ export function CourseColorPicker({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className={components.modal.overlay}
       onClick={onClose}
     >
       <div
-        className="bg-neutral-800 border border-gray-700 rounded-2xl w-full max-w-md"
+        className={cn(components.modal.container, "max-w-sm")}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-700">
-          <div>
-            <h3 className="text-lg font-semibold text-white">Choose Color</h3>
-            <p className="text-sm text-gray-400 mt-0.5">{courseName}</p>
+        <div className={components.modal.header}>
+          <div className="flex items-center justify-between w-full">
+            <div>
+              <h3 className={components.modal.title}>Choose Color</h3>
+              <p className="text-xs text-gray-400 mt-0.5">{courseName}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className={components.modal.closeButton}
+            >
+              <X size={18} />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-neutral-700 rounded-lg transition-colors"
-          >
-            <X size={20} className="text-gray-400" />
-          </button>
         </div>
 
         {/* Color Grid */}
-        <div className="p-6">
-          <div className="grid grid-cols-4 gap-4">
+        <div className={components.modal.content}>
+          <div className="grid grid-cols-4 gap-2">
             {sleekColors.map((color) => (
               <button
                 key={color}
                 className={`
-                  aspect-square rounded-2xl transition-all duration-200
+                  aspect-square rounded-xl transition-all duration-200
                   hover:scale-105 active:scale-95
-                  ${currentColor === color ? 'ring-3 ring-white ring-offset-2 ring-offset-neutral-800 scale-105' : ''}
+                  ${currentColor === color ? 'ring-2 ring-white ring-offset-1 ring-offset-neutral-800 scale-105' : ''}
                 `}
                 style={{
                   backgroundColor: color,
                   boxShadow: currentColor === color
-                    ? `0 0 20px ${color}60`
+                    ? `0 0 12px ${color}60`
                     : '0 2px 4px rgba(0,0,0,0.1)'
                 }}
                 onClick={() => handleColorSelect(color)}
@@ -91,8 +95,8 @@ export function CourseColorPicker({
               >
                 {currentColor === color && (
                   <div className="w-full h-full flex items-center justify-center">
-                    <div className="bg-white/90 rounded-full w-6 h-6 flex items-center justify-center">
-                      <span className="text-black text-sm font-semibold">✓</span>
+                    <div className="bg-white/90 rounded-full w-5 h-5 flex items-center justify-center">
+                      <span className="text-black text-xs font-semibold">✓</span>
                     </div>
                   </div>
                 )}
@@ -101,16 +105,16 @@ export function CourseColorPicker({
           </div>
 
           {/* Preview */}
-          <div className="mt-6">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">
+          <div className="mt-4">
+            <p className={cn(typography.body.small, "font-medium text-gray-400 uppercase tracking-wider mb-2")}>
               Preview
             </p>
-            <div className="bg-neutral-700/50 rounded-xl p-4 flex items-center">
+            <div className="bg-neutral-800/40 border border-gray-700/50 rounded-xl p-3 flex items-center">
               <div
-                className="w-6 h-6 rounded-full mr-4"
+                className="w-5 h-5 rounded-full mr-3"
                 style={{ backgroundColor: previewColor }}
               />
-              <span className="text-base font-semibold text-white">{courseName}</span>
+              <span className="text-sm font-semibold text-white">{courseName}</span>
             </div>
           </div>
         </div>
