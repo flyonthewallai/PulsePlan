@@ -1,41 +1,44 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CheckCircle } from 'lucide-react'
 
 export function OAuthSuccessPage() {
   const [searchParams] = useSearchParams()
   const provider = searchParams.get('provider')
   const email = searchParams.get('email')
+  const hasExecuted = useRef(false)
 
   useEffect(() => {
-    // Send success message to parent window
-    if (window.opener) {
-      window.opener.postMessage({
-        type: 'oauth-success',
-        provider,
-        email
-      }, window.location.origin)
-      window.close()
+    // Prevent double execution in React strict mode
+    if (hasExecuted.current) return
+    hasExecuted.current = true
+
+    const timestamp = Date.now()
+    
+    // Use sessionStorage for temporary cross-window communication (better than localStorage)
+    const result = {
+      type: 'oauth-success',
+      provider,
+      email,
+      timestamp
     }
+
+    sessionStorage.setItem('oauth_result', JSON.stringify(result))
+
+    // If opened as a popup, send postMessage to opener AND close
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage(result, window.location.origin)
+        window.close()
+      } catch (e) {
+        // Silently fail if popup can't be closed
+      }
+      return
+    }
+
+    // Fallback for redirect-mode (no opener): navigate back to integrations immediately
+    window.location.replace('/integrations')
   }, [provider, email])
 
-  return (
-    <div className="min-h-screen bg-neutral-900 flex items-center justify-center p-6">
-      <div className="bg-neutral-800 border border-gray-700 rounded-xl p-8 max-w-md w-full text-center">
-        <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-        <h1 className="text-2xl font-bold text-white mb-2">Success!</h1>
-        <p className="text-gray-400 mb-4">
-          Your {provider} account has been connected successfully.
-        </p>
-        {email && (
-          <p className="text-sm text-gray-500">
-            Connected account: {email}
-          </p>
-        )}
-        <p className="text-xs text-gray-600 mt-4">
-          You can close this window now.
-        </p>
-      </div>
-    </div>
-  )
+  // Render nothing; this page is a pure handoff/redirect.
+  return null
 }

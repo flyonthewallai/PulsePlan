@@ -19,6 +19,12 @@ export const OAUTH_CACHE_KEYS = {
   CONNECTION_STATUS: (provider: string) => ['oauth-connections', provider],
 }
 
+export const BRIEFING_CACHE_KEYS = {
+  TODAY: ['briefing', 'today'],
+  HISTORICAL: (date: string) => ['briefing', date],
+  HISTORY: ['briefing', 'history'],
+}
+
 
 
 

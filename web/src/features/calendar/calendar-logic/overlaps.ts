@@ -20,14 +20,14 @@ export interface EventGroup {
 
 export class OverlapCalculator {
   // Main function to calculate perfect lane layout for overlapping events
-  static calculateEventLayouts(events: CalendarEvent[], dayWidth: number = 160): EventLayout[] {
+  static calculateEventLayouts(events: CalendarEvent[], dayWidth: number = 160, startHour: number = 0): EventLayout[] {
     if (events.length === 0) return [];
 
     // Sort events by start time, then by duration (shorter first for better packing)
     const sortedEvents = [...events].sort((a, b) => {
       const startDiff = new Date(a.start).getTime() - new Date(b.start).getTime();
       if (startDiff !== 0) return startDiff;
-      
+
       // If same start time, shorter events first
       const aDuration = new Date(a.end).getTime() - new Date(a.start).getTime();
       const bDuration = new Date(b.end).getTime() - new Date(b.start).getTime();
@@ -36,12 +36,12 @@ export class OverlapCalculator {
 
     // Group overlapping events together
     const groups = this.groupOverlappingEvents(sortedEvents);
-    
+
     // Calculate layout for each group independently
     const layouts: EventLayout[] = [];
-    
+
     groups.forEach((group) => {
-      const groupLayouts = this.calculateGroupLayout(group, dayWidth);
+      const groupLayouts = this.calculateGroupLayout(group, dayWidth, startHour);
       layouts.push(...groupLayouts);
     });
 
@@ -88,22 +88,22 @@ export class OverlapCalculator {
   }
 
   // Calculate layout for a single group of overlapping events
-  private static calculateGroupLayout(group: EventGroup, dayWidth: number): EventLayout[] {
+  private static calculateGroupLayout(group: EventGroup, dayWidth: number, startHour: number = 0): EventLayout[] {
     if (group.events.length === 1) {
       // Single event takes full width
       const event = group.events[0];
-      return [this.createEventLayout(event, 0, dayWidth, 0, 1, 1)];
+      return [this.createEventLayout(event, 0, dayWidth, 0, 1, 1, startHour)];
     }
 
     // Use lane packing algorithm for multiple events
     const lanes = this.packEventsIntoLanes(group.events);
     const laneCount = lanes.length;
     const laneWidth = dayWidth / laneCount;
-    const GAP = 2; // 2px gap between lanes
+    const GAP = 1; // 1px gap between lanes
     const actualLaneWidth = laneWidth - GAP;
-    
+
     const layouts: EventLayout[] = [];
-    
+
     lanes.forEach((lane, laneIndex) => {
       lane.forEach(event => {
         const layout = this.createEventLayout(
@@ -112,7 +112,8 @@ export class OverlapCalculator {
           actualLaneWidth,
           laneIndex,
           laneCount,
-          laneIndex + 1 // Higher z-index for later lanes
+          laneIndex + 1, // Higher z-index for later lanes
+          startHour
         );
         layouts.push(layout);
       });
@@ -170,18 +171,33 @@ export class OverlapCalculator {
     width: number,
     laneIndex: number,
     laneCount: number,
-    zIndex: number
+    zIndex: number,
+    startHour: number = 0
   ): EventLayout {
     const startDate = new Date(event.start);
     const endDate = new Date(event.end);
     const durationMs = endDate.getTime() - startDate.getTime();
     const durationMinutes = durationMs / (1000 * 60);
-    
+
+    const yPos = GridMath.timeToY(startDate, startHour);
+
+    // Debug logging for position calculations
+    if (typeof window !== 'undefined' && localStorage.getItem('calendarDebug') === '1') {
+      console.log(`[OverlapCalculator] ${event.title}:`, {
+        start: event.start,
+        startDate: startDate.toISOString(),
+        localTime: `${startDate.getHours()}:${String(startDate.getMinutes()).padStart(2, '0')}`,
+        startHour,
+        yPos,
+        visualHour: startHour + (yPos / 120)
+      });
+    }
+
     return {
       id: event.id,
       event,
       x: Math.round(x), // Pixel-perfect positioning
-      y: GridMath.timeToY(startDate),
+      y: yPos,
       width: Math.round(width),
       height: Math.max(
         GridMath.durationToHeight(durationMinutes),

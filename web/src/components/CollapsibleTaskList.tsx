@@ -115,7 +115,8 @@ export function CollapsibleTaskList({ tasks, taskCount, onTaskToggle }: Collapsi
             {localTasks.map((task, index) => (
               <div 
                 key={task.id || index} 
-                className="flex items-start gap-3 p-3 bg-neutral-700/50 rounded-lg hover:bg-neutral-700/60 transition-colors duration-150"
+                className="flex items-start gap-3 p-4 rounded-xl transition-colors duration-150"
+                style={{ backgroundColor: '#2a2a2a' }}
               >
                  {/* Circular checkbox with course color fallback to priority */}
                  <button

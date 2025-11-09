@@ -211,6 +211,100 @@ export const userApi = {
   },
 };
 
+export interface Hobby {
+  id: string;
+  name: string;
+  icon: 'Music' | 'Camera' | 'Book' | 'Gamepad2' | 'Palette' | 'Target' | 'MountainSnow' | 'Heart' | 'Bike' | 'Dumbbell' | 'Mountain';
+  preferred_time: 'morning' | 'afternoon' | 'evening' | 'night' | 'any';
+  specific_time: { start: string; end: string } | null;
+  days: string[];
+  duration_min: number;
+  duration_max: number;
+  flexibility: 'low' | 'medium' | 'high';
+  notes: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateHobbyRequest {
+  name: string;
+  icon: string;
+  preferred_time: string;
+  specific_time: { start: string; end: string } | null;
+  days: string[];
+  duration_min: number;
+  duration_max: number;
+  flexibility: string;
+  notes: string;
+}
+
+export const hobbiesApi = {
+  parseHobby: async (description: string) => {
+    const response = await apiClient.post<{
+      success: boolean;
+      hobby: {
+        name: string;
+        preferred_time: 'morning' | 'afternoon' | 'evening' | 'night' | 'any';
+        specific_time: { start: string; end: string } | null;
+        days: string[];
+        duration: { min: number; max: number };
+        flexibility: 'low' | 'medium' | 'high';
+        notes: string;
+        icon: 'Music' | 'Camera' | 'Book' | 'Gamepad2' | 'Palette' | 'Target' | 'MountainSnow' | 'Heart' | 'Bike' | 'Dumbbell' | 'Mountain';
+      } | null;
+      error?: string;
+      confidence: number;
+    }>('/api/v1/user-management/hobbies/parse', { description });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    return response.data!;
+  },
+
+  list: async (includeInactive = false) => {
+    const params = includeInactive ? '?include_inactive=true' : '';
+    const response = await apiClient.get<Hobby[]>(`/api/v1/user-management/hobbies${params}`);
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    return response.data!;
+  },
+
+  get: async (id: string) => {
+    const response = await apiClient.get<Hobby>(`/api/v1/user-management/hobbies/${id}`);
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    return response.data!;
+  },
+
+  create: async (hobby: CreateHobbyRequest) => {
+    const response = await apiClient.post<Hobby>('/api/v1/user-management/hobbies', hobby);
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    return response.data!;
+  },
+
+  update: async (id: string, updates: Partial<CreateHobbyRequest>) => {
+    const response = await apiClient.patch<Hobby>(`/api/v1/user-management/hobbies/${id}`, updates);
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    return response.data!;
+  },
+
+  delete: async (id: string, permanent = false) => {
+    const params = permanent ? '?permanent=true' : '';
+    const response = await apiClient.delete<void>(`/api/v1/user-management/hobbies/${id}${params}`);
+    if (response.error) {
+      throw new Error(response.error);
+    }
+  },
+};
+
 export const analyticsApi = {
   getDashboardStats: async () => {
     const response = await apiClient.get<DashboardStats>(API_ENDPOINTS.ANALYTICS_DASHBOARD);
@@ -229,6 +323,19 @@ export const analyticsApi = {
   },
 };
 
+export const referralApi = {
+  sendInvite: async (friendEmail: string) => {
+    const response = await apiClient.post<{ success: boolean; message: string }>(
+      API_ENDPOINTS.REFERRALS_SEND,
+      { friend_email: friendEmail }
+    );
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    return response.data!;
+  },
+};
+
 export const healthApi = {
   check: async (): Promise<boolean> => {
     return apiClient.testConnection();
@@ -243,6 +350,7 @@ export const api = {
   ai: aiApi,
   user: userApi,
   analytics: analyticsApi,
+  referral: referralApi,
   health: healthApi,
 };
 
@@ -268,3 +376,5 @@ export const userAPI = {
   getPreferences: userApi.getPreferences,
   updatePreferences: userApi.updatePreferences,
 };
+
+export { commandsAPI } from './commands';

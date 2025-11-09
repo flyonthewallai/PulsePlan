@@ -174,7 +174,7 @@ export function EventsCard() {
 
       {/* Card */}
       <div 
-        className="bg-neutral-800/80 border border-gray-700/50 rounded-xl p-4 mb-6 cursor-pointer hover:bg-neutral-800 transition-colors"
+        className="bg-neutral-800/80 border border-gray-700/50 rounded-xl p-4 mb-6 cursor-pointer hover:bg-neutral-800/90 transition-colors"
         onClick={() => setShowModal(true)}
       >
         <div className="space-y-2">

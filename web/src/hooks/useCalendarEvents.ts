@@ -16,16 +16,23 @@ export const calendarQueryKeys = {
 };
 
 // Convert Task to CalendarEvent
-const taskToCalendarEvent = (task: Task): CalendarEvent => ({
-  id: task.id,
-  title: task.title,
-  description: task.description,
-  start: task.dueDate,
-  end: new Date(new Date(task.dueDate).getTime() + (task.estimatedDuration || 60) * 60 * 1000).toISOString(),
-  task,
-  priority: task.priority,
-  color: colors.taskColors[task.priority] || colors.taskColors.default,
-});
+const taskToCalendarEvent = (task: Task): CalendarEvent => {
+  // Ensure consistent date parsing - parse ISO string to Date
+  const startDate = new Date(task.dueDate);
+  const durationMs = (task.estimatedDuration || 60) * 60 * 1000;
+  const endDate = new Date(startDate.getTime() + durationMs);
+
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    start: startDate.toISOString(),
+    end: endDate.toISOString(),
+    task,
+    priority: task.priority,
+    color: colors.taskColors[task.priority] || colors.taskColors.default,
+  };
+};
 
 // Convert CalendarEvent updates back to Task updates
 const calendarEventUpdatesToTask = (updates: Partial<CalendarEvent>): Partial<Task> => {
@@ -48,7 +55,11 @@ const calendarEventUpdatesToTask = (updates: Partial<CalendarEvent>): Partial<Ta
 };
 
 // Hook for fetching calendar events (tasks) for a date range
-export function useCalendarEvents(startDate: string, endDate: string) {
+export function useCalendarEvents(
+  startDate: string,
+  endDate: string,
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: calendarQueryKeys.tasksByDateRange(startDate, endDate),
     queryFn: async () => {
@@ -60,6 +71,7 @@ export function useCalendarEvents(startDate: string, endDate: string) {
     },
     staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    enabled: options?.enabled ?? true, // Allow conditional fetching
   });
 }
 

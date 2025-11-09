@@ -18,10 +18,10 @@ export const useTasks = (params?: {
   return useQuery({
     queryKey,
     queryFn: () => api.tasks.list(params),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 1 * 60 * 1000, // 1 minute - reduced from 5 to catch fresh Canvas syncs
     gcTime: 10 * 60 * 1000, // 10 minutes (was cacheTime in v4)
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnWindowFocus: true, // Refetch when returning to tab
+    refetchOnMount: true, // Always refetch on mount to catch updates
     retry: 2,
   })
 }

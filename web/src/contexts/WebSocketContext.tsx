@@ -28,9 +28,10 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
       return;
     }
 
-    console.log('🔌 Initializing WebSocket connection...');
-    console.log('API_BASE_URL:', API_BASE_URL);
-    console.log('👤 User ID:', userId);
+    // Debug logging only in development
+    if (import.meta.env.DEV) {
+      console.log('🔌 Initializing WebSocket connection...');
+    }
     
     // Create socket connection 
     const newSocket = io(API_BASE_URL, {
@@ -47,7 +48,9 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
 
     // Connection events
     newSocket.on('connect', async () => {
-      console.log('✅ WebSocket connected');
+      if (import.meta.env.DEV) {
+        console.log('✅ WebSocket connected');
+      }
       setIsConnected(true);
       setError(null);
       
@@ -62,7 +65,6 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
         }
 
         if (session?.access_token && session?.user?.id) {
-          console.log('🔐 Authenticating WebSocket with token...');
           // Authenticate with the server using Supabase token
           newSocket.emit('authenticate', {
             userId: session.user.id,
@@ -79,7 +81,9 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
     });
 
     newSocket.on('disconnect', () => {
-      console.log('🔌 WebSocket disconnected');
+      if (import.meta.env.DEV) {
+        console.log('🔌 WebSocket disconnected');
+      }
       setIsConnected(false);
     });
 
@@ -91,7 +95,9 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
 
     // Authentication events
     newSocket.on('authenticated', (data) => {
-      console.log('🔐 WebSocket authenticated:', data);
+      if (import.meta.env.DEV) {
+        console.log('🔐 WebSocket authenticated');
+      }
     });
 
     newSocket.on('auth_error', (err) => {
@@ -101,7 +107,9 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
 
     // Cleanup on unmount or userId change
     return () => {
-      console.log('🧹 Cleaning up WebSocket connection');
+      if (import.meta.env.DEV) {
+        console.log('🧹 Cleaning up WebSocket connection');
+      }
       newSocket.disconnect();
       setSocket(null);
       setIsConnected(false);
