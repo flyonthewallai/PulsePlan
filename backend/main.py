@@ -82,15 +82,98 @@ async def lifespan(app: FastAPI):
             from app.workers.scheduling.timezone_scheduler import get_timezone_scheduler
             timezone_scheduler = get_timezone_scheduler()
             await timezone_scheduler.start()
-            
+
             # Store scheduler in app state for cleanup
             app.state.timezone_scheduler = timezone_scheduler
             logger.info("Timezone scheduler started")
         except Exception as e:
             logger.warning(f"Timezone scheduler failed to start: {e}")
-        
+
+        # Start calendar sync scheduler
+        logger.info("Starting calendar sync scheduler...")
+        try:
+            from app.workers.calendar_scheduler import get_calendar_scheduler
+            calendar_scheduler = get_calendar_scheduler()
+            await calendar_scheduler.start()
+
+            # Store scheduler in app state for cleanup
+            app.state.calendar_scheduler = calendar_scheduler
+            logger.info("Calendar sync scheduler started")
+        except Exception as e:
+            logger.warning(f"Calendar sync scheduler failed to start: {e}")
+
+        # Start Canvas sync scheduler
+        logger.info("Starting Canvas sync scheduler...")
+        try:
+            from app.workers.canvas_scheduler import get_canvas_scheduler
+            canvas_scheduler = get_canvas_scheduler()
+            await canvas_scheduler.start()
+
+            app.state.canvas_scheduler = canvas_scheduler
+            logger.info("Canvas sync scheduler started")
+        except Exception as e:
+            logger.warning(f"Canvas sync scheduler failed to start: {e}")
+
+        # Schedule usage aggregation jobs
+        logger.info("Scheduling usage aggregation jobs...")
+        try:
+            from app.jobs.usage_aggregation import schedule_usage_jobs
+
+            # Use the timezone scheduler for usage jobs
+            usage_scheduler = app.state.timezone_scheduler if hasattr(app.state, 'timezone_scheduler') else None
+            if usage_scheduler:
+                schedule_usage_jobs(usage_scheduler.scheduler)
+                logger.info("Usage aggregation jobs scheduled successfully")
+            else:
+                logger.warning("Timezone scheduler not available, usage jobs not scheduled")
+        except Exception as e:
+            logger.warning(f"Usage aggregation jobs failed to schedule: {e}")
+
         # Dialog system removed - replaced by unified agent system
         logger.info("Using unified agent system (dialog system deprecated)")
+
+        # Initialize NLU classifier (contrastive learning model)
+        logger.info("Initializing contrastive NLU classifier...")
+        try:
+            from app.agents.nlu.classifier_contrastive import create_contrastive_classifier
+
+            # Create contrastive classifier (uses sentence-transformers)
+            classifier = create_contrastive_classifier(
+                model_dir="app/agents/nlu/contrastive_classifier"
+            )
+
+            # Store classifier in app state
+            app.state.nlu_classifier = classifier
+
+            if classifier.is_available():
+                info = classifier.get_info()
+                logger.info(
+                    f"Contrastive NLU classifier initialized successfully: "
+                    f"{info['num_labels']} intents, confidence_threshold={info['confidence_threshold']}"
+                )
+            else:
+                logger.warning("Contrastive NLU classifier not available")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize contrastive NLU classifier: {e}")
+            logger.warning("Falling back to ONNX classifier if available...")
+
+            # Fallback to ONNX classifier
+            try:
+                from app.agents.nlu.classifier_onnx import create_classifier
+                from app.config.core.settings import get_settings
+
+                nlu_settings = get_settings()
+                classifier = create_classifier(
+                    model_path=nlu_settings.INTENT_MODEL_PATH,
+                    labels=nlu_settings.INTENT_LABELS,
+                    hf_tokenizer=nlu_settings.HF_TOKENIZER
+                )
+                app.state.nlu_classifier = classifier
+                logger.info("Using ONNX classifier fallback")
+            except Exception as e2:
+                logger.error(f"Failed to initialize fallback classifier: {e2}")
+                app.state.nlu_classifier = None
 
         # Additional startup tasks can be added here
         logger.info("Application startup completed successfully")
@@ -118,6 +201,24 @@ async def lifespan(app: FastAPI):
                     logger.info("Timezone scheduler stopped")
             except Exception as e:
                 logger.warning(f"Error stopping timezone scheduler: {e}")
+
+            # Stop calendar sync scheduler
+            logger.info("Stopping calendar sync scheduler...")
+            try:
+                if hasattr(app.state, 'calendar_scheduler'):
+                    await app.state.calendar_scheduler.stop()
+                    logger.info("Calendar sync scheduler stopped")
+            except Exception as e:
+                logger.warning(f"Error stopping calendar sync scheduler: {e}")
+
+            # Stop Canvas scheduler
+            logger.info("Stopping Canvas sync scheduler...")
+            try:
+                if hasattr(app.state, 'canvas_scheduler'):
+                    await app.state.canvas_scheduler.stop()
+                    logger.info("Canvas sync scheduler stopped")
+            except Exception as e:
+                logger.warning(f"Error stopping Canvas sync scheduler: {e}")
             
             # Close Redis connections
             logger.info("Closing Redis connections...")

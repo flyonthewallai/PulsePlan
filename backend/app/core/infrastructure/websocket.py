@@ -333,6 +333,25 @@ class WebSocketManager:
             'status': status,
             'result': result
         })
+
+    async def emit_timeblock_updated(self, user_id: str, timeblock_data: Dict[str, Any]):
+        """
+        Emit timeblock update for real-time calendar sync.
+
+        This ensures the calendar updates immediately when timeblocks are moved/rescheduled.
+
+        Args:
+            user_id: User whose timeblock was updated
+            timeblock_data: Timeblock data including id, start_time, end_time, title, etc.
+        """
+        logger.info(f"[WEBSOCKET MANAGER] Emitting timeblock_updated for user {user_id}")
+        logger.info(f"[WEBSOCKET MANAGER] Timeblock: {timeblock_data.get('title')} at {timeblock_data.get('start_time')}")
+
+        # Emit to all user connections for immediate UI update
+        await self.emit_to_user(user_id, 'timeblock_updated', {
+            'timeblock': timeblock_data,
+            'timestamp': datetime.utcnow().isoformat()
+        })
     
     def get_user_connection_count(self, user_id: str) -> int:
         """Get number of active connections for a user"""

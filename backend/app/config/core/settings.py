@@ -130,11 +130,15 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = Field(..., description="Google OAuth client ID")
     GOOGLE_CLIENT_SECRET: str = Field(..., description="Google OAuth client secret")
     GOOGLE_REDIRECT_URL: str = Field(..., description="Google OAuth redirect URL")
-    
+    GOOGLE_WEBHOOK_VERIFICATION_TOKEN: str = Field(..., description="Google Calendar webhook verification token")
+
     MICROSOFT_CLIENT_ID: str = Field(..., description="Microsoft OAuth client ID")
     MICROSOFT_CLIENT_SECRET: str = Field(..., description="Microsoft OAuth client secret")
     MICROSOFT_REDIRECT_URL: str = Field(..., description="Microsoft OAuth redirect URL")
     MICROSOFT_TENANT_ID: str = "common"
+
+    # API Base URL for webhooks
+    API_BASE_URL: str = Field(..., description="Public API base URL for webhooks")
     
     # OpenAI/LLM Configuration
     OPENAI_API_KEY: str = Field(..., description="OpenAI API key")
@@ -144,7 +148,30 @@ class Settings(BaseSettings):
     OPENAI_TIMEOUT: int = 30
     ENABLE_LLM_CACHING: bool = False  # Disabled for fresh responses
     LLM_CACHE_TTL_SECONDS: int = 0    # No TTL since caching is disabled
-    
+
+    # NLU Configuration (LLM-last pipeline)
+    INTENT_MODEL_PATH: Optional[str] = Field(None, description="Path to ONNX intent classifier model")
+    INTENT_LABELS: List[str] = Field(
+        default=[
+            "scheduling", "task_management", "calendar_event", "reminder",
+            "search", "email", "briefing", "status", "greeting", "thanks",
+            "confirm", "cancel", "help", "adjust_plan", "unknown"
+        ],
+        description="Ordered list of intent labels matching model output"
+    )
+    HF_TOKENIZER: str = Field(
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        description="HuggingFace tokenizer for ONNX classifier"
+    )
+    USE_LLM_FALLBACK: bool = Field(
+        default=False,
+        description="Use LLM for ambiguous cases (optional polish)"
+    )
+    TZ_DEFAULT: str = Field(
+        default="America/Denver",
+        description="Default timezone for date/time parsing"
+    )
+
     # Additional LLM Providers
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-pro"
@@ -152,9 +179,14 @@ class Settings(BaseSettings):
     # Search Integration
     TAVILY_API_KEY: str = Field(..., description="Tavily search API key")
     
-    # Apple Pay Integration
-    APPLE_SHARED_SECRET: Optional[str] = None
-    
+    # RevenueCat Integration
+    REVENUECAT_WEBHOOK_SECRET: str = Field(default="", description="RevenueCat webhook authorization secret")
+
+    # PostHog Analytics Configuration
+    POSTHOG_API_KEY: str = Field(default="", description="PostHog API key for analytics")
+    POSTHOG_HOST: str = Field(default="https://us.i.posthog.com", description="PostHog instance host")
+    POSTHOG_ENABLED: bool = Field(default=True, description="Enable/disable PostHog analytics")
+
     # iOS Push Notifications (APNS)
     APNS_TEAM_ID: str = Field(default="", description="Apple Push Notification service Team ID")
     APNS_KEY_ID: str = Field(default="", description="Apple Push Notification service Key ID")

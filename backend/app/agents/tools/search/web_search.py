@@ -7,7 +7,10 @@ import asyncio
 from datetime import datetime
 import httpx
 import os
+import logging
 from ..core.base import BaseTool, ToolResult, ToolError
+
+logger = logging.getLogger(__name__)
 
 
 class WebSearchTool(BaseTool):
@@ -151,9 +154,9 @@ class WebSearchTool(BaseTool):
         # Debug: Log the structure of the first result to understand the format
         if tavily_data.get("results"):
             first_result = tavily_data["results"][0]
-            print(f"[TAVILY DEBUG] First result structure: {list(first_result.keys())}")
-            print(f"[TAVILY DEBUG] Favicon field: {first_result.get('favicon')}")
-            print(f"[TAVILY DEBUG] Answer field: {tavily_data.get('answer')}")
+            logger.debug(f"First result structure: {list(first_result.keys())}")
+            logger.debug(f"Favicon field: {first_result.get('favicon')}")
+            logger.debug(f"Answer field: {tavily_data.get('answer')}")
         
         # Process search results
         for result in tavily_data.get("results", []):

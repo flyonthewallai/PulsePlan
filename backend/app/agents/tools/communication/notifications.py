@@ -10,7 +10,10 @@ from enum import Enum
 
 from ..core.base import BaseTool, ToolResult, ToolError
 from app.services.notifications.ios_notification_service import get_ios_notification_service
-from app.config.database.supabase import get_supabase
+from app.services.notification_preference_service import (
+    NotificationPreferenceService,
+    get_notification_preference_service
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +47,18 @@ class NotificationManagerTool(BaseTool):
     - Smart suggestions for optimization
     """
     
-    def __init__(self):
+    def __init__(
+        self,
+        ios_service=None,
+        preference_service: NotificationPreferenceService = None
+    ):
         super().__init__(
             name="notification_manager",
             description="Send contextual iOS notifications based on agent intelligence and detected conditions"
         )
         
-        self.ios_service = get_ios_notification_service()
-        self.supabase = get_supabase()
+        self.ios_service = ios_service or get_ios_notification_service()
+        self.preference_service = preference_service or get_notification_preference_service()
     
     def get_required_tokens(self) -> List[str]:
         """No OAuth tokens required for notifications"""
@@ -87,7 +94,12 @@ class NotificationManagerTool(BaseTool):
             urgency = input_data.get("urgency", NotificationUrgency.MEDIUM.value)
             
             # Check if user has notifications enabled for this type
-            if not await self._should_send_notification(user_id, notification_type):
+            should_send = await self.preference_service.should_send_notification(
+                user_id,
+                notification_type
+            )
+            
+            if not should_send:
                 return ToolResult(
                     success=True,
                     data={"status": "skipped", "reason": "user_preferences"},
@@ -169,7 +181,7 @@ class NotificationManagerTool(BaseTool):
         success = await self.ios_service.send_notification(user_id, notification)
         
         # Log the conflict notification
-        await self._log_notification(user_id, "conflict_detected", notification, success)
+        await self.preference_service.log_notification(user_id, "conflict_detected", notification, success)
         
         return {
             "notification_sent": success,
@@ -199,7 +211,7 @@ class NotificationManagerTool(BaseTool):
         }
         
         success = await self.ios_service.send_notification(user_id, notification)
-        await self._log_notification(user_id, "schedule_changed", notification, success)
+        await self.preference_service.log_notification(user_id, "schedule_changed", notification, success)
         
         return {
             "notification_sent": success,
@@ -231,7 +243,7 @@ class NotificationManagerTool(BaseTool):
         }
         
         success = await self.ios_service.send_notification(user_id, notification)
-        await self._log_notification(user_id, "urgent_deadline", notification, success)
+        await self.preference_service.log_notification(user_id, "urgent_deadline", notification, success)
         
         return {
             "notification_sent": success,
@@ -262,7 +274,7 @@ class NotificationManagerTool(BaseTool):
         }
         
         success = await self.ios_service.send_notification(user_id, notification)
-        await self._log_notification(user_id, "task_overdue", notification, success)
+        await self.preference_service.log_notification(user_id, "task_overdue", notification, success)
         
         return {
             "notification_sent": success,
@@ -292,7 +304,7 @@ class NotificationManagerTool(BaseTool):
         }
         
         success = await self.ios_service.send_notification(user_id, notification)
-        await self._log_notification(user_id, "calendar_sync_issue", notification, success)
+        await self.preference_service.log_notification(user_id, "calendar_sync_issue", notification, success)
         
         return {
             "notification_sent": success,
@@ -323,7 +335,7 @@ class NotificationManagerTool(BaseTool):
         }
         
         success = await self.ios_service.send_notification(user_id, notification)
-        await self._log_notification(user_id, "smart_suggestion", notification, success)
+        await self.preference_service.log_notification(user_id, "smart_suggestion", notification, success)
         
         return {
             "notification_sent": success,
@@ -355,7 +367,7 @@ class NotificationManagerTool(BaseTool):
         }
         
         success = await self.ios_service.send_notification(user_id, notification)
-        await self._log_notification(user_id, "workload_warning", notification, success)
+        await self.preference_service.log_notification(user_id, "workload_warning", notification, success)
         
         return {
             "notification_sent": success,
@@ -387,7 +399,7 @@ class NotificationManagerTool(BaseTool):
         }
         
         success = await self.ios_service.send_notification(user_id, notification)
-        await self._log_notification(user_id, "focus_time_reminder", notification, success)
+        await self.preference_service.log_notification(user_id, "focus_time_reminder", notification, success)
         
         return {
             "notification_sent": success,
@@ -413,7 +425,7 @@ class NotificationManagerTool(BaseTool):
         }
         
         success = await self.ios_service.send_notification(user_id, notification)
-        await self._log_notification(user_id, input_data["notification_type"], notification, success)
+        await self.preference_service.log_notification(user_id, input_data["notification_type"], notification, success)
         
         return {
             "notification_sent": success,
@@ -421,64 +433,6 @@ class NotificationManagerTool(BaseTool):
             "user_id": user_id
         }
     
-    async def _should_send_notification(self, user_id: str, notification_type: str) -> bool:
-        """Check if user has notifications enabled for this type"""
-        try:
-            # Get user notification preferences
-            response = await self.supabase.table("user_preferences").select(
-                "contextual_notifications_enabled, notification_types_enabled"
-            ).eq("user_id", user_id).single().execute()
-            
-            if not response.data:
-                return True  # Default to enabled if no preferences found
-            
-            preferences = response.data
-            
-            # Check if contextual notifications are enabled
-            if not preferences.get("contextual_notifications_enabled", True):
-                return False
-            
-            # Check if this specific notification type is enabled
-            enabled_types = preferences.get("notification_types_enabled", [])
-            if enabled_types and notification_type not in enabled_types:
-                return False
-            
-            # Check rate limiting - don't spam users
-            from app.services.cache_service import get_cache_service
-            cache_service = get_cache_service()
-            cache_key = f"notification_rate_limit:{user_id}:{notification_type}"
-            recent_count = await cache_service.get(cache_key) or 0
-            
-            # Limit to 3 notifications of the same type per hour
-            if recent_count >= 3:
-                return False
-            
-            # Increment rate limit counter
-            await cache_service.set(cache_key, recent_count + 1, 3600)  # 1 hour TTL
-            
-            return True
-            
-        except Exception as e:
-            logger.warning(f"Error checking notification preferences for user {user_id}: {e}")
-            return True  # Default to enabled on error
-    
-    async def _log_notification(self, user_id: str, notification_type: str, notification: Dict[str, Any], success: bool):
-        """Log notification sending for analytics and debugging"""
-        try:
-            log_entry = {
-                "user_id": user_id,
-                "notification_type": notification_type,
-                "title": notification["title"],
-                "success": success,
-                "sent_at": datetime.utcnow().isoformat(),
-                "priority": notification.get("priority", "normal"),
-                "category": notification.get("category", "general")
-            }
-            
-            await self.supabase.table("notification_logs").insert(log_entry).execute()
-            
-        except Exception as e:
-            logger.warning(f"Failed to log notification: {e}")
 
 
 # Create global instance

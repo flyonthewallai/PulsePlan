@@ -1,0 +1,665 @@
+{
+  "metadata": {
+    "source": "manually_curated_v1",
+    "version": "1.0.0",
+    "total_intents": 22,
+    "min_examples_required": 50,
+    "placeholder_normalization": true,
+    "domains": [
+      "scheduling",
+      "tasks",
+      "system",
+      "information",
+      "slots",
+      "planning",
+      "communication",
+      "fallback"
+    ]
+  },
+  "intents": [
+    {
+      "label": "adjust_plan",
+      "description": "Reorganize, restructure, rebalance, optimize, or revise entire schedule or plan. Broader than rescheduling single items.",
+      "domain": "planning",
+      "examples": [
+        "redo my weekly plan",
+        "shift everything back a day",
+        "modify my schedule for exam week",
+        "change my study plan",
+        "adjust my calendar for vacation",
+        "adjust for vacation",
+        "reorganize sprint backlog",
+        "revise timeline for capstone {task}",
+        "rework schedule completely",
+        "replan week"
+      ],
+      "keywords": [
+        "reorganize",
+        "restructure",
+        "rebalance",
+        "optimize",
+        "revise",
+        "rework"
+      ],
+      "hard_negatives": [
+        "Moving single event (use reschedule)",
+        "Creating new schedule (use scheduling)"
+      ]
+    },
+    {
+      "label": "calendar_event",
+      "description": "Add a specific event with details (time, location, attendees) to the calendar. More structured than general scheduling.",
+      "domain": "scheduling",
+      "examples": [
+        "concert tickets friday {time}",
+        "birthday party saturday evening",
+        "include the workshop in my events",
+        "holiday on calendar december 25",
+        "add parent-teacher {event} to schedule",
+        "add soccer practice tuesdays and thursdays",
+        "mark down the {task} day",
+        "add graduation ceremony to my schedule",
+        "add performance {event} to schedule",
+        "mark the orientation on calendar"
+      ],
+      "keywords": [
+        "add to calendar",
+        "create event",
+        "put on schedule",
+        "mark down"
+      ],
+      "hard_negatives": [
+        "Rescheduling events (use reschedule)",
+        "General time blocking (use scheduling)"
+      ]
+    },
+    {
+      "label": "cancel",
+      "description": "No, stop, abort, never mind, undo. Canceling or rejecting an action.",
+      "domain": "system",
+      "examples": [
+        "skip it",
+        "nope",
+        "opt out",
+        "no",
+        "nah",
+        "undo",
+        "don't do that",
+        "forget it",
+        "not interested",
+        "negative"
+      ],
+      "keywords": [
+        "no",
+        "cancel",
+        "stop",
+        "abort",
+        "never mind",
+        "undo"
+      ],
+      "hard_negatives": [
+        "Confirming (use confirm)",
+        "Requesting help (use help)"
+      ]
+    },
+    {
+      "label": "chitchat",
+      "description": "Casual conversation, jokes, weather, small talk. Not task-related.",
+      "domain": "fallback",
+      "examples": [
+        "how's life?",
+        "what's up?",
+        "cool story",
+        "peace out",
+        "later gator",
+        "favorite movie?",
+        "long time no see",
+        "good vibes",
+        "how's the weather?",
+        "did you watch the game?"
+      ],
+      "keywords": [
+        "weather",
+        "joke",
+        "how are you",
+        "what's up",
+        "favorite"
+      ],
+      "hard_negatives": [
+        "Help requests (use help)",
+        "Greetings (use greeting)"
+      ]
+    },
+    {
+      "label": "confirm",
+      "description": "Yes, okay, sure, affirmative, I agree. Confirming an action.",
+      "domain": "system",
+      "examples": [
+        "yup",
+        "aye",
+        "works for me",
+        "yep",
+        "absolutely",
+        "sounds good",
+        "go ahead",
+        "indeed",
+        "yes",
+        "confirm"
+      ],
+      "keywords": [
+        "yes",
+        "okay",
+        "sure",
+        "affirmative",
+        "I agree",
+        "that's correct"
+      ],
+      "hard_negatives": [
+        "Thanking (use thanks)",
+        "Greeting (use greeting)"
+      ]
+    },
+    {
+      "label": "email",
+      "description": "Compose, draft, send, reply to, or forward an email message. Communication via email.",
+      "domain": "communication",
+      "examples": [
+        "compose email to hr about benefits",
+        "draft email to group about {task} milestone",
+        "message {person} about invoice",
+        "write to support about bug",
+        "compose message to lab partner",
+        "email the {person} about my grade",
+        "contact it about wifi password",
+        "draft message declining invitation",
+        "send a message to my group members",
+        "send email to {person} about {task} question"
+      ],
+      "keywords": [
+        "email",
+        "send",
+        "message",
+        "draft",
+        "compose",
+        "reply",
+        "contact"
+      ],
+      "hard_negatives": [
+        "Creating tasks to send email (use task_management)",
+        "Searching emails (use search)"
+      ]
+    },
+    {
+      "label": "greeting",
+      "description": "Hello, hi, hey, greetings. Starting a conversation.",
+      "domain": "system",
+      "examples": [
+        "hello",
+        "good morning",
+        "hiya",
+        "evening",
+        "hi there",
+        "hello there",
+        "greetings",
+        "hello world",
+        "hi friend",
+        "good afternoon"
+      ],
+      "keywords": [
+        "hello",
+        "hi",
+        "hey",
+        "greetings",
+        "howdy"
+      ],
+      "hard_negatives": [
+        "Thanking (use thanks)",
+        "Requesting help (use help)"
+      ]
+    },
+    {
+      "label": "help",
+      "description": "Request assistance, tutorial, guide, instructions, or information about how to use features.",
+      "domain": "system",
+      "examples": [
+        "show me how",
+        "help",
+        "explain",
+        "what are commands?",
+        "instructions unclear",
+        "i'm stuck",
+        "confused about this feature",
+        "lost",
+        "need help",
+        "what are the options?"
+      ],
+      "keywords": [
+        "help",
+        "how do I",
+        "tutorial",
+        "guide",
+        "instructions",
+        "show me"
+      ],
+      "hard_negatives": [
+        "Chitchat (use chitchat)",
+        "Specific queries (use search)"
+      ]
+    },
+    {
+      "label": "reminder",
+      "description": "Set up a notification, alert, or reminder for a specific time or event. Prompt user to remember something.",
+      "domain": "communication",
+      "examples": [
+        "create a reminder for office hours",
+        "remind me to submit the form {date}",
+        "nudge me about car insurance renewal",
+        "notify me about the submission deadline",
+        "alert me when it's time for class",
+        "notify about upcoming webinar",
+        "wake me at {time}",
+        "alert me about flight check-in",
+        "don't forget to lock door when leaving",
+        "flag when license expires"
+      ],
+      "keywords": [
+        "remind",
+        "alert",
+        "notify",
+        "ping",
+        "heads up",
+        "don't forget"
+      ],
+      "hard_negatives": [
+        "Creating tasks (use task_management)",
+        "Scheduling events (use scheduling)"
+      ]
+    },
+    {
+      "label": "reschedule",
+      "description": "Move, postpone, delay, advance, shift, or change the time/date of an EXISTING event, meeting, or appointment.",
+      "domain": "scheduling",
+      "examples": [
+        "postpone monday's {event} to thursday",
+        "advance deadline by two days",
+        "reschedule tutorial to {date}",
+        "move the {time} {event} to {time}",
+        "reschedule haircut to next available",
+        "move lunch from 12 to 1",
+        "can we move the {event} to wednesday?",
+        "push dentist from {time} to {time}",
+        "shift the {time} slot to {time}",
+        "postpone quarterly {event}"
+      ],
+      "keywords": [
+        "move",
+        "reschedule",
+        "postpone",
+        "delay",
+        "shift",
+        "push back",
+        "change time"
+      ],
+      "hard_negatives": [
+        "Creating new events (use calendar_event or scheduling)",
+        "Adjusting entire plan (use adjust_plan)"
+      ]
+    },
+    {
+      "label": "scheduling",
+      "description": "Create, plan, arrange, or block time for a new event, meeting, study session, or work block. This is for NEW items, not modifying existing ones.",
+      "domain": "scheduling",
+      "examples": [
+        "schedule {person} {event} {date} morning",
+        "plan group study {event} for calculus next friday",
+        "block time for code {event} {event}",
+        "allocate 3 hours for coding {date}",
+        "reserve library study room for group",
+        "reserve time for gym workout this evening",
+        "plan {event} for {task} discussion next tuesday",
+        "book {event} with career counselor",
+        "i need to plan a study {event} for {date}",
+        "book a consultation with the {person}"
+      ],
+      "keywords": [
+        "schedule",
+        "plan",
+        "arrange",
+        "book",
+        "block time",
+        "set up",
+        "reserve"
+      ],
+      "hard_negatives": [
+        "Creating events with full details (use calendar_event)",
+        "Modifying existing items (use reschedule)",
+        "Creating tasks (use task_management)"
+      ]
+    },
+    {
+      "label": "search",
+      "description": "Find, look up, search for, filter, or query existing tasks, events, notes, assignments, or other data in the system.",
+      "domain": "information",
+      "examples": [
+        "retrieve deleted tasks",
+        "filter tasks by high priority",
+        "query overdue items",
+        "locate {task} files",
+        "look up the {event} notes from last monday",
+        "find all items tagged urgent",
+        "find tasks tagged urgent",
+        "retrieve notes from last semester",
+        "look up events for spring semester",
+        "look for notes from yesterday's lecture"
+      ],
+      "keywords": [
+        "find",
+        "search",
+        "look up",
+        "show",
+        "filter",
+        "query",
+        "list"
+      ],
+      "hard_negatives": [
+        "Creating new items (use task_management/scheduling)",
+        "Getting summaries (use briefing)"
+      ]
+    },
+    {
+      "label": "status",
+      "description": "Request productivity analytics, completion statistics, performance metrics, or numeric tracking data. Quantifiable measures of progress.",
+      "domain": "information",
+      "examples": [
+        "how many tasks completed this week?",
+        "show me completion rate",
+        "what's my productivity score?",
+        "check my velocity",
+        "what's my streak?",
+        "how many tasks did i finish today?",
+        "show completion statistics",
+        "what percentage of tasks are done?",
+        "track my performance metrics",
+        "how many hours logged this week?"
+      ],
+      "keywords": [
+        "how many",
+        "completion rate",
+        "metrics",
+        "statistics",
+        "velocity",
+        "streak",
+        "productivity score",
+        "percentage"
+      ],
+      "hard_negatives": [
+        "Showing task lists (use user_data_query)",
+        "Searching for tasks (use search)",
+        "General updates without metrics (use user_data_query)"
+      ]
+    },
+    {
+      "label": "task_management",
+      "description": "Create, update, complete, delete, or track tasks, todos, assignments, or action items. Manage your task list.",
+      "domain": "tasks",
+      "examples": [
+        "need to return library books",
+        "pack for trip",
+        "todo: complete peer evaluations",
+        "add studying for midterm to my tasks",
+        "buy groceries this weekend",
+        "add {event} {person} to todo list",
+        "download software update",
+        "create todo to finish problem set 3",
+        "order new supplies",
+        "create a todo for reading chapter 5"
+      ],
+      "keywords": [
+        "task",
+        "todo",
+        "assignment",
+        "create",
+        "add",
+        "complete",
+        "track"
+      ],
+      "hard_negatives": [
+        "Scheduling time blocks (use scheduling)",
+        "Setting reminders (use reminder)",
+        "Searching tasks (use search)"
+      ]
+    },
+    {
+      "label": "temporal_slot_fill",
+      "description": "Temporal expressions like 'tomorrow', 'next week', 'this Friday' used as slot-filling responses.",
+      "domain": "slots",
+      "examples": [
+        "in the morning",
+        "early {date}",
+        "saturday",
+        "after lunch",
+        "{date}",
+        "this month",
+        "next friday",
+        "this weekend",
+        "end of month",
+        "later {date}"
+      ],
+      "keywords": [
+        "tomorrow",
+        "next week",
+        "Monday",
+        "this Friday",
+        "tonight"
+      ],
+      "hard_negatives": [
+        "Complete scheduling request (use scheduling)",
+        "Time-only expressions (use time_slot_fill)"
+      ]
+    },
+    {
+      "label": "thanks",
+      "description": "Thank you, thanks, appreciate it. Expressing gratitude.",
+      "domain": "system",
+      "examples": [
+        "thanks a bunch",
+        "props",
+        "thank you",
+        "thx",
+        "ty",
+        "much obliged",
+        "thanks so much",
+        "much appreciated",
+        "cheers",
+        "many thanks"
+      ],
+      "keywords": [
+        "thank you",
+        "thanks",
+        "appreciate",
+        "grateful"
+      ],
+      "hard_negatives": [
+        "Greeting (use greeting)",
+        "Confirming (use confirm)"
+      ]
+    },
+    {
+      "label": "time_slot_fill",
+      "description": "Specific times like '3pm', '10:45', 'noon' used as slot-filling responses.",
+      "domain": "slots",
+      "examples": [
+        "{time}",
+        "quarter after",
+        "1700 hours",
+        "quarter to 4",
+        "top of the hour",
+        "half past six",
+        "9:15",
+        "2pm sharp",
+        "around 4",
+        "5:45pm"
+      ],
+      "keywords": [
+        "3pm",
+        "10:45",
+        "noon",
+        "midnight",
+        "quarter past"
+      ],
+      "hard_negatives": [
+        "Date expressions (use temporal_slot_fill)",
+        "Complete scheduling request (use scheduling)"
+      ]
+    },
+    {
+      "label": "unknown",
+      "description": "Unclear, ambiguous, nonsensical, or out-of-scope input that doesn't match any intent.",
+      "domain": "fallback",
+      "examples": [
+        "what are you saying",
+        "say that differently",
+        "i'm confused",
+        "lost me there",
+        "nonsense",
+        "can't figure this out",
+        "come again?",
+        "eh?",
+        "what does that mean",
+        "no comprende"
+      ],
+      "keywords": [
+        "unclear",
+        "huh",
+        "what",
+        "don't understand"
+      ],
+      "hard_negatives": [
+        "Any specific intent when user is clear"
+      ]
+    },
+    {
+      "label": "app_info_query",
+      "description": "Questions about how the PulsePlan app works, pricing, features, data usage, token limits, or available integrations.",
+      "domain": "system",
+      "examples": [
+        "how does the planner work?",
+        "what's included in premium?",
+        "how many tokens do i have left?",
+        "what integrations are available?",
+        "how do you handle my data?",
+        "what can this app do?",
+        "tell me about subscription plans",
+        "do you integrate with canvas?",
+        "what's my token usage?",
+        "how much does this cost?"
+      ],
+      "keywords": [
+        "app",
+        "token",
+        "pricing",
+        "subscription",
+        "feature",
+        "integration",
+        "how does",
+        "what can"
+      ],
+      "hard_negatives": [
+        "General help about using features (use help)",
+        "Task-related queries (use search)"
+      ]
+    },
+    {
+      "label": "adjust_preferences",
+      "description": "Change user settings or personalization preferences such as study hours, notification settings, focus mode, or UI preferences.",
+      "domain": "system",
+      "examples": [
+        "turn on focus mode",
+        "disable notifications",
+        "set study hours from {time} to {time}",
+        "make my default view the calendar",
+        "mute ai notifications",
+        "change my working hours",
+        "enable dark mode",
+        "update notification preferences",
+        "set timezone to pacific",
+        "turn off email reminders"
+      ],
+      "keywords": [
+        "preference",
+        "setting",
+        "update",
+        "change",
+        "adjust",
+        "toggle",
+        "enable",
+        "disable",
+        "set"
+      ],
+      "hard_negatives": [
+        "Scheduling time blocks (use scheduling)",
+        "Asking about app features (use app_info_query)"
+      ]
+    },
+    {
+      "label": "user_data_query",
+      "description": "Ask for stored personal data, statistics, or information about user's own tasks, events, emails, or progress. Informational queries about user's data.",
+      "domain": "information",
+      "examples": [
+        "what tasks are left for {date}?",
+        "show me my upcoming meetings",
+        "what emails did i get this morning?",
+        "list todos due {date}",
+        "how many tasks do i have?",
+        "what's my completion rate?",
+        "show my calendar for {date}",
+        "what assignments are due?",
+        "how am i tracking against goals?",
+        "what's on my plate?"
+      ],
+      "keywords": [
+        "show me",
+        "list",
+        "what are my",
+        "how many",
+        "my tasks",
+        "my meetings",
+        "my data"
+      ],
+      "hard_negatives": [
+        "Searching specific items (use search)",
+        "Generating summaries (use briefing)",
+        "Progress metrics (use status)"
+      ]
+    },
+    {
+      "label": "clarification_request",
+      "description": "User asks the assistant to clarify, restate, or explain something that was unclear.",
+      "domain": "fallback",
+      "examples": [
+        "what do you mean?",
+        "say that again",
+        "can you rephrase?",
+        "i don't understand what that means",
+        "explain what you said",
+        "confused about that",
+        "what are you asking?",
+        "didn't catch that",
+        "come again?",
+        "unclear what you want"
+      ],
+      "keywords": [
+        "what do you mean",
+        "rephrase",
+        "say again",
+        "explain",
+        "clarify",
+        "confused"
+      ],
+      "hard_negatives": [
+        "Help requests for features (use help)",
+        "Off-topic nonsense (use unknown)"
+      ]
+    }
+  ]
+}

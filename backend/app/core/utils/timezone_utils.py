@@ -27,13 +27,13 @@ class TimezoneManager:
         self._timezone_cache: Dict[str, Any] = {}
         self._default_timezone = pytz.UTC
 
-    async def get_user_timezone(self, user_id: str, db_session=None) -> pytz.BaseTzInfo:
+    async def get_user_timezone(self, user_id: str, user_service=None) -> pytz.BaseTzInfo:
         """
         Get user-specific timezone from users table.
 
         Args:
             user_id: User identifier
-            db_session: Database session (optional)
+            user_service: UserService instance (injected, optional)
 
         Returns:
             User's timezone or UTC if not found
@@ -44,16 +44,13 @@ class TimezoneManager:
 
         # Query users table for timezone
         try:
-            # Use Supabase client to get user timezone
-            from ...config.database.supabase import get_supabase
-            supabase = get_supabase()
-            
-            result = supabase.table("users").select("timezone").eq("id", user_id).execute()
-            
-            if result.data and len(result.data) > 0:
-                user_tz_str = result.data[0].get("timezone")
-            else:
-                user_tz_str = None
+            # Use injected service instead of direct DB access (async-safe)
+            if user_service is None:
+                from ...services.user_service import get_user_service
+                user_service = get_user_service()
+
+            user = await user_service.get_user(user_id)
+            user_tz_str = user.get("timezone") if user else None
 
             if user_tz_str:
                 try:
@@ -67,9 +64,9 @@ class TimezoneManager:
                         logger.warning(f"Unknown timezone '{user_tz_str}' for user {user_id}, using UTC")
                         user_tz = self._default_timezone
             else:
-                # Default to Mountain Time (Denver) for now since user mentioned 4am issue
-                user_tz = pytz.timezone("America/Denver")
-                logger.info(f"No timezone set for user {user_id}, defaulting to America/Denver")
+                # Default to UTC if user timezone is not set
+                user_tz = self._default_timezone
+                logger.info(f"No timezone set for user {user_id}, defaulting to UTC")
 
             # Cache the result
             self._timezone_cache[user_id] = user_tz
@@ -77,8 +74,8 @@ class TimezoneManager:
 
         except Exception as e:
             logger.error(f"Failed to get timezone for user {user_id}: {e}")
-            # Default to Mountain Time for now
-            user_tz = pytz.timezone("America/Denver")
+            # Default to UTC on error
+            user_tz = self._default_timezone
             self._timezone_cache[user_id] = user_tz
             return user_tz
 

@@ -11,7 +11,7 @@ This module contains all Canvas LMS related background jobs including:
 from .canvas_backfill_job import CanvasBackfillJob
 from .canvas_delta_sync_job import CanvasDeltaSyncJob
 from .canvas_sync import CanvasSync, get_canvas_sync
-from .nightly_canvas_sync import NightlyCanvasSync, run_nightly_canvas_sync
+from .nightly_canvas_sync import NightlyCanvasSync, get_nightly_canvas_sync
 
 __all__ = [
     "CanvasBackfillJob",
@@ -19,5 +19,5 @@ __all__ = [
     "CanvasSync",
     "get_canvas_sync",
     "NightlyCanvasSync",
-    "run_nightly_canvas_sync",
+    "get_nightly_canvas_sync",
 ]

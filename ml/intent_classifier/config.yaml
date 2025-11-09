@@ -1,0 +1,102 @@
+# Intent Classifier Configuration
+# GPU Training + CPU Inference Pipeline
+
+model:
+  base_model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  max_sequence_length: 128
+  hidden_dropout_probability: 0.1
+  attention_probs_dropout_probability: 0.1
+  num_labels: 19  # Updated based on intent_specs.py
+
+training:
+  # GPU preference for training (3060 Ti)
+  device_preference_train: "cuda"  # Use GPU for training if available
+  batch_size_train: 32
+  batch_size_eval: 64
+  num_epochs: 10
+  learning_rate: 2.0e-5
+  warmup_steps: 100
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+
+  # Early stopping
+  early_stopping_patience: 3
+  early_stopping_metric: "eval_f1"
+
+  # Logging
+  logging_steps: 50
+  eval_steps: 200
+  save_steps: 200
+  save_total_limit: 3
+
+inference:
+  # CPU-friendly inference after ONNX export
+  execution_provider_preference: ["CPUExecutionProvider"]
+  confidence_threshold: 0.7
+  onnx_opset_version: 14
+
+data:
+  train_file: "data/intents/train.jsonl"
+  dev_file: "data/intents/dev.jsonl"
+  test_file: "data/intents/test.jsonl"
+
+  # Data augmentation
+  augmentation_enabled: true
+  augmentation_probability: 0.3
+
+paths:
+  output_dir: "ml/intent_classifier/outputs"
+  checkpoint_dir: "ml/intent_classifier/checkpoints"
+  onnx_model_path: "ml/intent_classifier/model.onnx"
+  quantized_onnx_model_path: "ml/intent_classifier/model_quantized.onnx"
+  labels_path: "ml/intent_classifier/labels.json"
+
+optimization:
+  # ONNX optimization level
+  onnx_optimization_level: 99  # All optimizations
+
+  # Quantization settings for CPU inference
+  quantization_mode: "dynamic"  # dynamic, static
+  quantization_weight_type: "QUInt8"
+
+labels:
+  # --- Task Management --
+  - "task_create"        # create or add a task
+  - "task_update"        # modify, complete, or delete a task
+  - "task_query"         # list, view, or search tasks
+
+  # --- Scheduling & Calendar ---
+  - "scheduling_create"  # create or plan new events
+  - "scheduling_modify"  # move, reschedule, adjust time blocks
+  - "event_query"        # list or view events, schedules, availability
+
+  # --- Email ---
+  - "email_draft"        # compose or reply to an email
+  - "email_summary"      # summarize inbox (LLM heavy)
+  - "email_query"        # list or search specific emails
+
+  # --- Briefing & Reminders ---
+  - "briefing_generate"  # daily/weekly summary
+  - "reminder_create"    # set a reminder
+  - "reminder_query"     # list or check reminders
+
+  # --- Search & App Information ---
+  - "search_query"       # web or knowledge search
+  - "app_info_query"     # info about app, pricing, or features
+  - "user_data_query"    # info about user's data or stats (tokens, progress)
+  - "adjust_preferences" # modify settings or scheduling preferences
+  - "status_query"       # how am I doing? daily/weekly progress
+
+  # --- Meta / Conversational ---
+  - "greeting"
+  - "thanks"
+  - "confirm"
+  - "cancel"
+  - "help"
+  - "chitchat"
+  - "unknown"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_path: "ml/intent_classifier/training.log"

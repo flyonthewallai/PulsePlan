@@ -16,25 +16,19 @@ from .types import (
 )
 
 from .main import (
-    WorkerManager,
-    create_worker_manager,
-    run_workers,
-    shutdown_workers
+    WorkerManager
 )
 
 __all__ = [
     # Worker types
     "JobStatus",
     "JobResult",
-    "EmailData", 
+    "EmailData",
     "BriefingData",
     "WeeklyPulseData",
-    
+
     # Worker management
     "WorkerManager",
-    "create_worker_manager",
-    "run_workers",
-    "shutdown_workers",
 ]
 
 

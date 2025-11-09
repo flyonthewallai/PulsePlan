@@ -40,6 +40,7 @@ __all__ = [
     "EmailServiceTool",
     "EmailDatabaseTool",
     "get_email_tool_factory",
+    "SystemEmailTool",
     
     # Scheduling tools
     "SchedulingDatabaseTool",

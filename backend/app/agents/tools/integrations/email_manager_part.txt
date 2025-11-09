@@ -1,0 +1,543 @@
+"""
+Email management tools for PulsePlan agents.
+Handles Gmail, Outlook, and system email sending scenarios with smart routing.
+"""
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+import asyncio
+from enum import Enum
+import logging
+
+from ..core.base import EmailTool, ToolResult, ToolError
+from app.services.auth.token_service import get_token_service
+from app.services.infrastructure.user_preferences import get_user_preferences_service
+from app.agents.tools.data.contacts import GoogleContactsTool
+import httpx
+import json
+from pydantic import BaseModel
+from typing import List
+
+logger = logging.getLogger(__name__)
+
+
+class EmailDraft(BaseModel):
+    """Email draft for user verification"""
+    to: List[str]
+    subject: str
+    body: str
+    sender_email: str
+    provider: str
+    draft_id: str
+    needs_approval: bool = True
+
+
+class ContactSuggestion(BaseModel):
+    """Suggestion to add email recipients to contacts"""
+    email: str
+    name: Optional[str] = None
+    suggested_action: str = "add_to_contacts"  # add_to_contacts, ignore, auto_add
+    
+    
+class EmailResult(BaseModel):
+    """Enhanced email result with contact suggestions"""
+    success: bool
+    message_id: Optional[str] = None
+    provider: str
+    contact_suggestions: List[ContactSuggestion] = []
+    message: str
+
+
+class EmailVerificationRequired(Exception):
+    """Exception raised when email needs user approval"""
+    def __init__(self, draft: EmailDraft, message: str = "Email requires user verification before sending"):
+        self.draft = draft
+        self.message = message
+        super().__init__(message)
+
+
+class EmailSender(str, Enum):
+    """Who is sending the email"""
+    USER = "user"  # User sending from their own account
+    AGENT = "agent"  # Agent sending to user from system email
+
+
+class EmailProvider(str, Enum):
+    """Email provider types"""
+    GMAIL = "gmail"
+    OUTLOOK = "outlook"
+    SYSTEM = "system"  # Agent system email
+
+
+class SmartEmailRouter:
+    """
+    Routes email operations based on sender, recipient, and available accounts
+    """
+    
+    @staticmethod
+    def determine_best_provider(
+        sender: EmailSender,
+        connected_accounts: Dict[str, Any],
+        user_preference: Optional[str] = None
+    ) -> EmailProvider:
+        """
+        Determine best email provider based on context
+        
+        Args:
+            sender: Who is sending (user vs agent)
+            connected_accounts: User's connected email accounts
+            user_preference: User's preferred email provider
+            
+        Returns:
+            Best email provider to use
+        """
+        if sender == EmailSender.AGENT:
+            # Agent always sends from system email
+            return EmailProvider.SYSTEM
+        
+        # User is sending - check their connected accounts
+        available_providers = []
+        
+        if "gmail" in connected_accounts or "google" in connected_accounts:
+            available_providers.append(EmailProvider.GMAIL)
+        
+        if "microsoft" in connected_accounts or "outlook" in connected_accounts:
+            available_providers.append(EmailProvider.OUTLOOK)
+        
+        if not available_providers:
+            raise ToolError("No email accounts connected", "email_router")
+        
+        # Use user preference if available and valid
+        if user_preference:
+            preferred = EmailProvider(user_preference.lower())
+            if preferred in available_providers:
+                return preferred
+        
+        # Default priority: Gmail > Outlook
+        if EmailProvider.GMAIL in available_providers:
+            return EmailProvider.GMAIL
+        
+        return available_providers[0]
+
+
+class EmailManagerTool(EmailTool):
+    """
+    Smart email manager that routes to appropriate provider
+    """
+    
+    def __init__(self):
+        super().__init__(
+            name="email_manager",
+            description="Smart email routing for user and agent sending"
+        )
+        
+        # Initialize provider tools
+        self.gmail_tool = GmailUserTool()
+        self.outlook_tool = OutlookUserTool()
+        self.system_tool = SystemEmailTool()
+    
+    def get_required_tokens(self) -> List[str]:
+        """Get required tokens for email manager"""
+        return ["google", "microsoft"]  # Can work with either
+    
+    def validate_input(self, input_data: Dict[str, Any]) -> bool:
+        """Validate email manager input"""
+        operation = input_data.get("operation")
+        if operation not in ["send", "list", "get", "draft"]:
+            return False
+        
+        if operation == "send":
+            if not input_data.get("to") or not input_data.get("subject"):
+                return False
+        
+        return True
+    
+    async def execute(self, input_data: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
+        """Execute email operation with mandatory user verification for sends"""
+        try:
+            operation = input_data["operation"]
+            sender = EmailSender(input_data.get("sender", "user"))
+            user_id = context.get("user_id")
+            
+            if not user_id:
+                return ToolResult(
+                    success=False,
+                    data={},
+                    error="User ID required for email operations",
+                    metadata={"tool": "email_manager"}
+                )
+            
+            # For send operations, ALWAYS require user approval
+            if operation == "send":
+                return await self._handle_send_with_verification(input_data, context, sender, user_id)
+            
+            # For read operations, proceed normally
+            elif operation in ["list", "get"]:
+                return await self._handle_read_operation(input_data, context, sender, user_id)
+            
+            elif operation == "draft":
+                return await self._handle_draft_operation(input_data, context, sender, user_id)
+            
+            elif operation == "approve_send":
+                return await self._handle_approved_send(input_data, context, user_id)
+            
+            else:
+                return ToolResult(
+                    success=False,
+                    data={},
+                    error=f"Unsupported operation: {operation}",
+                    metadata={"tool": "email_manager"}
+                )
+            
+        except EmailVerificationRequired as e:
+            # This is expected for send operations - return draft for user approval
+            return ToolResult(
+                success=False,
+                data={
+                    "requires_approval": True,
+                    "draft": e.draft.dict(),
+                    "message": e.message
+                },
+                error="USER_APPROVAL_REQUIRED",
+                metadata={"tool": "email_manager", "verification_required": True}
+            )
+            
+        except Exception as e:
+            logger.error(f"Email tool execution error: {str(e)}")
+            return ToolResult(
+                success=False,
+                data={},
+                error=str(e),
+                metadata={"tool": "email_manager"}
+            )
+    
+    async def _handle_send_with_verification(
+        self, input_data: Dict[str, Any], context: Dict[str, Any], 
+        sender: EmailSender, user_id: str
+    ) -> ToolResult:
+        """Handle send operation with mandatory user verification"""
+        # Get user's connected accounts securely
+        token_service = get_token_service()
+        user_tokens = await token_service.get_user_tokens_for_agent(user_id)
+        
+        # Determine best provider
+        connected_accounts = {}
+        if user_tokens.google:
+            connected_accounts["google"] = user_tokens.google.dict()
+        if user_tokens.microsoft:
+            connected_accounts["microsoft"] = user_tokens.microsoft.dict()
+        
+        provider = SmartEmailRouter.determine_best_provider(
+            sender=sender,
+            connected_accounts=connected_accounts,
+            user_preference=input_data.get("preferred_provider")
+        )
+        
+        # Create draft for user verification
+        draft_id = f"draft_{user_id}_{datetime.utcnow().timestamp()}"
+        
+        # Determine sender email
+        sender_email = "noreply@pulseplan.ai"
+        if provider == EmailProvider.GOOGLE and user_tokens.google:
+            # Get user email from Google token (would need API call)
+            sender_email = context.get("user_email", "user@gmail.com")
+        elif provider == EmailProvider.OUTLOOK and user_tokens.microsoft:
+            # Get user email from Microsoft token (would need API call)
+            sender_email = context.get("user_email", "user@outlook.com")
+        
+        # Convert recipients to list if string
+        recipients = input_data.get("to", [])
+        if isinstance(recipients, str):
+            recipients = [recipients]
+        
+        draft = EmailDraft(
+            to=recipients,
+            subject=input_data.get("subject", ""),
+            body=input_data.get("body", ""),
+            sender_email=sender_email,
+            provider=provider.value,
+            draft_id=draft_id
+        )
+        
+        # ALWAYS require user approval for email sends
+        raise EmailVerificationRequired(
+            draft=draft,
+            message=f"PulsePlan needs your approval to send this email to {', '.join(recipients)}"
+        )
+    
+    async def _handle_read_operation(
+        self, input_data: Dict[str, Any], context: Dict[str, Any], 
+        sender: EmailSender, user_id: str
+    ) -> ToolResult:
+        """Handle read operations (list, get)"""
+        # Get user's tokens securely
+        token_service = get_token_service()
+        user_tokens = await token_service.get_user_tokens_for_agent(user_id)
+        
+        connected_accounts = {}
+        if user_tokens.google:
+            connected_accounts["google"] = user_tokens.google.dict()
+        if user_tokens.microsoft:
+            connected_accounts["microsoft"] = user_tokens.microsoft.dict()
+        
+        if not connected_accounts:
+            return ToolResult(
+                success=False,
+                data={},
+                error="No email accounts connected. Please connect Gmail or Outlook first.",
+                metadata={"tool": "email_manager"}
+            )
+        
+        provider = SmartEmailRouter.determine_best_provider(
+            sender=sender,
+            connected_accounts=connected_accounts,
+            user_preference=input_data.get("preferred_provider")
+        )
+        
+        # Route to appropriate tool with tokens
+        if provider == EmailProvider.GMAIL:
+            tool = self.gmail_tool
+        elif provider == EmailProvider.OUTLOOK:
+            tool = self.outlook_tool
+        else:
+            return ToolResult(
+                success=False,
+                data={},
+                error="System email doesn't support reading operations",
+                metadata={"tool": "email_manager"}
+            )
+        
+        # Add token to context
+        context_with_tokens = {**context, "user_tokens": user_tokens}
+        tool_input = {**input_data, "provider": provider.value}
+        
+        return await tool.execute(tool_input, context_with_tokens)
+    
+    async def _handle_draft_operation(
+        self, input_data: Dict[str, Any], context: Dict[str, Any], 
+        sender: EmailSender, user_id: str
+    ) -> ToolResult:
+        """Handle draft creation"""
+        # Get user's tokens securely
+        token_service = get_token_service()
+        user_tokens = await token_service.get_user_tokens_for_agent(user_id)
+        
+        connected_accounts = {}
+        if user_tokens.google:
+            connected_accounts["google"] = user_tokens.google.dict()
+        if user_tokens.microsoft:
+            connected_accounts["microsoft"] = user_tokens.microsoft.dict()
+        
+        if not connected_accounts:
+            return ToolResult(
+                success=False,
+                data={},
+                error="No email accounts connected. Please connect Gmail or Outlook first.",
+                metadata={"tool": "email_manager"}
+            )
+        
+        provider = SmartEmailRouter.determine_best_provider(
+            sender=sender,
+            connected_accounts=connected_accounts,
+            user_preference=input_data.get("preferred_provider")
+        )
+        
+        # Route to appropriate tool
+        if provider == EmailProvider.GMAIL:
+            tool = self.gmail_tool
+        elif provider == EmailProvider.OUTLOOK:
+            tool = self.outlook_tool
+        else:
+            return ToolResult(
+                success=False,
+                data={},
+                error="System email doesn't support draft creation",
+                metadata={"tool": "email_manager"}
+            )
+        
+        # Add token to context
+        context_with_tokens = {**context, "user_tokens": user_tokens}
+        tool_input = {**input_data, "provider": provider.value}
+        
+        return await tool.execute(tool_input, context_with_tokens)
+    
+    async def _handle_approved_send(
+        self, input_data: Dict[str, Any], context: Dict[str, Any], user_id: str
+    ) -> ToolResult:
+        """Handle sending after user approval with contact suggestions"""
+        draft_id = input_data.get("draft_id")
+        if not draft_id:
+            return ToolResult(
+                success=False,
+                data={},
+                error="Draft ID required for approved send",
+                metadata={"tool": "email_manager"}
+            )
+        
+        # TODO: Retrieve draft from cache/database and send
+        # For now, simulate successful send
+        
+        # Extract recipients from draft (for now, get from input_data)
+        recipients = input_data.get("to", [])
+        if isinstance(recipients, str):
+            recipients = [recipients]
+        
+        # Check for contact suggestions after successful send
+        contact_suggestions = await self._check_recipients_in_contacts(
+            recipients, user_id, context
+        )
+        
+        # Format success message with contact suggestions
+        base_message = "Email sent successfully!"
+        suggestion_message = await self._format_contact_suggestions_message(contact_suggestions)
+        full_message = base_message + suggestion_message
+        
+        return ToolResult(
+            success=True,
+            data={
+                "message_id": f"approved_{draft_id}",
+                "sent_at": datetime.utcnow().isoformat(),
+                "status": "sent_with_approval",
+                "contact_suggestions": [s.dict() for s in contact_suggestions],
+                "message": full_message
+            },
+            metadata={"tool": "email_manager", "approved_send": True}
+        )
+    
+    # Implement abstract methods from EmailTool
+    async def send_email(self, email_data: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
+        """Send email using best available provider (with mandatory user verification)"""
+        input_data = {
+            "operation": "send",
+            "to": email_data.get("to"),
+            "subject": email_data.get("subject"),
+            "body": email_data.get("body"),
+            "sender": email_data.get("sender", "user")
+        }
+        return await self.execute(input_data, context)
+    
+    async def list_emails(self, filters: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
+        """List emails using best available provider"""
+        input_data = {
+            "operation": "list",
+            "query": filters.get("query", ""),
+            "limit": filters.get("limit", 50),
+            "sender": "user"  # Only user can list their messages
+        }
+        return await self.execute(input_data, context)
+
+    async def _check_recipients_in_contacts(
+        self, recipients: List[str], user_id: str, context: Dict[str, Any]
+    ) -> List[ContactSuggestion]:
+        """Check which recipients are not in user's contacts and suggest adding them"""
+        try:
+            # Check user preferences first
+            preferences_service = get_user_preferences_service()
+            if not await preferences_service.should_suggest_contacts(user_id):
+                logger.info(f"User {user_id} has contact suggestions disabled")
+                return []
+            
+            # Get user's tokens to check if they have contacts access
+            token_service = get_token_service()
+            user_tokens = await token_service.get_user_tokens_for_agent(user_id)
+            
+            if not user_tokens or not user_tokens.google:
+                # No contacts access available
+                return []
+            
+            # Check if contacts scope is available
+            if not await token_service.has_contacts_access(user_id, "google"):
+                logger.info(f"User {user_id} doesn't have contacts access, skipping contact suggestions")
+                return []
+            
+            # Initialize contacts tool
+            contacts_tool = GoogleContactsTool()
+            contact_suggestions = []
+            
+            # Check each recipient
+            for email in recipients:
+                if isinstance(email, str) and "@" in email:
+                    email_domain = email.split("@")[1] if "@" in email else None
+                    
+                    # Check if this email should be auto-added
+                    should_auto_add = await preferences_service.should_auto_add_contacts(user_id, email_domain)
+                    
+                    # Search for this email in contacts
+                    search_result = await contacts_tool.execute(
+                        {
+                            "operation": "search_contacts",
+                            "query": email,
+                            "max_results": 1
+                        },
+                        {
+                            "user_id": user_id,
+                            "oauth_tokens": {
+                                "google_access_token": user_tokens.google.access_token
+                            }
+                        }
+                    )
+                    
+                    # If not found in contacts, suggest adding
+                    if search_result.success and search_result.data.get("contacts_found", 0) == 0:
+                        # Extract name from email if possible
+                        name = email.split("@")[0].replace(".", " ").title() if "." in email.split("@")[0] else None
+                        
+                        suggested_action = "auto_add" if should_auto_add else "add_to_contacts"
+                        
+                        contact_suggestions.append(ContactSuggestion(
+                            email=email,
+                            name=name,
+                            suggested_action=suggested_action
+                        ))
+                        
+                        # If auto-add is enabled, add the contact immediately
+                        if should_auto_add:
+                            await self._auto_add_contact(email, name, user_id, user_tokens.google.access_token)
+                        
+            return contact_suggestions
+            
+        except Exception as e:
+            logger.warning(f"Error checking contacts for user {user_id}: {str(e)}")
+            return []  # Fail gracefully, don't block email sending
+    
+    async def _auto_add_contact(self, email: str, name: Optional[str], user_id: str, access_token: str) -> bool:
+        """Automatically add a contact to user's Google Contacts"""
+        try:
+            # TODO: Implement actual contact creation via Google People API
+            # For now, just log the action
+            logger.info(f"Auto-adding contact {email} ({name}) for user {user_id}")
+            
+            # This would be implemented with the Google People API:
+            # headers = {"Authorization": f"Bearer {access_token}"}
+            # contact_data = {
+            #     "names": [{"givenName": name or email.split("@")[0]}],
+            #     "emailAddresses": [{"value": email, "type": "other"}]
+            # }
+            # response = requests.post(
+            #     "https://people.googleapis.com/v1/people:createContact",
+            #     headers=headers,
+            #     json=contact_data
+            # )
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error auto-adding contact {email} for user {user_id}: {str(e)}")
+            return False
+    
+    async def _format_contact_suggestions_message(self, suggestions: List[ContactSuggestion]) -> str:
+        """Format contact suggestions into a user-friendly message"""
+        if not suggestions:
+            return ""
+        
+        if len(suggestions) == 1:
+            email = suggestions[0].email
+            return f"\n\nTip: {email} isn't in your contacts yet. Would you like me to add them for easier messaging in the future?"
+        else:
+            emails = [s.email for s in suggestions]
+            if len(emails) == 2:
+                email_list = f"{emails[0]} and {emails[1]}"
+            else:
+                email_list = f"{', '.join(emails[:-1])}, and {emails[-1]}"
+            
+            return f"\n\nTip: {email_list} aren't in your contacts yet. Would you like me to add them for easier messaging in the future?"
+

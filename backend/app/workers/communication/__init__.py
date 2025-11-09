@@ -9,20 +9,12 @@ This module contains all communication-related worker functionality including:
 
 from .email_service import (
     EmailService,
-    get_email_service,
-    send_briefing_email,
-    send_notification_email,
-    send_weekly_pulse_email,
-    validate_email_delivery
+    get_email_service
 )
 
 __all__ = [
     "EmailService",
     "get_email_service",
-    "send_briefing_email", 
-    "send_notification_email",
-    "send_weekly_pulse_email",
-    "validate_email_delivery",
 ]
 
 

@@ -8,11 +8,13 @@ import os
 
 try:
     import resend
+    from resend import Emails
     resend.api_key = os.getenv("RESEND_API_KEY")
     if not resend.api_key:
         raise ValueError("RESEND_API_KEY environment variable is required")
 except ImportError:
     resend = None
+    Emails = None
 
 from ..core.types import EmailData, BriefingData, WeeklyPulseData
 
@@ -23,7 +25,7 @@ class EmailService:
     """Email service using Resend API"""
     
     def __init__(self):
-        if not resend:
+        if not resend or not Emails:
             raise ImportError("resend package is required. Install with: pip install resend")
         
         # resend.api_key is already set in the import block above
@@ -33,7 +35,7 @@ class EmailService:
     async def send_email(self, email_data: EmailData) -> Dict[str, Any]:
         """Send email using Resend API"""
         try:
-            response = self.resend.emails.send({
+            response = Emails.send({
                 "from": email_data.from_email or self.from_email,
                 "to": email_data.to,
                 "subject": email_data.subject,
@@ -103,54 +105,71 @@ class EmailService:
     
     def _generate_daily_briefing_html(self, user_name: str, data: Dict[str, Any]) -> str:
         """Generate HTML for daily briefing email"""
-        # Extract data with fallbacks
-        summary = data.get("summary", "Your briefing is ready!")
-        tasks = data.get("todays_tasks", data.get("tasks", []))
-        events = data.get("upcoming_events", data.get("events", []))
-        recommendations = data.get("recommendations", [])
-        weather = data.get("weather", {})
+        # Debug logging to see what data we're receiving
+        logger.info(f"Email service received data keys: {list(data.keys())}")
+        if "briefing" in data:
+            logger.info(f"Briefing data keys: {list(data['briefing'].keys())}")
+            if "content_sections" in data["briefing"]:
+                logger.info(f"Content sections keys: {list(data['briefing']['content_sections'].keys())}")
         
-        # Convert agent data to expected format
-        formatted_tasks = []
-        if isinstance(tasks, list):
-            for task in tasks:
-                if isinstance(task, dict):
-                    formatted_tasks.append({
-                        "title": task.get("title", str(task)),
-                        "due_time": task.get("due_date", task.get("due_time"))
-                    })
-                else:
-                    formatted_tasks.append({"title": str(task)})
+        # Extract briefing content from workflow output
+        # The content is nested in content_sections.synthesized_content
+        content_sections = data.get("briefing", {}).get("content_sections", {})
+        briefing_content = content_sections.get("synthesized_content", content_sections)
+
+        # Get sections from workflow
+        greeting = briefing_content.get("greeting", "Good morning!")
+        email_summary = briefing_content.get("email_summary", "No email updates")
+        calendar_overview = briefing_content.get("calendar_overview", "No calendar events")
+        task_status = briefing_content.get("task_status", "No tasks")
+        priority_items = briefing_content.get("priority_items", [])
+        recommendations = briefing_content.get("recommendations", [])
         
-        formatted_events = []
-        if isinstance(events, list):
-            for event in events:
-                if isinstance(event, dict):
-                    formatted_events.append({
-                        "title": event.get("title", str(event)),
-                        "start_time": event.get("start_time", event.get("start"))
-                    })
-                else:
-                    formatted_events.append({"title": str(event)})
+        # Extract tasks due today from priority_items for better formatting
+        # Priority items are dictionaries with 'title', 'due', 'priority' fields
+        tasks_due_today = []
+        for item in priority_items:
+            if isinstance(item, dict):
+                # Check if task is due today
+                due_text = item.get('due', '')
+                if 'today' in str(due_text).lower():
+                    tasks_due_today.append(item.get('title', 'Untitled Task'))
+            elif isinstance(item, str) and "due today" in item.lower():
+                tasks_due_today.append(item)
+
+        # Format tasks due today with bullets
+        if tasks_due_today:
+            tasks_formatted = "<br/>".join([f"• {task}" for task in tasks_due_today])
+            task_status_formatted = f"Tasks due today:<br/>{tasks_formatted}"
+        else:
+            task_status_formatted = task_status  # Use the summary from task_status
         
-        # Get first task
-        first_task = formatted_tasks[0]["title"] if formatted_tasks else "No tasks scheduled"
+        # Debug logging to see extracted values
+        logger.info(f"Extracted email_summary: {email_summary}")
+        logger.info(f"Extracted calendar_overview: {calendar_overview}")
+        logger.info(f"Extracted task_status: {task_status}")
+        logger.info(f"Extracted priority_items: {priority_items}")
+        logger.info(f"Extracted recommendations: {recommendations}")
         
-        # Get meeting summary
-        meetings = [event for event in formatted_events if "meeting" in event.get("title", "").lower()]
-        meeting_summary = f"{len(meetings)} meetings scheduled" if meetings else "No meetings today"
+        # Format priority items - handle both dict and string formats
+        def format_priority_item(item):
+            if isinstance(item, dict):
+                title = item.get('title', 'Untitled')
+                due = item.get('due', '')
+                priority = item.get('priority', 'medium')
+                return f"{title} (Due: {due})"
+            return str(item)
+
+        priority_1 = format_priority_item(priority_items[0]) if len(priority_items) > 0 else "Focus on your most important work"
+        priority_2 = format_priority_item(priority_items[1]) if len(priority_items) > 1 else "Review and plan tomorrow"
+        priority_3 = format_priority_item(priority_items[2]) if len(priority_items) > 2 else "Take breaks and stay hydrated"
         
-        # Get free time blocks (simplified)
-        free_time_blocks = data.get("free_time_blocks", "Morning: 9-11 AM, Afternoon: 2-4 PM")
-        
-        # Get top 3 priorities
-        priorities = formatted_tasks[:3] if len(formatted_tasks) >= 3 else formatted_tasks
-        priority_1 = priorities[0]["title"] if len(priorities) > 0 else "Focus on your most important work"
-        priority_2 = priorities[1]["title"] if len(priorities) > 1 else "Review and plan tomorrow"
-        priority_3 = priorities[2]["title"] if len(priorities) > 2 else "Take breaks and stay hydrated"
-        
-        # Get reschedule summary
-        reschedule_summary = data.get("reschedule_summary", "No changes to your schedule today.")
+        # Format recommendations
+        recommendation_text = ""
+        if recommendations:
+            recommendation_text = "• " + "\\n• ".join(recommendations)
+        else:
+            recommendation_text = "• Stay focused and productive\\n• Take regular breaks\\n• Review your goals"
         
         return f'''
         <!DOCTYPE html>
@@ -206,11 +225,34 @@ class EmailService:
                 .spacer {{ 
                     margin: 20px 0;
                 }}
+                .logo {{ 
+                    text-align: left;
+                    margin-bottom: 30px;
+                }}
+                .logo img {{ 
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 12px;
+                }}
+                @media (max-width: 480px) {{
+                    .logo {{ 
+                        text-align: center;
+                        margin-bottom: 20px;
+                    }}
+                    .logo img {{ 
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 10px;
+                    }}
+                }}
             </style>
         </head>
         <body>
             <div class="container">
-                <div class="greeting">Good morning, {user_name.split()[0] if user_name else 'there'}</div>
+                <div class="logo">
+                    <img src="https://www.pulseplan.app/assets/logo.png" alt="PulsePlan - AI Productivity Assistant" />
+                </div>
+                <div class="greeting" style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">Good morning, {user_name.split()[0] if user_name else 'there'}!</div>
                 
                 <div>Here's your morning briefing</div>
                 
@@ -221,35 +263,20 @@ class EmailService:
                 <div class="spacer"></div>
                 <div class="spacer"></div>
                 
-                <div class="section-title">Today's Schedule</div>
+                <div class="section-title">📅 Calendar Events</div>
+                <div class="content-block">{calendar_overview}</div>
+                <div style="border-top: 1px solid #e5e7eb; margin: 15px 0;"></div>
+                
+                <div class="spacer"></div>
+                
+                <div class="section-title">✅ Tasks</div>
+                <div class="content-block">{task_status_formatted}</div>
+                <div style="border-top: 1px solid #e5e7eb; margin: 15px 0;"></div>
                 
                 <div class="spacer"></div>
                 <div class="spacer"></div>
                 
-                <div class="content-block">
-                    <strong>First task:</strong> {first_task}
-                </div>
-                
-                <div class="spacer"></div>
-                
-                <div class="content-block">
-                    <strong>Meetings:</strong> {meeting_summary}
-                </div>
-                
-                <div class="spacer"></div>
-                
-                <div class="content-block">
-                    <strong>Free time blocks:</strong> {free_time_blocks}
-                </div>
-                
-                <div class="spacer"></div>
-                
-                <div style="font-style: italic;">(Want to restructure your day? Just ask!)</div>
-                
-                <div class="spacer"></div>
-                <div class="spacer"></div>
-                
-                <div class="section-title">Top Priorities for Today</div>
+                <div class="section-title">🎯 Top Priorities for Today</div>
                 
                 <div class="spacer"></div>
                 <div class="spacer"></div>
@@ -264,13 +291,18 @@ class EmailService:
                 
                 <div class="content-block">{priority_3}</div>
                 
-                <div class="spacer"></div>
+                <div style="border-top: 1px solid #e5e7eb; margin: 15px 0;"></div>
+                
                 <div class="spacer"></div>
                 
-                <div class="section-title">Changes to Your Plan</div>
+                <div class="section-title">💡 Recommendations</div>
+                <div class="content-block">{recommendation_text}</div>
+                <div style="border-top: 1px solid #e5e7eb; margin: 15px 0;"></div>
                 
-                <div class="content-block">{reschedule_summary}</div>
-                <div style="font-style: italic;">(All changes are already reflected in your dashboard.)</div>
+                <div class="spacer"></div>
+                
+                <div class="section-title">📧 Email Summary</div>
+                <div class="content-block">{email_summary}</div>
                 
                 <div class="spacer"></div>
                 <div class="spacer"></div>
@@ -416,13 +448,34 @@ class EmailService:
                     border-radius: 6px;
                     font-weight: 500;
                 }}
+                .logo {{ 
+                    text-align: left;
+                    margin-bottom: 20px;
+                }}
+                .logo img {{ 
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 10px;
+                }}
                 @media (max-width: 480px) {{
                     .stats {{ grid-template-columns: 1fr; }}
+                    .logo {{ 
+                        text-align: center;
+                        margin-bottom: 15px;
+                    }}
+                    .logo img {{ 
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 8px;
+                    }}
                 }}
             </style>
         </head>
         <body>
             <div class="container">
+                <div class="logo">
+                    <img src="https://www.pulseplan.app/assets/logo.png" alt="PulsePlan - AI Productivity Assistant" />
+                </div>
                 <div class="header">
                     <h1>Weekly Pulse</h1>
                     <p>Your productivity summary for {user_name}</p>

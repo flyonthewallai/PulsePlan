@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 # Enable debug logging for Canvas jobs
 logging.getLogger("app.jobs.canvas_backfill_job").setLevel(logging.DEBUG)
 
-# Configuration - Hardcoded for easy testing
+# Configuration - Token should be stored in database via canvas_token_service
+# This test retrieves the token from the database for the test user
 CANVAS_URL = "https://canvas.colorado.edu"
-CANVAS_API_TOKEN = "10772~eE7y7mGTBt2EyJaBzU8Kht3mxh8tMueA2wHKNnfYDmFexttDftmBwYKyKBNQQrMe"
 USER_ID = "4dd1cef4-a1e9-4b34-a711-1a1e17adbd83"
 
 
@@ -32,8 +32,16 @@ async def test_canvas_token_validation():
         logger.info("Testing Canvas token validation with real API...")
         token_service = get_canvas_token_service()
 
-        # Test direct token validation
-        is_valid = await token_service.validate_token_direct(CANVAS_URL, CANVAS_API_TOKEN)
+        # Retrieve token from database
+        token_data = await token_service.retrieve_canvas_token(USER_ID)
+        if not token_data:
+            logger.error("❌ No Canvas token found in database for test user")
+            logger.info("   Please store a Canvas token first using store_canvas_token()")
+            return False
+
+        canvas_url = token_data.get("base_url", CANVAS_URL)
+        # Token is encrypted in DB, validate using the service method
+        is_valid = await token_service.validate_token(USER_ID)
 
         if is_valid:
             logger.info("✅ Canvas API token is valid!")
@@ -48,27 +56,18 @@ async def test_canvas_token_validation():
 
 
 async def test_canvas_token_storage():
-    """Test Canvas token storage and retrieval with real token"""
+    """Test Canvas token storage and retrieval"""
     try:
         from app.services.integrations.canvas_token_service import get_canvas_token_service
 
-        logger.info("Testing Canvas token storage...")
+        logger.info("Testing Canvas token storage and retrieval...")
         token_service = get_canvas_token_service()
 
-        # Test storing token
-        result = await token_service.store_canvas_token(
-            user_id=USER_ID,
-            canvas_url=CANVAS_URL,
-            api_token=CANVAS_API_TOKEN
-        )
-
-        logger.info(f"Token storage result: {result['success']}")
-
-        # Test retrieving token
+        # Test retrieving token from database
         retrieved = await token_service.retrieve_canvas_token(USER_ID)
 
         if retrieved:
-            logger.info("✅ Token stored and retrieved successfully")
+            logger.info("✅ Token retrieved successfully from database")
             logger.info(f"Base URL: {retrieved['base_url']}")
             logger.info(f"Status: {retrieved['status']}")
 
@@ -81,7 +80,9 @@ async def test_canvas_token_storage():
 
             return test_valid
         else:
-            logger.error("❌ Failed to retrieve token")
+            logger.warning("⚠️ No token found in database for test user")
+            logger.info("   To test token storage, first store a token using:")
+            logger.info(f"   await token_service.store_canvas_token(user_id='{USER_ID}', canvas_url='{CANVAS_URL}', api_token='YOUR_TOKEN')")
             return False
 
     except Exception as e:
@@ -93,57 +94,32 @@ async def test_canvas_api_calls():
     """Test actual Canvas API calls"""
     try:
         import httpx
+        from app.services.integrations.canvas_token_service import get_canvas_token_service
 
         logger.info("Testing Canvas API calls...")
 
-        headers = {"Authorization": f"Bearer {CANVAS_API_TOKEN}"}
-
-        # Test user info
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{CANVAS_URL}/api/v1/users/self", headers=headers)
-
-        if response.status_code == 200:
-            user_data = response.json()
-            logger.info(f"✅ Connected to Canvas as: {user_data.get('name', 'Unknown')}")
-
-            # Test courses
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{CANVAS_URL}/api/v1/courses",
-                    headers=headers,
-                    params={"enrollment_type": "student", "enrollment_state": "active"}
-                )
-
-            if response.status_code == 200:
-                courses = response.json()
-                logger.info(f"✅ Found {len(courses)} courses")
-
-                if courses:
-                    # Test assignments for first course
-                    first_course = courses[0]
-                    course_id = first_course["id"]
-                    course_name = first_course.get("name", "Unknown Course")
-
-                    async with httpx.AsyncClient() as client:
-                        response = await client.get(
-                            f"{CANVAS_URL}/api/v1/courses/{course_id}/assignments",
-                            headers=headers,
-                            params={"per_page": 5}
-                        )
-
-                    if response.status_code == 200:
-                        assignments = response.json()
-                        logger.info(f"✅ Found {len(assignments)} assignments in '{course_name}'")
-
-                        for assignment in assignments[:3]:  # Show first 3
-                            logger.info(f"   - {assignment.get('name', 'Unnamed')} (ID: {assignment.get('id')})")
-
-                        return True
-
-            return True
-        else:
-            logger.error(f"❌ Canvas API call failed: {response.status_code}")
+        # Retrieve token from database
+        token_service = get_canvas_token_service()
+        token_data = await token_service.retrieve_canvas_token(USER_ID)
+        if not token_data:
+            logger.error("❌ No Canvas token found in database for test user")
             return False
+
+        # Get decrypted token for API calls
+        # Note: The service should provide a method to get the decrypted token
+        # For now, we'll use the validation which internally uses the token
+        canvas_url = token_data.get("base_url", CANVAS_URL)
+        
+        # Test token validation (which makes API calls internally)
+        is_valid = await token_service.validate_token(USER_ID)
+        if not is_valid:
+            logger.error("❌ Canvas token is invalid")
+            return False
+
+        logger.info("✅ Canvas API token is valid and can make API calls")
+        # Additional API testing can be done through the Canvas service methods
+        # which handle token retrieval and decryption internally
+        return True
 
     except Exception as e:
         logger.error(f"Canvas API test failed: {e}")
@@ -157,15 +133,15 @@ async def test_canvas_backfill_job():
 
         logger.info("Testing Canvas backfill job...")
 
-        # First store the token
+        # Verify token exists in database
         from app.services.integrations.canvas_token_service import get_canvas_token_service
         token_service = get_canvas_token_service()
 
-        await token_service.store_canvas_token(
-            user_id=USER_ID,
-            canvas_url=CANVAS_URL,
-            api_token=CANVAS_API_TOKEN
-        )
+        token_data = await token_service.retrieve_canvas_token(USER_ID)
+        if not token_data:
+            logger.error("❌ No Canvas token found in database for test user")
+            logger.info("   Please store a Canvas token first before running backfill test")
+            return False
 
         # Run backfill job
         backfill_job = get_canvas_backfill_job()

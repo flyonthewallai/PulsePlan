@@ -111,26 +111,36 @@ User Query → Agent Router → Specialized Graph → Tool Execution → Respons
 PulsePlan/
 ├── backend/                    # Python FastAPI backend with LangGraph agents
 │   ├── app/
-│   │   ├── agents/            # LangGraph agent system
-│   │   │   ├── graphs/        # Specialized workflow graphs
-│   │   │   ├── nodes/         # Agent execution nodes
-│   │   │   ├── tools/         # 15+ AI agent tools
+│   │   ├── agents/            # LangGraph multi-agent system
+│   │   │   ├── core/          # Orchestration (intent, driver, gates, continuation)
+│   │   │   ├── graphs/        # Workflow implementations (email, chat)
+│   │   │   ├── nlu/           # Intent classification models
+│   │   │   ├── services/      # Action execution, planning, NLU
+│   │   │   ├── tools/         # Integration tools (calendar, email, Canvas)
 │   │   │   └── orchestrator.py
 │   │   ├── api/v1/           # REST API endpoints
-│   │   ├── jobs/             # Background job system
-│   │   ├── memory/           # Vector memory system
-│   │   ├── scheduler/        # Intelligent scheduling engine
+│   │   │   └── endpoints/    # Domain-specific endpoints
+│   │   ├── database/         # Supabase models and repositories
+│   │   ├── integrations/     # External integrations
+│   │   │   └── providers/    # Calendar providers (Google, Microsoft)
+│   │   ├── jobs/             # Background jobs (Canvas sync, etc.)
+│   │   ├── memory/           # Dual-layer memory (pgvector + Redis)
+│   │   ├── scheduler/        # OR-Tools scheduling engine
 │   │   ├── services/         # Business logic layer
-│   │   └── workers/          # Background task processing
+│   │   ├── workers/          # APScheduler workers
+│   │   └── security/         # Encryption and auth services
 │   ├── docs/                 # Technical documentation
 │   └── tests/               # Comprehensive test suite
-├── src/                     # React Native mobile app (Expo)
-│   ├── app/                # App router and screens
-│   ├── components/         # Reusable UI components
-│   ├── contexts/          # State management
-│   ├── hooks/            # Custom React hooks
-│   └── services/        # API integration layer
-└── server/             # Legacy Node.js server (being migrated)
+├── web/                     # React web app (Vite + TypeScript)
+│   ├── src/
+│   │   ├── components/      # Reusable UI components
+│   │   ├── contexts/        # React contexts for state
+│   │   ├── features/        # Feature-based modules
+│   │   ├── hooks/           # Custom React hooks
+│   │   ├── pages/           # Page components
+│   │   └── services/        # API integration layer
+│   └── public/             # Static assets
+└── setup.sh               # Cross-platform setup script
 ```
 
 ---
@@ -145,7 +155,7 @@ PulsePlan/
 | **Scheduling Engine** | OR-Tools CP-SAT + Constraint Programming + ML    |
 | **Memory System**     | Dual-layer: pgvector + Redis + OpenAI Embeddings |
 | **Learning Models**   | Contextual Bandits + Logistic Regression         |
-| **Frontend**          | React Native (Expo 53) + TypeScript              |
+| **Frontend**          | React + Vite + TypeScript + Tailwind CSS         |
 | **Database**          | Supabase (PostgreSQL) + Row Level Security       |
 | **Caching**           | Redis + Multi-layer caching strategy             |
 | **Authentication**    | Supabase Auth + JWT + OAuth2                     |
@@ -162,49 +172,70 @@ PulsePlan/
 
 - Python 3.11+
 - Node.js 18+
-- Docker (optional)
+- Redis (for caching)
 - Supabase account
 - OpenAI API key
-- Google/Microsoft OAuth credentials (for integrations)
+- Google OAuth credentials (for Calendar integration)
+- Canvas API key (for LMS integration)
 
-### Backend Setup (LangGraph Agents)
+### Easy Setup (Recommended)
 
 ```bash
-# 1. Clone repository
+# Clone repository
 git clone https://github.com/flyonthewall-dev/pulseplan.git
-cd PulsePlan/backend
+cd PulsePlan
 
-# 2. Python environment
+# Run automated setup script (cross-platform)
+./setup.sh
+
+# Follow the interactive prompts to configure:
+# - Python environment
+# - Node.js dependencies
+# - Environment variables
+# - Database migrations
+```
+
+### Manual Setup
+
+#### Backend (Python FastAPI + LangGraph)
+
+```bash
+cd backend
+
+# 1. Create Python virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Environment configuration
+# 3. Configure environment
 cp .env.example .env
-# Edit .env with your credentials
+# Edit .env with your API keys and credentials
 
-# 4. Database setup
-# Configure Supabase connection in .env
-python -m app.database.migrations
-
-# 5. Start the backend
+# 4. Start backend server
 python main.py
+# Backend runs on http://localhost:8000
 ```
 
-### Frontend Setup (React Native)
+#### Frontend (React Web App)
 
 ```bash
-# 1. Frontend dependencies
-cd ../src
+cd web
+
+# 1. Install dependencies
 npm install
 
-# 2. Configure app.json with backend URL and Supabase credentials
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with backend URL and Supabase credentials
 
-# 3. Start Expo development server
-npx expo start
+# 3. Start development server
+npm run dev
+# Frontend runs on http://localhost:5173
 ```
 
-### Docker Setup (Recommended)
+### Docker Setup (Alternative)
 
 ```bash
 # Full stack with Docker Compose
@@ -345,45 +376,50 @@ PulsePlan features a sophisticated scheduling system built on OR-Tools constrain
 
 ## 📊 Background Job System
 
-### **Automated Jobs**
+### **Automated Jobs (APScheduler)**
 
-- **Nightly Canvas Sync** – Automated assignment and course synchronization with batch processing
-- **Calendar Refresh** – OAuth token refresh and calendar event updates
+**Calendar Sync Workers:**
+- **Incremental Pulls** – Every 20 minutes during user active hours (respects timezone + working_hours)
+- **Watch Renewals** – Every hour for Google Calendar webhook channels expiring within 12 hours
+- **Discovery** – Periodic calendar discovery and primary write calendar setup
+
+**Canvas Integration:**
+- **Backfill Job** – Initial full sync of courses, assignments, and submissions
+- **Delta Sync** – Incremental updates based on last sync timestamp
+- **Auto-Ingestion** – Processes academic data into memory system
+
+**Memory & Analytics:**
 - **Memory Processing** – Semantic indexing, embedding generation, and namespace management
 - **Analytics Generation** – Weekly pulse analytics and productivity insights
-- **Learning Model Updates** – Completion prediction and bandit model training
-- **Cache Management** – Intelligent cache warming, cleanup, and optimization
 - **Profile Snapshots** – Periodic user behavior analysis and preference updates
 
-### **Job Configuration**
-
-```python
-# Configurable job schedules
-CANVAS_SYNC_SCHEDULE = "0 2 * * *"        # Daily at 2 AM
-WEEKLY_PULSE_SCHEDULE = "0 6 * * 1"       # Monday at 6 AM
-CALENDAR_SYNC_SCHEDULE = "*/30 * * * *"    # Every 30 minutes
-MODEL_UPDATE_SCHEDULE = "0 4 * * *"       # Daily at 4 AM
-PROFILE_SNAPSHOT_SCHEDULE = "0 3 * * 0"   # Weekly on Sunday at 3 AM
-```
+**System Maintenance:**
+- **Cache Management** – Intelligent cache warming, cleanup, and optimization
+- **Token Refresh** – OAuth token refresh for Google/Microsoft/Canvas
+- **Learning Model Updates** – Completion prediction and bandit model training
 
 ---
 
-## 🧠 Memory System
+## 📅 Calendar Integration
 
-### **Semantic Memory Architecture**
+### **Centralized Calendar System**
 
-- **Vector Database** – ChromaDB with OpenAI embeddings
-- **Multi-Namespace Storage** – Organized by data type and user context
-- **Intelligent Retrieval** – Context-aware memory search
-- **Auto-Ingestion** – Automated processing of assignments, tasks, and interactions
+**Provider Support:**
+- **Google Calendar** – Full OAuth integration with bidirectional sync
+- **Microsoft Outlook** – Calendar integration (configurable)
+- **Provider Abstraction** – Extensible interface for additional calendar providers
 
-### **Memory Categories**
+**Sync Architecture:**
+- **Incremental Sync** – Uses sync tokens for delta updates (falls back to window sync)
+- **Webhook Integration** – Google Calendar watch channels for real-time change notifications
+- **Conflict Resolution** – Source-of-truth logic (calendar/task/latest_update) in `calendar_links` table
+- **Premium Gating** – Push operations and write-enabled calendars require active subscription
 
-- **Tasks & Assignments** – Academic work and deadlines
-- **Calendar Events** – Meetings and scheduled activities
-- **User Interactions** – Chat history and preferences
-- **Academic Data** – Course information and grades
-- **Productivity Insights** – Performance patterns and analytics
+**Key Features:**
+- **Unified Timeblocks API** – Merges tasks + calendar events into single view
+- **Primary Write Calendar** – One designated calendar for task → event sync
+- **Active Hours Scheduling** – Respects user timezone and working hours for sync jobs
+- **Auto-Renewal** – Watch channels automatically renewed before expiration
 
 ---
 
@@ -401,10 +437,11 @@ PROFILE_SNAPSHOT_SCHEDULE = "0 3 * * 0"   # Weekly on Sunday at 3 AM
 
 **Integration Services:**
 
-- **Calendar Sync Service** – Bidirectional Google/Microsoft Calendar integration
-- **Canvas Service** – Automated LMS synchronization with error handling
-- **Token Service** – OAuth token lifecycle management and refresh
-- **Preferences Service** – User constraint and preference management
+- **Google Calendar Client** – OAuth token auto-refresh, incremental sync, webhook watch channels
+- **Canvas Service** – Automated LMS synchronization with backfill and delta sync jobs
+- **Token Service** – OAuth token lifecycle management with encryption
+- **Integration Settings Service** – User preferences for Canvas/Google/Microsoft integrations
+- **NLU Service** – Natural language understanding for intent classification
 
 **Data Processing:**
 
@@ -515,11 +552,15 @@ PROFILE_SNAPSHOT_SCHEDULE = "0 3 * * 0"   # Weekly on Sunday at 3 AM
 
 ## 📚 Documentation
 
-- **[Backend API Documentation](backend/README.md)** – Complete FastAPI setup guide
-- **[LangGraph Workflows](backend/docs/LANGGRAPH_AGENT_WORKFLOWS.md)** – Agent system architecture
+**Project Guidelines:**
+- **[RULES.md](RULES.md)** – Architecture rules, coding standards, and module organization (required reading)
+- **[CLAUDE.md](CLAUDE.md)** – AI assistant guidance for working with this codebase
+
+**Technical Documentation:**
+- **[Calendar System](backend/docs/CALENDAR_SYSTEM.md)** – Centralized calendar architecture and Google sync
+- **[KMS Setup Guide](backend/docs/KMS_SETUP_GUIDE.md)** – AWS KMS encryption configuration
 - **[Memory System](backend/docs/MEMORY_SYSTEM_DOCUMENTATION.md)** – Vector memory implementation
-- **[Frontend Development](README_FRONTEND.md)** – React Native app guide
-- **[Agent Tools Reference](backend/app/agents/tools/README.md)** – Complete tool documentation
+- **[LangGraph Workflows](backend/docs/LANGGRAPH_AGENT_WORKFLOWS.md)** – Agent system architecture (if exists)
 
 ---
 
@@ -545,25 +586,6 @@ cp .env.production .env
 - **Production** – Optimized production deployment with monitoring
 
 ---
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### **Development Workflow**
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes with tests
-4. Commit changes (`git commit -m 'Add amazing feature'`)
-5. Push to branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
-
-### **Code Standards**
-
-- **Python** – Black formatting, type hints, comprehensive tests
-- **TypeScript** – ESLint + Prettier, strict type checking
-- **Documentation** – Clear docstrings and API documentation
 
 ---
 

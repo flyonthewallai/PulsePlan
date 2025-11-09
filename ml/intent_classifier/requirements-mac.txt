@@ -1,0 +1,26 @@
+# Mac-compatible requirements for Intent Classifier
+
+# NumPy (must be < 2.0 for PyTorch compatibility)
+numpy<2.0.0
+
+# PyTorch (CPU version for Mac)
+torch
+torchvision
+torchaudio
+
+# Sentence transformers
+sentence-transformers
+accelerate>=0.26.0
+
+# Data processing
+datasets
+pyyaml
+scikit-learn
+
+# Utilities
+tqdm
+
+# ONNX export and quantization
+onnx>=1.14.0
+onnxruntime>=1.16.0
+optimum[onnxruntime]>=1.14.0

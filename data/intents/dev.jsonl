@@ -1,0 +1,100 @@
+{"text": "Plan meeting for project discussion next Tuesday", "label": "scheduling"}
+{"text": "Schedule team standup tomorrow morning", "label": "scheduling"}
+{"text": "Add midterm exam to calendar", "label": "calendar_event"}
+{"text": "Put the workshop on my schedule for next month", "label": "calendar_event"}
+{"text": "Move Friday's appointment to Monday", "label": "reschedule"}
+{"text": "Shift the 2pm slot to 3pm", "label": "reschedule"}
+{"text": "Add finishing the essay to my todos", "label": "task_management"}
+{"text": "Create task for lab report submission", "label": "task_management"}
+{"text": "Remind me about the quiz on Wednesday", "label": "reminder"}
+{"text": "Alert me before the meeting starts", "label": "reminder"}
+{"text": "Send email to TA about homework question", "label": "email"}
+{"text": "Message professor regarding office hours", "label": "email"}
+{"text": "Find my tasks for this week", "label": "search"}
+{"text": "Search calendar for doctor appointments", "label": "search"}
+{"text": "How are my tasks progressing?", "label": "status"}
+{"text": "Give me a status update", "label": "status"}
+{"text": "Hello there", "label": "greeting"}
+{"text": "Good evening", "label": "greeting"}
+{"text": "Thanks for the help", "label": "thanks"}
+{"text": "Much obliged", "label": "thanks"}
+{"text": "Sounds good", "label": "confirm"}
+{"text": "I agree", "label": "confirm"}
+{"text": "Actually no", "label": "cancel"}
+{"text": "Forget it", "label": "cancel"}
+{"text": "Need help", "label": "help"}
+{"text": "Show me how", "label": "help"}
+{"text": "Modify my schedule for exam week", "label": "adjust_plan"}
+{"text": "Update my task priorities", "label": "adjust_plan"}
+{"text": "Next Monday", "label": "temporal_slot_fill"}
+{"text": "This afternoon", "label": "temporal_slot_fill"}
+{"text": "9am", "label": "time_slot_fill"}
+{"text": "4:15pm", "label": "time_slot_fill"}
+{"text": "Don't get it", "label": "unknown"}
+{"text": "Say what?", "label": "unknown"}
+{"text": "How are you?", "label": "chitchat"}
+{"text": "What's for lunch?", "label": "chitchat"}
+{"text": "Arrange study group for algorithms class", "label": "scheduling"}
+{"text": "Insert department meeting into calendar", "label": "calendar_event"}
+{"text": "Reschedule tutorial to next week", "label": "reschedule"}
+{"text": "Make a task for preparing slides", "label": "task_management"}
+{"text": "Set reminder for assignment due date", "label": "reminder"}
+{"text": "Draft email to group about project milestone", "label": "email"}
+{"text": "Look up events for spring semester", "label": "search"}
+{"text": "Check my task status", "label": "status"}
+{"text": "Greetings", "label": "greeting"}
+{"text": "Appreciate it", "label": "thanks"}
+{"text": "That's correct", "label": "confirm"}
+{"text": "Don't do that", "label": "cancel"}
+{"text": "Confused about this feature", "label": "help"}
+{"text": "Reorganize next week's meetings", "label": "adjust_plan"}
+{"text": "End of the week", "label": "temporal_slot_fill"}
+{"text": "Noon", "label": "time_slot_fill"}
+{"text": "No idea", "label": "unknown"}
+{"text": "Random question", "label": "chitchat"}
+{"text": "Block time for code review session", "label": "scheduling"}
+{"text": "Add final presentation to calendar", "label": "calendar_event"}
+{"text": "Change interview from 10am to 2pm", "label": "reschedule"}
+{"text": "Need to return library books", "label": "task_management"}
+{"text": "Ping me about subscription renewal", "label": "reminder"}
+{"text": "Reach out to customer support", "label": "email"}
+{"text": "Pull up incomplete tasks", "label": "search"}
+{"text": "Track completion rate", "label": "status"}
+{"text": "Hi", "label": "greeting"}
+{"text": "Grateful for that", "label": "thanks"}
+{"text": "Works for me", "label": "confirm"}
+{"text": "Cancel that", "label": "cancel"}
+{"text": "Tutorial needed", "label": "help"}
+{"text": "Rebalance my weekly plan", "label": "adjust_plan"}
+{"text": "This month", "label": "temporal_slot_fill"}
+{"text": "7:30pm", "label": "time_slot_fill"}
+{"text": "Didn't follow", "label": "unknown"}
+{"text": "Awesome day", "label": "chitchat"}
+{"text": "Coordinate meeting with stakeholders", "label": "scheduling"}
+{"text": "Add performance review to schedule", "label": "calendar_event"}
+{"text": "Bump deadline forward", "label": "reschedule"}
+{"text": "Upload documents to shared drive", "label": "task_management"}
+{"text": "Notify about upcoming webinar", "label": "reminder"}
+{"text": "Send update to investors", "label": "email"}
+{"text": "Retrieve archived projects", "label": "search"}
+{"text": "How am I tracking?", "label": "status"}
+{"text": "Hey", "label": "greeting"}
+{"text": "Thanks a bunch", "label": "thanks"}
+{"text": "Okay by me", "label": "confirm"}
+{"text": "Not interested", "label": "cancel"}
+{"text": "Walk me through it", "label": "help"}
+{"text": "Adjust for vacation", "label": "adjust_plan"}
+{"text": "By end of day", "label": "temporal_slot_fill"}
+{"text": "Quarter after", "label": "time_slot_fill"}
+{"text": "Lost me there", "label": "unknown"}
+{"text": "what features are in the free tier?", "label": "app_info_query"}
+{"text": "can i export my data?", "label": "app_info_query"}
+{"text": "turn off email reminders", "label": "adjust_preferences"}
+{"text": "switch to 24 hour time", "label": "adjust_preferences"}
+{"text": "change my theme", "label": "adjust_preferences"}
+{"text": "what's on my plate?", "label": "user_data_query"}
+{"text": "do i have any overdue tasks?", "label": "user_data_query"}
+{"text": "show my task history", "label": "user_data_query"}
+{"text": "unclear what you want", "label": "clarification_request"}
+{"text": "can you clarify?", "label": "clarification_request"}
+{"text": "what exactly do you need?", "label": "clarification_request"}
