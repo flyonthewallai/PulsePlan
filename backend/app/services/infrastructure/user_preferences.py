@@ -6,7 +6,10 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from app.config.database.supabase import get_supabase
+from app.database.repositories.user_repositories import (
+    UserPreferenceRepository,
+    get_user_preference_repository
+)
 from app.models.user.user_preferences import (
     UserPreferences, UserPreferencesUpdate, UserPreferencesResponse,
     EmailPreferences, NotificationPreferences, BriefingPreferences, ContactManagementMode
@@ -18,24 +21,26 @@ logger = logging.getLogger(__name__)
 class UserPreferencesService:
     """Service for managing user preferences"""
     
-    def __init__(self):
-        self.supabase = None
+    def __init__(
+        self,
+        user_preference_repository: Optional[UserPreferenceRepository] = None
+    ):
+        self._user_preference_repository = user_preference_repository
     
-    def _get_supabase(self):
-        """Get Supabase client"""
-        if not self.supabase:
-            self.supabase = get_supabase()
-        return self.supabase
+    @property
+    def user_preference_repository(self) -> UserPreferenceRepository:
+        """Lazy-load user preference repository"""
+        if self._user_preference_repository is None:
+            self._user_preference_repository = get_user_preference_repository()
+        return self._user_preference_repository
     
     async def get_user_preferences(self, user_id: str) -> UserPreferences:
         """Get user preferences, creating defaults if none exist"""
         try:
-            supabase = self._get_supabase()
-            result = supabase.table('user_preferences').select('*').eq('user_id', user_id).execute()
+            data = await self.user_preference_repository.get_by_user(user_id)
             
-            if result.data and isinstance(result.data, list) and len(result.data) > 0:
+            if data:
                 # Parse existing preferences
-                data = result.data[0]
                 # Parse briefing preferences from database columns
                 briefing_data = {
                     'daily_briefing_enabled': data.get('daily_briefing_enabled', True),
@@ -73,7 +78,6 @@ class UserPreferencesService:
     async def save_user_preferences(self, preferences: UserPreferences) -> bool:
         """Save user preferences to database"""
         try:
-            supabase = self._get_supabase()
             preferences.updated_at = datetime.utcnow()
             
             # Convert briefings to individual columns for database storage
@@ -111,18 +115,13 @@ class UserPreferencesService:
                 'updated_at': preferences.updated_at.isoformat()
             }
             
-            # Check if preferences exist
-            existing = supabase.table('user_preferences').select('user_id').eq('user_id', preferences.user_id).execute()
-            
-            if existing.data:
-                # Update existing
-                result = supabase.table('user_preferences').update(data).eq('user_id', preferences.user_id).execute()
-            else:
-                # Create new
+            # Add created_at if this is a new entry
+            existing = await self.user_preference_repository.check_exists(preferences.user_id)
+            if not existing:
                 data['created_at'] = preferences.created_at.isoformat()
-                result = supabase.table('user_preferences').insert(data).execute()
             
-            return bool(result.data)
+            result = await self.user_preference_repository.upsert_preferences(preferences.user_id, data)
+            return bool(result)
             
         except Exception as e:
             logger.error(f"Error saving user preferences for {preferences.user_id}: {str(e)}")

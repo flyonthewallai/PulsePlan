@@ -13,7 +13,14 @@ import ssl
 import aiohttp
 from dataclasses import dataclass
 
-from app.config.database.supabase import get_supabase_client
+from app.database.repositories.integration_repositories import (
+    IOSDeviceRepository,
+    get_ios_device_repository,
+    NotificationLogRepository,
+    get_notification_log_repository,
+    ScheduledNotificationRepository,
+    get_scheduled_notification_repository
+)
 from app.services.infrastructure.cache_service import get_cache_service
 from app.config.core.settings import get_settings
 
@@ -64,9 +71,16 @@ class DeviceToken:
 class iOSNotificationService:
     """Service for sending iOS push notifications via APNs"""
     
-    def __init__(self):
+    def __init__(
+        self,
+        ios_device_repository: Optional[IOSDeviceRepository] = None,
+        notification_log_repository: Optional[NotificationLogRepository] = None,
+        scheduled_notification_repository: Optional[ScheduledNotificationRepository] = None
+    ):
         self.settings = get_settings()
-        self.supabase = get_supabase_client()
+        self._ios_device_repository = ios_device_repository
+        self._notification_log_repository = notification_log_repository
+        self._scheduled_notification_repository = scheduled_notification_repository
         self.cache_service = get_cache_service()
         
         # Initialize APNs configuration
@@ -75,6 +89,27 @@ class iOSNotificationService:
         # JWT token for APNs authentication
         self._jwt_token: Optional[str] = None
         self._jwt_expires_at: Optional[datetime] = None
+    
+    @property
+    def ios_device_repository(self) -> IOSDeviceRepository:
+        """Lazy-load iOS device repository"""
+        if self._ios_device_repository is None:
+            self._ios_device_repository = get_ios_device_repository()
+        return self._ios_device_repository
+    
+    @property
+    def notification_log_repository(self) -> NotificationLogRepository:
+        """Lazy-load notification log repository"""
+        if self._notification_log_repository is None:
+            self._notification_log_repository = get_notification_log_repository()
+        return self._notification_log_repository
+    
+    @property
+    def scheduled_notification_repository(self) -> ScheduledNotificationRepository:
+        """Lazy-load scheduled notification repository"""
+        if self._scheduled_notification_repository is None:
+            self._scheduled_notification_repository = get_scheduled_notification_repository()
+        return self._scheduled_notification_repository
     
     def _load_apns_config(self) -> APNsConfig:
         """Load APNs configuration from settings"""
@@ -280,10 +315,11 @@ class iOSNotificationService:
             True if unregistration successful
         """
         try:
-            await self.supabase.table("ios_devices").update({
-                "is_active": False,
-                "unregistered_at": datetime.utcnow().isoformat()
-            }).eq("device_token", device_token).execute()
+            await self.ios_device_repository.update_device_status(
+                device_token=device_token,
+                is_active=False,
+                inactive_reason="unregistered"
+            )
             
             logger.info(f"Unregistered device token: {device_token}")
             return True
@@ -303,18 +339,17 @@ class iOSNotificationService:
             Notification statistics
         """
         try:
-            # Get device count
-            devices_response = await self.supabase.table("ios_devices").select(
-                "device_token, is_active, registered_at, last_used_at"
-            ).eq("user_id", user_id).execute()
-            
-            devices = devices_response.data or []
+            # Get device count using repository
+            devices = await self.ios_device_repository.get_devices_by_user(user_id)
             active_devices = [d for d in devices if d["is_active"]]
             
             # Get recent notification logs (last 30 days)
+            # Note: NotificationLogRepository doesn't have a query method yet, so we'll leave this as a TODO
+            # TODO: Add get_logs_by_user_and_date_range to NotificationLogRepository
+            from app.config.database.supabase import get_supabase_client
+            supabase = get_supabase_client()
             thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
-            
-            logs_response = await self.supabase.table("notification_logs").select(
+            logs_response = await supabase.table("notification_logs").select(
                 "notification_type, success, sent_at"
             ).eq("user_id", user_id).gte("sent_at", thirty_days_ago).execute()
             
@@ -490,11 +525,7 @@ class iOSNotificationService:
     async def _get_user_device_tokens(self, user_id: str) -> List[DeviceToken]:
         """Get all active device tokens for a user"""
         try:
-            response = await self.supabase.table("ios_devices").select(
-                "user_id, device_token, device_model, ios_version, app_version, is_active, registered_at, last_used_at"
-            ).eq("user_id", user_id).eq("is_active", True).execute()
-            
-            devices = response.data or []
+            devices = await self.ios_device_repository.get_devices_by_user(user_id, active_only=True)
             
             return [
                 DeviceToken(
@@ -517,12 +548,7 @@ class iOSNotificationService:
     async def _get_device_by_token(self, device_token: str) -> Optional[Dict[str, Any]]:
         """Get device information by device token"""
         try:
-            response = await self.supabase.table("ios_devices").select("*").eq(
-                "device_token", device_token
-            ).single().execute()
-            
-            return response.data
-            
+            return await self.ios_device_repository.get_device_by_token(device_token)
         except Exception as e:
             logger.debug(f"Device token not found: {device_token}")
             return None
@@ -540,7 +566,7 @@ class iOSNotificationService:
             "last_used_at": datetime.utcnow().isoformat()
         }
         
-        await self.supabase.table("ios_devices").insert(registration_data).execute()
+        await self.ios_device_repository.create_device(registration_data)
     
     async def _update_device_registration(self, device_token: str, user_id: str, device_info: Dict[str, Any]):
         """Update existing device registration"""
@@ -553,15 +579,13 @@ class iOSNotificationService:
             "last_used_at": datetime.utcnow().isoformat()
         }
         
-        await self.supabase.table("ios_devices").update(update_data).eq(
-            "device_token", device_token
-        ).execute()
+        await self.ios_device_repository.update_device(device_token, update_data)
     
     async def _update_device_last_used(self, device_token: str):
         """Update device last used timestamp"""
-        await self.supabase.table("ios_devices").update({
+        await self.ios_device_repository.update_device(device_token, {
             "last_used_at": datetime.utcnow().isoformat()
-        }).eq("device_token", device_token).execute()
+        })
     
     async def _handle_failed_device(self, device_token: str):
         """Handle device that failed to receive notification"""
@@ -579,7 +603,7 @@ class iOSNotificationService:
             "created_at": datetime.utcnow().isoformat()
         }
         
-        await self.supabase.table("scheduled_notifications").insert(scheduled_data).execute()
+        await self.scheduled_notification_repository.create(scheduled_data)
     
     async def _log_notification_send(self, user_id: str, notification: Dict[str, Any], success_count: int, total_devices: int):
         """Log notification sending for analytics"""
@@ -593,7 +617,7 @@ class iOSNotificationService:
             "sent_at": datetime.utcnow().isoformat()
         }
         
-        await self.supabase.table("notification_logs").insert(log_entry).execute()
+        await self.notification_log_repository.create_log(log_entry)
     
     def _validate_device_token(self, device_token: str) -> bool:
         """Validate APNs device token format"""

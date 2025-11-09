@@ -45,6 +45,14 @@ __all__ = [
     
     # Worker services
     "CalendarBackgroundWorker",
+    "CalendarSyncWorker",
+    "get_calendar_sync_worker",
+    "BriefingJobRunner",
+    "NotificationJobRunner",
+    "NotificationJobs",
+    "get_notification_jobs",
+    "CanvasJobRunner",
+    "get_canvas_job_runner",
+    "UsageJobRunner",
+    "get_usage_job_runner",
 ]
-
-

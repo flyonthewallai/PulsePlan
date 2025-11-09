@@ -16,12 +16,14 @@ class CacheService:
     """Async Redis cache service using centralized Upstash Redis client"""
     
     def __init__(self):
-        self.redis_client = get_redis_client()
+        self.redis_client = None
     
     async def _get_client(self):
         """Get centralized Redis client (Upstash)"""
+        if self.redis_client is None:
+            self.redis_client = await get_redis_client()
         # Ensure Redis is initialized
-        if not self.redis_client.client:
+        if not self.redis_client._initialized:
             await self.redis_client.initialize()
         return self.redis_client
     

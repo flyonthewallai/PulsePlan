@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
 
-from app.config.database.supabase import get_supabase
+from app.database.repositories.integration_repositories import OAuthTokenRepository, get_oauth_token_repository
 from app.services.auth.oauth import GoogleOAuthService, MicrosoftOAuthService
 
 
@@ -52,7 +52,7 @@ class OAuthToken:
     access_token: str
     refresh_token: Optional[str]
     token_type: str
-    scope: Optional[str]
+    scopes: List[str]
     expires_at: datetime
     created_at: datetime
     last_refreshed: Optional[datetime]
@@ -66,11 +66,14 @@ class TokenRefreshService:
     Runs background tasks to refresh tokens before they expire
     """
     
-    def __init__(self):
+    def __init__(self, oauth_token_repository: Optional[OAuthTokenRepository] = None):
         self.refresh_margin_minutes = 30  # Refresh 30 minutes before expiry
         self.max_retry_attempts = 3
         self.retry_delay_seconds = 300  # 5 minutes between retries
         self.batch_size = 50  # Process tokens in batches
+        
+        # OAuth token repository
+        self._oauth_token_repository = oauth_token_repository
         
         # OAuth service instances
         self.oauth_services = {
@@ -87,6 +90,13 @@ class TokenRefreshService:
         # Background task control
         self._refresh_task: Optional[asyncio.Task] = None
         self._stop_refresh = False
+    
+    @property
+    def oauth_token_repository(self) -> OAuthTokenRepository:
+        """Lazy-load OAuth token repository"""
+        if self._oauth_token_repository is None:
+            self._oauth_token_repository = get_oauth_token_repository()
+        return self._oauth_token_repository
     
     async def start_background_refresh(self):
         """Start the background token refresh task"""
@@ -134,20 +144,15 @@ class TokenRefreshService:
         refresh_threshold = datetime.utcnow() + timedelta(minutes=self.refresh_margin_minutes)
         
         try:
-            supabase = get_supabase()
-            
-            # Query oauth_tokens table for tokens needing refresh
-            response = supabase.table("oauth_tokens").select("*").filter(
-                "expires_at", "lte", refresh_threshold.isoformat()
-            ).filter(
-                "refresh_token", "not.is", "null"
-            ).filter(
-                "is_active", "eq", True
-            ).limit(self.batch_size).execute()
+            # Query oauth_tokens table for tokens needing refresh using repository
+            token_data = await self.oauth_token_repository.get_expiring_tokens(
+                expiry_threshold=refresh_threshold,
+                limit=self.batch_size
+            )
             
             # Convert to OAuthToken objects
             tokens = []
-            for data in response.data or []:
+            for data in token_data:
                 token = OAuthToken(
                     id=data["id"],
                     user_id=data["user_id"],
@@ -155,7 +160,7 @@ class TokenRefreshService:
                     access_token=data["access_token"],
                     refresh_token=data.get("refresh_token"),
                     token_type=data.get("token_type", "Bearer"),
-                    scope=data.get("scope"),
+                    scopes=data.get("scopes", []),
                     expires_at=datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00")),
                     created_at=datetime.fromisoformat(data["created_at"].replace("Z", "+00:00")),
                     last_refreshed=datetime.fromisoformat(data["last_refreshed"].replace("Z", "+00:00")) if data.get("last_refreshed") else None,
@@ -188,51 +193,66 @@ class TokenRefreshService:
     async def _refresh_single_token(self, token: OAuthToken) -> RefreshAttempt:
         """Refresh a single OAuth token"""
         provider = TokenProvider(token.provider)
-        
+
         attempt = RefreshAttempt(
             user_id=token.user_id,
             provider=provider,
             result=RefreshResult.FAILED,
             timestamp=datetime.utcnow()
         )
-        
+
         try:
             if not token.refresh_token:
                 attempt.result = RefreshResult.NO_REFRESH_TOKEN
                 attempt.error = "No refresh token available"
+                # Only mark as expired if there's truly no refresh token, not on transient errors
                 await self._mark_token_expired(token)
                 return attempt
-            
+
             oauth_service = self.oauth_services.get(provider)
             if not oauth_service:
                 attempt.error = f"No OAuth service available for provider {provider}"
+                # Don't mark as expired - this is a configuration issue, not a token issue
                 return attempt
-            
+
+            # Decrypt refresh token before sending to OAuth service
+            from app.security.encryption import get_encryption_service
+            encryption_service = get_encryption_service()
+            decrypted_refresh_token = encryption_service.decrypt_token(token.refresh_token, token.user_id)
+
             # Attempt token refresh
-            refresh_data = await oauth_service.refresh_token(token.refresh_token)
-            
+            refresh_data = await oauth_service.refresh_token(decrypted_refresh_token)
+
             if not refresh_data or not refresh_data.get("access_token"):
                 attempt.result = RefreshResult.PROVIDER_ERROR
                 attempt.error = "Provider returned invalid refresh response"
+                # Don't mark as expired on transient provider errors - let it retry next cycle
+                logger.warning(f"Provider error refreshing token for user {token.user_id}, will retry next cycle")
                 return attempt
-            
+
             # Update token in database
             await self._update_token(token, refresh_data)
-            
+
             attempt.result = RefreshResult.SUCCESS
             attempt.new_expires_at = datetime.utcnow() + timedelta(seconds=refresh_data.get("expires_in", 3600))
-            
+
             logger.info(f"Successfully refreshed token for user {token.user_id} provider {provider}")
-            
+
         except Exception as e:
             attempt.error = str(e)
             logger.error(f"Failed to refresh token for user {token.user_id} provider {provider}: {str(e)}")
-            
-            # Check if token was revoked
-            if "revoked" in str(e).lower() or "invalid_grant" in str(e).lower():
+
+            # Only mark as expired if the token is definitively revoked or invalid
+            # Network errors, timeouts, etc. should NOT mark tokens as inactive
+            error_str = str(e).lower()
+            if "revoked" in error_str or "invalid_grant" in error_str or "invalid refresh token" in error_str:
                 attempt.result = RefreshResult.TOKEN_REVOKED
+                logger.warning(f"Token revoked for user {token.user_id} provider {provider}, marking as inactive")
                 await self._mark_token_expired(token)
-        
+            else:
+                # Transient error - log but don't mark as inactive
+                logger.warning(f"Transient error refreshing token for user {token.user_id}, will retry next cycle: {e}")
+
         # Store attempt in history
         self._add_refresh_attempt(attempt)
         return attempt
@@ -240,30 +260,39 @@ class TokenRefreshService:
     async def _update_token(self, token: OAuthToken, refresh_data: Dict[str, Any]):
         """Update token with new refresh data"""
         try:
-            supabase = get_supabase()
-            
+            # Encrypt tokens before storing
+            from app.security.encryption import get_encryption_service
+            encryption_service = get_encryption_service()
+
             # Prepare update data
             update_data = {
-                "access_token": refresh_data["access_token"],
-                "last_refreshed": datetime.utcnow().isoformat()
+                "access_token": encryption_service.encrypt_token(refresh_data["access_token"], token.user_id),
+                "last_refreshed": datetime.utcnow().isoformat(),
+                "is_active": True,  # Ensure token is marked as active on successful refresh
+                "updated_at": datetime.utcnow().isoformat()
             }
-            
+
             if "refresh_token" in refresh_data:
-                update_data["refresh_token"] = refresh_data["refresh_token"]
-            
+                update_data["refresh_token"] = encryption_service.encrypt_token(refresh_data["refresh_token"], token.user_id)
+
             expires_in = refresh_data.get("expires_in", 3600)
             new_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
             update_data["expires_at"] = new_expires_at.isoformat()
-            
+
             if "scope" in refresh_data:
-                update_data["scope"] = refresh_data["scope"]
-            
-            # Update token in Supabase
-            response = supabase.table("oauth_tokens").update(update_data).eq("id", token.id).execute()
-            
-            if not response.data:
+                # Convert space-separated scope string to array
+                scopes_str = refresh_data["scope"]
+                update_data["scopes"] = scopes_str.split() if scopes_str else []
+
+            # Update token using repository
+            success = await self.oauth_token_repository.update_token_after_refresh(
+                token_id=token.id,
+                update_data=update_data
+            )
+
+            if not success:
                 raise Exception("Failed to update token in database")
-            
+
         except Exception as e:
             logger.error(f"Failed to update token {token.id}: {e}")
             raise e
@@ -271,16 +300,13 @@ class TokenRefreshService:
     async def _mark_token_expired(self, token: OAuthToken):
         """Mark token as expired/inactive"""
         try:
-            supabase = get_supabase()
+            # Mark token as inactive using repository
+            success = await self.oauth_token_repository.mark_token_inactive(
+                token_id=token.id,
+                reason="Token expired or revoked"
+            )
             
-            update_data = {
-                "is_active": False,
-                "last_refreshed": datetime.utcnow().isoformat()
-            }
-            
-            response = supabase.table("oauth_tokens").update(update_data).eq("id", token.id).execute()
-            
-            if not response.data:
+            if not success:
                 raise Exception("Failed to mark token as expired in database")
                 
         except Exception as e:
@@ -297,28 +323,18 @@ class TokenRefreshService:
     async def force_refresh_user_tokens(self, user_id: str, provider: Optional[TokenProvider] = None) -> List[RefreshAttempt]:
         """Force refresh all tokens for a specific user"""
         try:
-            supabase = get_supabase()
-            
-            # Build query
-            query = supabase.table("oauth_tokens").select("*").filter(
-                "user_id", "eq", user_id
-            ).filter(
-                "is_active", "eq", True
-            ).filter(
-                "refresh_token", "not.is", "null"
+            # Get active tokens using repository
+            token_data = await self.oauth_token_repository.get_active_by_user(
+                user_id=user_id,
+                provider=provider.value if provider else None
             )
             
-            if provider:
-                query = query.filter("provider", "eq", provider.value)
-            
-            response = query.execute()
-            
-            if not response.data:
+            if not token_data:
                 return []
             
             # Convert to OAuthToken objects
             tokens = []
-            for data in response.data:
+            for data in token_data:
                 token = OAuthToken(
                     id=data["id"],
                     user_id=data["user_id"],
@@ -326,7 +342,7 @@ class TokenRefreshService:
                     access_token=data["access_token"],
                     refresh_token=data.get("refresh_token"),
                     token_type=data.get("token_type", "Bearer"),
-                    scope=data.get("scope"),
+                    scopes=data.get("scopes", []),
                     expires_at=datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00")),
                     created_at=datetime.fromisoformat(data["created_at"].replace("Z", "+00:00")),
                     last_refreshed=datetime.fromisoformat(data["last_refreshed"].replace("Z", "+00:00")) if data.get("last_refreshed") else None,
@@ -350,15 +366,11 @@ class TokenRefreshService:
     async def get_token_health(self, user_id: str) -> Dict[str, Any]:
         """Get health status of user's tokens"""
         try:
-            supabase = get_supabase()
-            
-            response = supabase.table("oauth_tokens").select("*").filter(
-                "user_id", "eq", user_id
-            ).filter(
-                "is_active", "eq", True
-            ).execute()
-            
-            tokens_data = response.data or []
+            # Get active tokens using repository
+            tokens_data = await self.oauth_token_repository.get_active_by_user(
+                user_id=user_id,
+                provider=None  # Get all providers
+            )
             
             health_status = {
                 "user_id": user_id,

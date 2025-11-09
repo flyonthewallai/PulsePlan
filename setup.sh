@@ -1,53 +1,146 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # PulsePlan Setup Script
-# This script sets up the development environment for PulsePlan
+# Cross-platform setup for Mac, Linux, and Windows (Git Bash/WSL)
 
 set -e
 
-echo "Setting up PulsePlan development environment..."
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-# Check if Python 3.12+ is available
-if ! command -v python3.12 &> /dev/null; then
-    echo "❌ Python 3.12+ is required but not found."
-    echo "Please install Python 3.12+ using Homebrew: brew install python@3.12"
+# Detect OS
+OS="unknown"
+case "$(uname -s)" in
+    Linux*)     OS="linux";;
+    Darwin*)    OS="mac";;
+    CYGWIN*|MINGW*|MSYS*)    OS="windows";;
+esac
+
+echo "🚀 Setting up PulsePlan development environment..."
+echo "Detected OS: $OS"
+echo ""
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" &> /dev/null
+}
+
+# Function to find Python 3.11+
+find_python() {
+    for cmd in python3.12 python3.11 python3 python; do
+        if command_exists "$cmd"; then
+            version=$("$cmd" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+            major=$(echo "$version" | cut -d. -f1)
+            minor=$(echo "$version" | cut -d. -f2)
+
+            if [ "$major" -eq 3 ] && [ "$minor" -ge 11 ]; then
+                echo "$cmd"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
+# Check Python
+echo "Checking for Python 3.11+..."
+PYTHON_CMD=$(find_python)
+
+if [ -z "$PYTHON_CMD" ]; then
+    echo -e "${RED}❌ Python 3.11+ is required but not found.${NC}"
+    echo ""
+    echo "Installation instructions:"
+    case $OS in
+        mac)
+            echo "  macOS:   brew install python@3.12"
+            ;;
+        linux)
+            echo "  Ubuntu:  sudo apt-get install python3.12"
+            echo "  Fedora:  sudo dnf install python3.12"
+            ;;
+        windows)
+            echo "  Windows: Download from https://www.python.org/downloads/"
+            echo "           Or use: winget install Python.Python.3.12"
+            ;;
+    esac
     exit 1
 fi
 
-echo "✅ Python 3.12+ found"
+echo -e "${GREEN}✅ Python found: $PYTHON_CMD${NC}"
 
-# Backend setup
-echo "Setting up backend dependencies..."
+# Check Node.js
+echo "Checking for Node.js..."
+if ! command_exists node; then
+    echo -e "${RED}❌ Node.js is required but not found.${NC}"
+    echo ""
+    echo "Installation instructions:"
+    case $OS in
+        mac)
+            echo "  macOS:   brew install node"
+            ;;
+        linux)
+            echo "  Linux:   curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -"
+            echo "           sudo apt-get install -y nodejs"
+            ;;
+        windows)
+            echo "  Windows: Download from https://nodejs.org/"
+            echo "           Or use: winget install OpenJS.NodeJS"
+            ;;
+    esac
+    exit 1
+fi
+
+NODE_VERSION=$(node --version)
+echo -e "${GREEN}✅ Node.js found: $NODE_VERSION${NC}"
+
+# Check npm
+if ! command_exists npm; then
+    echo -e "${RED}❌ npm is required but not found.${NC}"
+    exit 1
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Backend Setup (Python)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
 cd backend
 
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
     echo "Creating Python virtual environment..."
-    python3.12 -m venv venv
+    "$PYTHON_CMD" -m venv venv
+    echo -e "${GREEN}✅ Virtual environment created${NC}"
+else
+    echo -e "${GREEN}✅ Virtual environment already exists${NC}"
 fi
 
-# Activate virtual environment and install dependencies
+# Activate virtual environment (cross-platform)
+echo "Activating virtual environment..."
+if [ "$OS" = "windows" ]; then
+    source venv/Scripts/activate
+else
+    source venv/bin/activate
+fi
+
+# Upgrade pip
+echo "Upgrading pip..."
+python -m pip install --upgrade pip --quiet
+
+# Install dependencies
 echo "Installing Python dependencies..."
-source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements.txt --quiet
 
-echo "✅ Backend dependencies installed"
-
-# Frontend setup
-echo "Setting up frontend dependencies..."
-cd ../web
-
-# Install Node.js dependencies
-echo "Installing Node.js dependencies..."
-npm install
-
-echo "✅ Frontend dependencies installed"
+echo -e "${GREEN}✅ Backend dependencies installed${NC}"
 
 # Create .env file if it doesn't exist
-cd ../backend
 if [ ! -f ".env" ]; then
-    echo "📝 Creating .env file..."
+    echo ""
+    echo "📝 Creating backend .env file..."
     cat > .env << 'EOF'
 # PulsePlan Development Environment Configuration
 # This file contains development-only values for testing
@@ -84,11 +177,19 @@ TOKEN_ENCRYPTION_KEY=dev-encryption-key-32-chars-long-12345678901234567890123456
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_REDIRECT_URL=http://localhost:8000/auth/google/callback
+GOOGLE_WEBHOOK_VERIFICATION_TOKEN=your-webhook-verification-token
 
 MICROSOFT_CLIENT_ID=your-microsoft-client-id
 MICROSOFT_CLIENT_SECRET=your-microsoft-client-secret
 MICROSOFT_REDIRECT_URL=http://localhost:8000/auth/microsoft/callback
 MICROSOFT_TENANT_ID=common
+
+# Canvas LMS Configuration (Replace with your actual values)
+CANVAS_API_KEY=your-canvas-api-key-here
+CANVAS_BASE_URL=https://canvas.instructure.com
+
+# Calendar System (Replace with actual values)
+API_BASE_URL=http://localhost:8000
 
 # OpenAI/LLM Configuration (Replace with your actual API key)
 OPENAI_API_KEY=your-openai-api-key-here
@@ -106,7 +207,7 @@ RESEND_FROM_EMAIL=noreply@yourdomain.com
 
 # Application URLs
 APP_URL=http://localhost:8000
-CLIENT_URL=http://localhost:8081
+CLIENT_URL=http://localhost:5173
 
 # Logging Configuration
 LOG_LEVEL=INFO
@@ -125,19 +226,78 @@ HEALTH_CHECK_TIMEOUT_SECONDS=5
 MEMORY_WARNING_THRESHOLD=80
 MEMORY_CRITICAL_THRESHOLD=90
 EOF
-    echo "✅ .env file created"
+    echo -e "${GREEN}✅ Backend .env file created${NC}"
 else
-    echo "✅ .env file already exists"
+    echo -e "${GREEN}✅ Backend .env file already exists${NC}"
 fi
 
 cd ..
 
 echo ""
-echo "🎉 Setup complete!"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Frontend Setup (React Web App)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+cd web
+
+# Install Node.js dependencies
+echo "Installing Node.js dependencies..."
+npm install --quiet
+
+echo -e "${GREEN}✅ Frontend dependencies installed${NC}"
+
+# Create .env file if it doesn't exist
+if [ ! -f ".env" ]; then
+    echo ""
+    echo "📝 Creating frontend .env file..."
+    cat > .env << 'EOF'
+# Frontend Environment Configuration
+
+# Backend API URL
+VITE_API_URL=http://localhost:8000
+
+# Supabase Configuration (Replace with your actual values)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key-here
+
+# OAuth Configuration
+VITE_GOOGLE_CLIENT_ID=your-google-client-id
+
+# Environment
+VITE_ENVIRONMENT=development
+EOF
+    echo -e "${GREEN}✅ Frontend .env file created${NC}"
+else
+    echo -e "${GREEN}✅ Frontend .env file already exists${NC}"
+fi
+
+cd ..
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  🎉 Setup Complete!"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo -e "${YELLOW}⚠️  IMPORTANT: Update .env files with your actual API keys!${NC}"
+echo ""
+echo "  Backend:  backend/.env"
+echo "  Frontend: web/.env"
 echo ""
 echo "To start the applications:"
-echo "  Backend:  cd backend && source venv/bin/activate && python3 main.py"
-echo "  Frontend: cd web && npm run dev"
 echo ""
-echo "⚠️  Remember to update the .env file with your actual API keys and configuration!"
+echo -e "${GREEN}  Backend:${NC}"
+if [ "$OS" = "windows" ]; then
+    echo "    cd backend && source venv/Scripts/activate && python main.py"
+else
+    echo "    cd backend && source venv/bin/activate && python main.py"
+fi
+echo ""
+echo -e "${GREEN}  Frontend:${NC}"
+echo "    cd web && npm run dev"
+echo ""
+echo "Backend will run on:  http://localhost:8000"
+echo "Frontend will run on: http://localhost:5173"
+echo ""
+echo "For more information, see README.md"
 echo ""

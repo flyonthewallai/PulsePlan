@@ -13,6 +13,28 @@ from app.agents.core.conversation.conversation_manager import get_conversation_m
 logger = logging.getLogger(__name__)
 
 
+async def _cancel_pending_gates_for_action(action_id_str: str):
+    """Cancel any pending gates associated with an action to prevent continuation loops."""
+    try:
+        from app.database.repositories.integration_repositories import create_nlu_repository
+        nlu_repo = create_nlu_repository()
+
+        # Find and cancel any pending gates for this action
+        response = nlu_repo.supabase.table("pending_gates")\
+            .select("gate_token")\
+            .eq("action_id", action_id_str)\
+            .is_("confirmed_at", "null")\
+            .is_("cancelled_at", "null")\
+            .execute()
+
+        if response.data and len(response.data) > 0:
+            for gate in response.data:
+                await nlu_repo.cancel_gate(gate["gate_token"])
+                logger.info(f"Cancelled pending gate {gate['gate_token']} for action {action_id_str}")
+    except Exception as gate_error:
+        logger.error(f"Failed to cancel pending gate: {gate_error}")
+
+
 async def execute_crud_operation_direct(
     user_id: str,
     conversation_id: str,
@@ -34,11 +56,16 @@ async def execute_crud_operation_direct(
         
     except Exception as e:
         logger.error(f"CRUD operation failed: {e}")
+
+        # Cancel any pending gates associated with this action to prevent infinite loops
+        if hasattr(intent_result, 'metadata') and intent_result.metadata.get('action_id'):
+            await _cancel_pending_gates_for_action(intent_result.metadata.get('action_id'))
+
         # Create failure card with actual task title if available
         task_title = "task"
         if hasattr(intent_result, 'task_info') and intent_result.task_info and intent_result.task_info.task_title:
             task_title = intent_result.task_info.task_title
-        
+
         await task_manager.create_crud_failure_card(
             user_id=user_id,
             operation="failed",
@@ -50,7 +77,7 @@ async def execute_crud_operation_direct(
 
 async def _execute_task_creation_direct(user_id: str, conversation_id: str, intent_result, original_query: str, task_manager):
     """Execute task creation directly"""
-    from app.agents.tools.tasks import TaskDatabaseTool
+    from app.agents.tools.data.tasks import TaskDatabaseTool
     task_tool = TaskDatabaseTool()
     
     # Check for batch task creation
@@ -110,6 +137,10 @@ async def _execute_task_creation_direct(user_id: str, conversation_id: str, inte
     else:
         # Single task creation
         if not intent_result.task_info:
+            # Cancel pending gates before returning to prevent continuation loops
+            if hasattr(intent_result, 'metadata') and intent_result.metadata.get('action_id'):
+                await _cancel_pending_gates_for_action(intent_result.metadata.get('action_id'))
+
             await task_manager.create_crud_failure_card(
                 user_id=user_id,
                 operation="failed",
@@ -164,6 +195,10 @@ async def _execute_task_creation_direct(user_id: str, conversation_id: str, inte
                 conversation_id=conversation_id
             )
         else:
+            # Cancel pending gates before creating failure card
+            if hasattr(intent_result, 'metadata') and intent_result.metadata.get('action_id'):
+                await _cancel_pending_gates_for_action(intent_result.metadata.get('action_id'))
+
             # Create failure card
             await task_manager.create_crud_failure_card(
                 user_id=user_id,
@@ -176,7 +211,7 @@ async def _execute_task_creation_direct(user_id: str, conversation_id: str, inte
 
 async def _execute_task_deletion_direct(user_id: str, conversation_id: str, intent_result, task_manager):
     """Execute todo deletion directly (DELETE_TASK should operate on todos, not tasks)"""
-    from app.agents.tools.todos import TodoDatabaseTool
+    from app.agents.tools.data.todos import TodoDatabaseTool
     todo_tool = TodoDatabaseTool()
     
     # Check for batch task deletion
@@ -279,7 +314,7 @@ async def _execute_task_deletion_direct(user_id: str, conversation_id: str, inte
 async def _execute_task_update_direct(user_id: str, conversation_id: str, intent_result, original_query: str, task_manager):
     """Execute todo update directly (UPDATE_TASK should operate on todos, not tasks)"""
     logger.info(f"🔧 [UPDATE_TODO] Starting UPDATE_TASK execution (operating on todos)")
-    from app.agents.tools.todos import TodoDatabaseTool
+    from app.agents.tools.data.todos import TodoDatabaseTool
     todo_tool = TodoDatabaseTool()
     
     if not intent_result.task_info:
@@ -362,7 +397,7 @@ async def _execute_task_update_direct(user_id: str, conversation_id: str, intent
 async def _execute_task_completion_direct(user_id: str, conversation_id: str, intent_result, task_manager):
     """Execute todo completion directly (COMPLETE_TASK should operate on todos, not tasks)"""
     logger.info(f"🔧 [COMPLETE_TODO] Starting COMPLETE_TASK execution (operating on todos)")
-    from app.agents.tools.todos import TodoDatabaseTool
+    from app.agents.tools.data.todos import TodoDatabaseTool
     todo_tool = TodoDatabaseTool()
     
     if not intent_result.task_info:
@@ -442,7 +477,7 @@ async def execute_task_listing_direct(
         if intent_result.entities.get("tags"):
             filters["tags"] = intent_result.entities["tags"]
 
-        from app.agents.tools.tasks import TaskDatabaseTool
+        from app.agents.tools.data.tasks import TaskDatabaseTool
         task_tool = TaskDatabaseTool()
 
         # List tasks

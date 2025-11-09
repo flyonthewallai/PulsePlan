@@ -1,242 +1,234 @@
 """
-Tags management API endpoints.
+Tags Management API Endpoints
+
 Handles predefined tags and user custom tags.
+Implements RULES.md Section 6.1 - No DB access in routers, use service layer.
 """
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any
 from pydantic import BaseModel, Field
+import logging
 
 from app.core.auth import get_current_user
-from app.config.database.supabase import get_supabase
+from app.services.tag_service import TagService, get_tag_service
+from app.core.utils.error_handlers import handle_endpoint_error, ServiceError
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 class UserTagCreateRequest(BaseModel):
     """Request model for creating user tags"""
-    name: str = Field(..., description="Tag name")
+    name: str = Field(..., description="Tag name", min_length=1, max_length=50)
 
 
 @router.get("/predefined", response_model=Dict[str, Any])
-async def get_predefined_tags():
-    """Get all predefined system tags"""
+async def get_predefined_tags(
+    service: TagService = Depends(get_tag_service)
+):
+    """
+    Get all predefined system tags
+
+    Returns:
+        Dictionary with success status and tag data
+    """
     try:
-        supabase = get_supabase()
-        result = supabase.table("predefined_tags").select("*").execute()
+        tags = await service.get_predefined_tags()
 
         return {
             "success": True,
             "data": {
-                "tags": result.data,
-                "total": len(result.data)
+                "tags": tags,
+                "total": len(tags)
             }
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return handle_endpoint_error(e, logger, "get_predefined_tags")
 
 
 @router.get("/user", response_model=Dict[str, Any])
 async def get_user_tags(
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    service: TagService = Depends(get_tag_service)
 ):
-    """Get all user custom tags"""
+    """
+    Get all user custom tags
+
+    Args:
+        current_user: Current authenticated user
+
+    Returns:
+        Dictionary with success status and user tag data
+    """
     try:
-        supabase = get_supabase()
-        result = supabase.table("user_tags").select("*").eq("user_id", current_user["id"]).execute()
+        tags = await service.get_user_tags(current_user.user_id)
 
         return {
             "success": True,
             "data": {
-                "tags": result.data,
-                "total": len(result.data)
+                "tags": tags,
+                "total": len(tags)
             }
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return handle_endpoint_error(e, logger, "get_user_tags")
 
 
 @router.get("/all", response_model=Dict[str, Any])
 async def get_all_available_tags(
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    service: TagService = Depends(get_tag_service)
 ):
-    """Get all available tags (predefined + user custom)"""
+    """
+    Get all available tags (predefined + user custom)
+
+    Args:
+        current_user: Current authenticated user
+
+    Returns:
+        Dictionary with all available tags categorized by type
+    """
     try:
-        supabase = get_supabase()
-
-        # Get predefined tags
-        predefined_result = supabase.table("predefined_tags").select("name, category").execute()
-        predefined_tags = [{"name": tag["name"], "category": tag["category"], "type": "predefined"} for tag in predefined_result.data]
-
-        # Get user tags
-        user_result = supabase.table("user_tags").select("name").eq("user_id", current_user["id"]).execute()
-        user_tags = [{"name": tag["name"], "category": "custom", "type": "user"} for tag in user_result.data]
-
-        all_tags = predefined_tags + user_tags
+        result = await service.get_all_available_tags(current_user.user_id)
 
         return {
             "success": True,
-            "data": {
-                "tags": all_tags,
-                "predefined_count": len(predefined_tags),
-                "user_count": len(user_tags),
-                "total": len(all_tags)
-            }
+            "data": result
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return handle_endpoint_error(e, logger, "get_all_available_tags")
 
 
 @router.post("/user", response_model=Dict[str, Any])
 async def create_user_tag(
     request: UserTagCreateRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    service: TagService = Depends(get_tag_service)
 ):
-    """Create a new user custom tag"""
+    """
+    Create a new user custom tag
+
+    Args:
+        request: Tag creation request
+        current_user: Current authenticated user
+
+    Returns:
+        Dictionary with created tag data
+
+    Raises:
+        HTTPException: If tag already exists or creation fails
+    """
     try:
-        supabase = get_supabase()
+        tag = await service.create_user_tag(current_user.user_id, request.name)
 
-        # Check if tag already exists for this user
-        existing = supabase.table("user_tags").select("id").eq("user_id", current_user["id"]).eq("name", request.name.lower()).execute()
-
-        if existing.data:
-            raise HTTPException(status_code=400, detail="Tag already exists")
-
-        # Create the tag
-        tag_data = {
-            "user_id": current_user["id"],
-            "name": request.name.lower()
+        return {
+            "success": True,
+            "data": {"tag": tag}
         }
 
-        result = supabase.table("user_tags").insert(tag_data).execute()
-
-        if result.data:
-            return {
-                "success": True,
-                "data": {"tag": result.data[0]}
-            }
-        else:
-            raise HTTPException(status_code=400, detail="Failed to create tag")
+    except ServiceError as e:
+        # Handle specific service errors
+        if "already exists" in e.message.lower():
+            raise HTTPException(status_code=400, detail="Tag already exists")
+        raise HTTPException(status_code=500, detail=str(e))
 
     except Exception as e:
-        if isinstance(e, HTTPException):
-            raise
-        raise HTTPException(status_code=500, detail=str(e))
+        return handle_endpoint_error(e, logger, "create_user_tag")
 
 
 @router.delete("/user/{tag_id}", response_model=Dict[str, Any])
 async def delete_user_tag(
     tag_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    service: TagService = Depends(get_tag_service)
 ):
-    """Delete a user custom tag"""
+    """
+    Delete a user custom tag
+
+    Args:
+        tag_id: Tag ID to delete
+        current_user: Current authenticated user
+
+    Returns:
+        Dictionary with deletion confirmation
+
+    Raises:
+        HTTPException: If tag not found or deletion fails
+    """
     try:
-        supabase = get_supabase()
+        deleted = await service.delete_user_tag(current_user.user_id, tag_id)
 
-        # Delete the tag (RLS policy ensures only owner can delete)
-        result = supabase.table("user_tags").delete().eq("id", tag_id).eq("user_id", current_user["id"]).execute()
-
-        if result.data:
-            return {
-                "success": True,
-                "data": {"deleted_tag_id": tag_id}
-            }
-        else:
+        if not deleted:
             raise HTTPException(status_code=404, detail="Tag not found")
 
+        return {
+            "success": True,
+            "data": {"deleted_tag_id": tag_id}
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+
     except Exception as e:
-        if isinstance(e, HTTPException):
-            raise
-        raise HTTPException(status_code=500, detail=str(e))
+        return handle_endpoint_error(e, logger, "delete_user_tag")
 
 
 @router.get("/suggestions/{text}", response_model=Dict[str, Any])
 async def get_tag_suggestions(
     text: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    service: TagService = Depends(get_tag_service)
 ):
-    """Get tag suggestions based on text analysis"""
+    """
+    Get tag suggestions based on text analysis
+
+    Args:
+        text: Text to analyze for tag suggestions
+        current_user: Current authenticated user
+
+    Returns:
+        Dictionary with suggested tags
+    """
     try:
-        supabase = get_supabase()
-
-        # Get all available tags
-        predefined_result = supabase.table("predefined_tags").select("name").execute()
-        predefined_tags = {tag["name"].lower() for tag in predefined_result.data}
-
-        user_result = supabase.table("user_tags").select("name").eq("user_id", current_user["id"]).execute()
-        user_tags = {tag["name"].lower() for tag in user_result.data}
-
-        all_tags = predefined_tags | user_tags
-
-        # Simple keyword-based suggestions
-        text_lower = text.lower()
-        suggestions = []
-
-        tag_patterns = {
-            "fitness": ["gym", "workout", "exercise", "fitness", "run", "walk", "jog", "bike"],
-            "errand": ["store", "shop", "buy", "pick up", "get", "purchase", "grocery", "mall"],
-            "work": ["work", "job", "office", "project", "deadline", "meeting", "client"],
-            "personal": ["personal", "self", "me", "my"],
-            "health": ["doctor", "dentist", "checkup", "appointment", "health", "medicine"],
-            "family": ["family", "mom", "dad", "parent", "sibling", "kids", "children"],
-            "club": ["club", "organization", "society", "group", "team"]
-        }
-
-        for tag, keywords in tag_patterns.items():
-            if tag in all_tags and any(keyword in text_lower for keyword in keywords):
-                suggestions.append(tag)
+        suggestions = await service.get_tag_suggestions(current_user.user_id, text)
 
         return {
             "success": True,
             "data": {
-                "suggestions": suggestions[:3],  # Limit to 3 suggestions
+                "suggestions": suggestions,
                 "text_analyzed": text
             }
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return handle_endpoint_error(e, logger, "get_tag_suggestions")
 
 
 @router.get("/analytics", response_model=Dict[str, Any])
 async def get_tag_analytics(
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    service: TagService = Depends(get_tag_service)
 ):
-    """Get tag usage analytics for the user"""
+    """
+    Get tag usage analytics for the user
+
+    Args:
+        current_user: Current authenticated user
+
+    Returns:
+        Dictionary with tag analytics data
+    """
     try:
-        supabase = get_supabase()
-
-        # Get tag usage counts using junction table
-        # First get user's todo IDs
-        user_todos = supabase.table("todos").select("id").eq("user_id", current_user["id"]).execute()
-        todo_ids = [todo["id"] for todo in user_todos.data]
-
-        if todo_ids:
-            # Query junction table for tag counts
-            tag_usage = supabase.table("todo_tags").select("tag_name").in_("todo_id", todo_ids).execute()
-
-            tag_counts = {}
-            for tag_record in tag_usage.data:
-                tag_name = tag_record["tag_name"]
-                tag_counts[tag_name] = tag_counts.get(tag_name, 0) + 1
-        else:
-            tag_counts = {}
-
-        analytics_data = [{"tag_name": tag, "usage_count": count} for tag, count in tag_counts.items()]
-
-        # Sort by usage count
-        analytics_data.sort(key=lambda x: x.get("usage_count", 0), reverse=True)
+        analytics = await service.get_tag_analytics(current_user.user_id)
 
         return {
             "success": True,
-            "data": {
-                "tag_analytics": analytics_data,
-                "total_unique_tags": len(analytics_data),
-                "most_used_tag": analytics_data[0] if analytics_data else None
-            }
+            "data": analytics
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return handle_endpoint_error(e, logger, "get_tag_analytics")

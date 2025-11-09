@@ -9,7 +9,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
 
-from app.config.database.supabase import get_supabase
+from app.database.repositories.user_repositories import UserPreferenceRepository, get_user_preference_repository
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,15 @@ class PreferenceCreate(BaseModel):
 class PreferencesService:
     """Service for managing user preferences"""
     
-    def __init__(self):
-        self.db = get_supabase()
+    def __init__(self, user_preference_repository: Optional[UserPreferenceRepository] = None):
+        self._user_preference_repository = user_preference_repository
+    
+    @property
+    def user_preference_repository(self) -> UserPreferenceRepository:
+        """Lazy-load user preference repository"""
+        if self._user_preference_repository is None:
+            self._user_preference_repository = get_user_preference_repository()
+        return self._user_preference_repository
     
     async def get_preference(
         self, 
@@ -57,14 +64,13 @@ class PreferencesService:
     ) -> Optional[UserPreference]:
         """Get a specific preference by category and key"""
         try:
-            result = self.db.from_("user_preferences").select("*").eq(
-                "user_id", user_id
-            ).eq("category", category).eq("preference_key", preference_key).eq(
-                "is_active", True
-            ).order("priority", desc=True).limit(1).execute()
+            row = await self.user_preference_repository.get_by_category_and_key(
+                user_id=user_id,
+                category=category,
+                preference_key=preference_key
+            )
             
-            if result.data and len(result.data) > 0:
-                row = result.data[0]
+            if row:
                 return UserPreference(
                     id=row["id"],
                     user_id=row["user_id"],
@@ -93,15 +99,15 @@ class PreferencesService:
     ) -> Any:
         """Get just the value of a preference, with optional default"""
         try:
-            # Use the database function for efficiency
-            result = self.db.rpc("get_preference_value", {
-                "p_user_id": user_id,
-                "p_category": category,
-                "p_preference_key": preference_key
-            }).execute()
+            # Use the repository RPC method for efficiency
+            result = await self.user_preference_repository.get_preference_value_rpc(
+                user_id=user_id,
+                category=category,
+                preference_key=preference_key
+            )
             
-            if result.data:
-                return result.data
+            if result:
+                return result
             
             return default
             
@@ -117,29 +123,35 @@ class PreferencesService:
     ) -> List[UserPreference]:
         """Get all preferences for a user, optionally filtered by category"""
         try:
-            # Use the database function
-            result = self.db.rpc("get_user_preferences_by_category", {
-                "p_user_id": user_id,
-                "p_category": category,
-                "p_active_only": active_only
-            }).execute()
+            # Get preferences using repository
+            if category:
+                result_data = await self.user_preference_repository.get_all_by_category(
+                    user_id=user_id,
+                    category=category
+                )
+            else:
+                result_data = await self.user_preference_repository.get_all_by_user(
+                    user_id=user_id
+                )
             
             preferences = []
-            if result.data:
-                for row in result.data:
-                    pref = UserPreference(
-                        id=row["id"],
-                        user_id=row["user_id"],
-                        category=row["category"],
-                        preference_key=row["preference_key"],
-                        value=row["value"],
-                        description=row.get("description"),
-                        is_active=row["is_active"],
-                        priority=row["priority"],
-                        created_at=datetime.fromisoformat(row["created_at"].replace('Z', '+00:00')),
-                        updated_at=datetime.fromisoformat(row["updated_at"].replace('Z', '+00:00'))
-                    )
-                    preferences.append(pref)
+            if result_data:
+                for row in result_data:
+                    # Apply active_only filter if needed
+                    if not active_only or row.get("is_active", True):
+                        pref = UserPreference(
+                            id=row["id"],
+                            user_id=row["user_id"],
+                            category=row["category"],
+                            preference_key=row["preference_key"],
+                            value=row["value"],
+                            description=row.get("description"),
+                            is_active=row["is_active"],
+                            priority=row["priority"],
+                            created_at=datetime.fromisoformat(row["created_at"].replace('Z', '+00:00')),
+                            updated_at=datetime.fromisoformat(row["updated_at"].replace('Z', '+00:00'))
+                        )
+                        preferences.append(pref)
             
             return preferences
             
@@ -154,26 +166,23 @@ class PreferencesService:
     ) -> Optional[str]:
         """Set/update a preference"""
         try:
-            upsert_data = {
-                "user_id": user_id,
-                "category": preference.category,
-                "preference_key": preference.preference_key,
+            preference_data = {
                 "value": preference.value,
                 "description": preference.description,
                 "is_active": preference.is_active,
                 "priority": preference.priority,
-                "updated_at": datetime.utcnow().isoformat()
             }
             
-            result = self.db.from_("user_preferences").upsert(
-                upsert_data,
-                on_conflict="user_id,category,preference_key"
-            ).select("id").execute()
+            result = await self.user_preference_repository.upsert_preference(
+                user_id=user_id,
+                category=preference.category,
+                preference_key=preference.preference_key,
+                preference_data=preference_data
+            )
             
-            if result.data and len(result.data) > 0:
-                pref_id = result.data[0]["id"]
+            if result:
                 logger.info(f"Set preference {preference.category}.{preference.preference_key} for user {user_id}")
-                return pref_id
+                return result["id"]
             
             return None
             
@@ -190,10 +199,7 @@ class PreferencesService:
     ) -> bool:
         """Update an existing preference"""
         try:
-            update_data = {
-                "value": updates.value,
-                "updated_at": datetime.utcnow().isoformat()
-            }
+            update_data = {"value": updates.value}
             
             if updates.description is not None:
                 update_data["description"] = updates.description
@@ -202,11 +208,14 @@ class PreferencesService:
             if updates.priority is not None:
                 update_data["priority"] = updates.priority
             
-            result = self.db.from_("user_preferences").update(update_data).eq(
-                "user_id", user_id
-            ).eq("category", category).eq("preference_key", preference_key).execute()
+            result = await self.user_preference_repository.upsert_preference(
+                user_id=user_id,
+                category=category,
+                preference_key=preference_key,
+                preference_data=update_data
+            )
             
-            success = result.data and len(result.data) > 0
+            success = result is not None
             if success:
                 logger.info(f"Updated preference {category}.{preference_key} for user {user_id}")
             
@@ -224,11 +233,12 @@ class PreferencesService:
     ) -> bool:
         """Delete a preference"""
         try:
-            result = self.db.from_("user_preferences").delete().eq(
-                "user_id", user_id
-            ).eq("category", category).eq("preference_key", preference_key).execute()
+            success = await self.user_preference_repository.delete_preference(
+                user_id=user_id,
+                category=category,
+                preference_key=preference_key
+            )
             
-            success = result.data and len(result.data) > 0
             if success:
                 logger.info(f"Deleted preference {category}.{preference_key} for user {user_id}")
             

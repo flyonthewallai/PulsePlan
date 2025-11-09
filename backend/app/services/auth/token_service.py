@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import logging
-from app.config.database.supabase import get_supabase
+from app.database.repositories.integration_repositories import OAuthTokenRepository, get_oauth_token_repository
 from app.config.cache.redis_client import get_redis_client
 from app.security.encryption import encryption_service
 from app.models.auth.oauth_tokens import (
@@ -18,15 +18,16 @@ class TokenService:
     Handles encryption, storage, and refresh of OAuth tokens
     """
     
-    def __init__(self):
-        self.supabase = None
+    def __init__(self, oauth_token_repository: Optional[OAuthTokenRepository] = None):
+        self._oauth_token_repository = oauth_token_repository
         self._redis_client = None
-        
-    def _get_supabase(self):
-        """Get Supabase client"""
-        if not self.supabase:
-            self.supabase = get_supabase()
-        return self.supabase
+    
+    @property
+    def oauth_token_repository(self) -> OAuthTokenRepository:
+        """Lazy-load OAuth token repository"""
+        if self._oauth_token_repository is None:
+            self._oauth_token_repository = get_oauth_token_repository()
+        return self._oauth_token_repository
     
     async def _get_redis_client(self):
         """Get redis client instance"""
@@ -37,13 +38,15 @@ class TokenService:
     async def get_user_connected_accounts(self, user_id: str) -> List[OAuthToken]:
         """Get all connected accounts for a user (matching Node.js method)"""
         try:
-            supabase = self._get_supabase()
-            
-            result = supabase.table('oauth_tokens').select('*').eq('user_id', user_id).execute()
-            
-            if result.data:
+            # Get active tokens using repository
+            token_data = await self.oauth_token_repository.get_active_by_user(
+                user_id=user_id,
+                provider=None  # Get all providers
+            )
+
+            if token_data:
                 connections = []
-                for row in result.data:
+                for row in token_data:
                     # Decrypt tokens for internal use
                     decrypted_access = encryption_service.decrypt_token(
                         row['access_token'], user_id
@@ -53,12 +56,13 @@ class TokenService:
                         decrypted_refresh = encryption_service.decrypt_token(
                             row['refresh_token'], user_id
                         )
-                    
+
                     # Convert to model
                     connection = OAuthToken(
                         id=row['id'],
                         user_id=row['user_id'],
                         provider=Provider(row['provider']),
+                        service_type=row.get('service_type', 'default'),  # Include service_type
                         access_token=decrypted_access,
                         refresh_token=decrypted_refresh,
                         expires_at=datetime.fromisoformat(row['expires_at'].replace('Z', '+00:00')) if row.get('expires_at') else None,
@@ -68,11 +72,11 @@ class TokenService:
                         updated_at=datetime.fromisoformat(row['updated_at'].replace('Z', '+00:00'))
                     )
                     connections.append(connection)
-                
+
                 return connections
-            
+
             return []
-            
+
         except Exception as e:
             logger.error(f"Error fetching connected accounts for user {user_id}: {e}")
             raise
@@ -82,7 +86,7 @@ class TokenService:
         try:
             # Check cache first
             redis_client = await self._get_redis_client()
-            cached_tokens = await redis_client.get_cached_user_tokens(user_id)
+            cached_tokens = await redis_client.get_cached_user_data(f"tokens:{user_id}")
             if cached_tokens:
                 return self._deserialize_user_tokens_from_cache(cached_tokens)
             
@@ -121,7 +125,7 @@ class TokenService:
             # Cache the result with proper datetime serialization
             cache_data = self._serialize_user_tokens_for_cache(user_tokens)
             redis_client = await self._get_redis_client()
-            await redis_client.cache_user_tokens(user_id, cache_data, ttl=300)  # 5 minutes
+            await redis_client.cache_user_data(f"tokens:{user_id}", cache_data, ttl=300)  # 5 minutes
             
             return user_tokens
             
@@ -202,39 +206,44 @@ class TokenService:
     async def _refresh_user_token(self, user_id: str, provider: str, refresh_token: str) -> TokenRefreshResult:
         """Refresh a user's token for a specific provider (matching Node.js method)"""
         try:
+            # Decrypt refresh token before sending to OAuth service
+            decrypted_refresh_token = encryption_service.decrypt_token(refresh_token, user_id)
+            
             new_tokens = None
             
             if provider == "google":
-                new_tokens = await self._refresh_google_token(refresh_token)
+                new_tokens = await self._refresh_google_token(decrypted_refresh_token)
             elif provider == "microsoft":
-                new_tokens = await self._refresh_microsoft_token(refresh_token)
+                new_tokens = await self._refresh_microsoft_token(decrypted_refresh_token)
             else:
                 return TokenRefreshResult(success=False, error=f"Unsupported provider: {provider}")
             
             if not new_tokens:
                 return TokenRefreshResult(success=False, error="Failed to refresh token")
             
-            # Update tokens in database
-            supabase = self._get_supabase()
-            
+            # Update tokens in database using repository
             update_data = {
                 'access_token': encryption_service.encrypt_token(new_tokens['access_token'], user_id),
-                'updated_at': datetime.now(timezone.utc).isoformat()
+                'updated_at': datetime.now(timezone.utc).isoformat(),
+                'last_refreshed': datetime.now(timezone.utc).isoformat(),
+                'is_active': True  # Ensure token is marked as active on successful refresh
             }
-            
+
             if new_tokens.get('refresh_token'):
                 update_data['refresh_token'] = encryption_service.encrypt_token(
                     new_tokens['refresh_token'], user_id
                 )
-            
+
             if new_tokens.get('expires_at'):
                 update_data['expires_at'] = new_tokens['expires_at']
             
-            result = supabase.table('oauth_tokens').update(update_data).eq(
-                'user_id', user_id
-            ).eq('provider', provider).execute()
+            success = await self.oauth_token_repository.update_by_user_and_provider(
+                user_id=user_id,
+                provider=provider,
+                update_data=update_data
+            )
             
-            if result.data:
+            if success:
                 logger.info(f"Successfully refreshed {provider} token for user {user_id}")
                 
                 # Invalidate user cache
@@ -270,53 +279,45 @@ class TokenService:
         return await provider.refresh_token(refresh_token)
     
     async def store_user_tokens(
-        self, 
-        user_id: str, 
-        provider: str, 
+        self,
+        user_id: str,
+        provider: str,
+        service_type: str,  # NEW: service identifier (calendar, gmail, etc.)
         tokens: OAuthTokenCreate
     ) -> str:
-        """Store new tokens for a user (matching Node.js method)"""
+        """Store new tokens for a user with service-specific isolation"""
         try:
-            supabase = self._get_supabase()
-            
             # Encrypt tokens before storage
             encrypted_access = encryption_service.encrypt_token(tokens.access_token, user_id)
             encrypted_refresh = None
             if tokens.refresh_token:
                 encrypted_refresh = encryption_service.encrypt_token(tokens.refresh_token, user_id)
-            
-            data = {
-                'user_id': user_id,
-                'provider': provider,
+
+            token_data = {
                 'access_token': encrypted_access,
                 'refresh_token': encrypted_refresh,
                 'expires_at': tokens.expires_at.isoformat() if tokens.expires_at else None,
                 'scopes': tokens.scopes,
-                'email': tokens.email
+                'email': tokens.email,
+                'is_active': True  # Set active flag when storing tokens
             }
+
+            # Upsert using repository
+            result = await self.oauth_token_repository.upsert_token(
+                user_id=user_id,
+                provider=provider,
+                service_type=service_type,
+                token_data=token_data
+            )
             
-            # Check if connection already exists
-            existing = supabase.table('oauth_tokens').select('*').eq(
-                'user_id', user_id
-            ).eq('provider', provider).execute()
-            
-            if existing.data:
-                # Update existing connection
-                result = supabase.table('oauth_tokens').update(data).eq(
-                    'id', existing.data[0]['id']
-                ).execute()
-            else:
-                # Insert new connection
-                result = supabase.table('oauth_tokens').insert(data).execute()
-            
-            if result.data:
-                logger.info(f"Successfully stored {provider} tokens for user {user_id}")
+            if result:
+                logger.info(f"Successfully stored {provider}/{service_type} tokens for user {user_id}")
                 
                 # Invalidate user cache
                 redis_client = await self._get_redis_client()
                 await redis_client.invalidate_user_cache(user_id)
                 
-                return result.data[0]['id']
+                return result['id']
             else:
                 raise Exception("Failed to store tokens")
                 
@@ -324,26 +325,27 @@ class TokenService:
             logger.error(f"Error storing tokens for user {user_id}: {e}")
             raise
     
-    async def remove_user_tokens(self, user_id: str, provider: str) -> bool:
-        """Remove tokens for a user and provider (matching Node.js method)"""
+    async def remove_user_tokens(self, user_id: str, provider: str, service_type: str) -> bool:
+        """Remove tokens for a user, provider, and specific service"""
         try:
-            supabase = self._get_supabase()
-            
-            result = supabase.table('oauth_tokens').delete().eq(
-                'user_id', user_id
-            ).eq('provider', provider).execute()
-            
-            if result.data is not None:  # Successful deletion
-                logger.info(f"Successfully removed {provider} tokens for user {user_id}")
-                
+            # Delete using repository
+            success = await self.oauth_token_repository.delete_by_user_provider_service(
+                user_id=user_id,
+                provider=provider,
+                service_type=service_type
+            )
+
+            if success:
+                logger.info(f"Successfully removed {provider}/{service_type} tokens for user {user_id}")
+
                 # Invalidate user cache
                 redis_client = await self._get_redis_client()
                 await redis_client.invalidate_user_cache(user_id)
-                
+
                 return True
             else:
                 return False
-                
+
         except Exception as e:
             logger.error(f"Error removing tokens for user {user_id}: {e}")
             return False
@@ -351,13 +353,11 @@ class TokenService:
     async def has_provider_connected(self, user_id: str, provider: str) -> bool:
         """Check if user has connected a specific provider (matching Node.js method)"""
         try:
-            supabase = self._get_supabase()
-            
-            result = supabase.table('oauth_tokens').select('id').eq(
-                'user_id', user_id
-            ).eq('provider', provider).limit(1).execute()
-            
-            return len(result.data) > 0
+            # Check using repository
+            return await self.oauth_token_repository.check_provider_exists(
+                user_id=user_id,
+                provider=provider
+            )
             
         except Exception as e:
             logger.error(f"Error checking provider connection for user {user_id}: {e}")

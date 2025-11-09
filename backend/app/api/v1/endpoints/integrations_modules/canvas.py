@@ -11,8 +11,7 @@ from datetime import datetime
 
 from app.core.auth import get_current_user
 from app.services.integrations.canvas_token_service import get_canvas_token_service
-from app.jobs.canvas.canvas_backfill_job import get_canvas_backfill_job
-from app.jobs.canvas.canvas_delta_sync_job import get_canvas_delta_sync_job
+from app.services.workers.canvas_job_runner import get_canvas_job_runner
 from app.middleware.rate_limiting import rate_limit
 
 logger = logging.getLogger(__name__)
@@ -341,31 +340,25 @@ async def get_canvas_status(
                 status="not_connected"
             )
 
-        # Get additional integration info
-        from app.config.database.supabase import get_supabase
-        supabase = get_supabase()
+        # Get additional integration info from metadata
+        from app.database.repositories.task_repositories.task_repository import get_task_repository
+        
+        task_repo = get_task_repository()
+        metadata = token_data.get("metadata", {}) if isinstance(token_data.get("metadata"), dict) else {}
 
-        # Get integration record
-        response = supabase.table("integration_canvas").select("*").eq(
-            "user_id", user_id
-        ).single().execute()
-
-        integration_data = response.data if response.data else {}
-
-        # Get assignment count
-        tasks_response = supabase.table("tasks").select("id").eq(
-            "user_id", user_id
-        ).eq("external_source", "canvas").execute()
-
-        assignments_count = len(tasks_response.data) if tasks_response.data else 0
+        # Get assignment count using repository
+        assignments_count = await task_repo.count_by_filters(
+            user_id=user_id,
+            filters={"external_source": "canvas"}
+        )
 
         return CanvasIntegrationStatus(
             user_id=user_id,
             connected=True,
             canvas_url=token_data.get("base_url"),
-            status=integration_data.get("status", "ok"),
-            last_sync=integration_data.get("last_full_sync_at") or integration_data.get("last_delta_at"),
-            last_error=integration_data.get("last_error_code"),
+            status=token_data.get("status", "ok"),
+            last_sync=metadata.get("last_full_sync_at") or metadata.get("last_delta_at"),
+            last_error=metadata.get("last_error_code"),
             assignments_count=assignments_count
         )
 
@@ -486,21 +479,25 @@ async def get_canvas_assignments(
     user_id = current_user["id"]
 
     try:
-        from ....config.supabase import get_supabase_client
-        supabase = get_supabase_client()
+        from app.database.repositories.task_repositories.task_repository import get_task_repository
+        
+        task_repo = get_task_repository()
 
-        # Build query
-        query = supabase.table("tasks").select("*").eq(
-            "user_id", user_id
-        ).eq("external_source", "canvas")
-
+        # Build filters for Canvas tasks
+        filters = {
+            "external_source": "canvas",
+            "order_by": "due_date",
+            "order_desc": False
+        }
+        
         if not include_completed:
-            query = query.eq("completed", False)
+            filters["completed"] = False
 
-        query = query.order("due_date", desc=False, nullsfirst=False).limit(limit)
-
-        response = await query.execute()
-        assignments = response.data or []
+        assignments = await task_repo.get_by_user(
+            user_id=user_id,
+            filters=filters,
+            limit=limit
+        )
 
         return {
             "success": True,
@@ -524,8 +521,8 @@ async def _execute_full_sync_job(user_id: str, sync_id: str, force_restart: bool
     try:
         logger.info(f"Starting full Canvas sync job {sync_id} for user {user_id}")
 
-        backfill_job = get_canvas_backfill_job()
-        result = await backfill_job.execute_backfill(user_id, force_restart)
+        job_runner = get_canvas_job_runner()
+        result = await job_runner.run_backfill(user_id, force_restart)
 
         logger.info(f"Full Canvas sync job {sync_id} completed for user {user_id}: {result['status']}")
 
@@ -534,7 +531,7 @@ async def _execute_full_sync_job(user_id: str, sync_id: str, force_restart: bool
             from app.core.infrastructure.websocket import websocket_manager as ws_manager
             await ws_manager.emit_to_user(
                 user_id,
-                'canvas_sync',
+                'canvas_sync_completed',
                 {
                     'status': result['status'],
                     'sync_id': sync_id,
@@ -569,8 +566,8 @@ async def _execute_delta_sync_job(user_id: str, sync_id: str):
     try:
         logger.info(f"Starting delta Canvas sync job {sync_id} for user {user_id}")
 
-        delta_job = get_canvas_delta_sync_job()
-        result = await delta_job.execute_delta_sync(user_id)
+        job_runner = get_canvas_job_runner()
+        result = await job_runner.run_delta_sync(user_id)
 
         logger.info(f"Delta Canvas sync job {sync_id} completed for user {user_id}: {result['status']}")
 
