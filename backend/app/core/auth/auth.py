@@ -82,9 +82,12 @@ async def get_current_user(
     except HTTPException:
         raise
     except Exception as e:
+        # Log detailed error for debugging, but return generic message to client
+        # to prevent information disclosure
+        logger.error(f"Authentication failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Authentication failed: {str(e)}",
+            detail="Authentication failed",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

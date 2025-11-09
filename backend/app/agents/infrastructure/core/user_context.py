@@ -11,8 +11,12 @@ from pydantic import BaseModel
 import uuid
 
 from app.config.cache.redis_client import get_redis_client
-from app.config.database.supabase import get_supabase
 from app.memory import get_vector_memory_service, get_chat_memory_service
+from app.services.user_service import UserService, get_user_service
+from app.database.repositories.user_repositories.user_preference_repository import (
+    UserPreferenceRepository,
+    get_user_preference_repository
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,18 +65,33 @@ class UserContextSnapshot:
 class UserContextService:
     """Service for building comprehensive user context for AI agents"""
     
-    def __init__(self):
+    def __init__(
+        self,
+        user_service: Optional[UserService] = None,
+        user_preference_repository: Optional[UserPreferenceRepository] = None
+    ):
         self.redis = None
-        self.supabase = None
+        self._user_service = user_service
+        self._user_preference_repository = user_preference_repository
         self.vector_service = None
         self.chat_service = None
+    
+    def _get_user_service(self) -> UserService:
+        """Lazy-load user service"""
+        if self._user_service is None:
+            self._user_service = get_user_service()
+        return self._user_service
+    
+    def _get_user_preference_repository(self) -> UserPreferenceRepository:
+        """Lazy-load user preference repository"""
+        if self._user_preference_repository is None:
+            self._user_preference_repository = get_user_preference_repository()
+        return self._user_preference_repository
         
     async def _ensure_services(self):
         """Lazy initialize services"""
         if not self.redis:
             self.redis = await get_redis_client()
-        if not self.supabase:
-            self.supabase = get_supabase()
         if not self.vector_service:
             self.vector_service = get_vector_memory_service()
         if not self.chat_service:
@@ -83,9 +102,9 @@ class UserContextService:
         await self._ensure_services()
         
         try:
-            # Get user data from users table only
-            user_response = self.supabase.table("users").select("*").eq("id", user_id).execute()
-            user_data = user_response.data[0] if user_response.data else {}
+            # Get user data using UserService
+            user_service = self._get_user_service()
+            user_data = await user_service.get_user_profile(user_id)
 
             # Check for agent context in user_preferences table
             agent_context = await self._get_agent_context(user_id)
@@ -112,17 +131,17 @@ class UserContextService:
     async def _get_agent_context(self, user_id: str) -> Dict[str, Any]:
         """Get agent-specific context (description, instructions, persona)"""
         try:
-            # Check user_preferences table for agent context
-            prefs_response = self.supabase.table("user_preferences").select("*").eq("user_id", user_id).eq("category", "agent_context").execute()
+            # Check user_preferences table for agent context using repository
+            repo = self._get_user_preference_repository()
+            prefs_data = await repo.get_all_by_category(user_id, "agent_context")
             
             agent_context = {}
-            if prefs_response.data:
-                for pref in prefs_response.data:
-                    key = pref.get("preference_key")
-                    value = pref.get("value")
-                    if key in ["description", "instructions", "persona"] and value:
-                        # Extract string value from jsonb
-                        agent_context[key] = value if isinstance(value, str) else value.get("value")
+            for pref in prefs_data:
+                key = pref.get("preference_key")
+                value = pref.get("value")
+                if key in ["description", "instructions", "persona"] and value:
+                    # Extract string value from jsonb
+                    agent_context[key] = value if isinstance(value, str) else value.get("value")
             
             return agent_context
             
@@ -149,16 +168,19 @@ class UserContextService:
             if persona is not None:
                 updates["persona"] = persona
             
+            repo = self._get_user_preference_repository()
             for key, value in updates.items():
-                # Upsert agent context preferences
-                self.supabase.table("user_preferences").upsert({
-                    "user_id": user_id,
-                    "category": "agent_context",
-                    "preference_key": key,
-                    "value": value,
-                    "description": f"Agent {key} set by user",
-                    "updated_at": datetime.utcnow().isoformat()
-                }, on_conflict="user_id,category,preference_key").execute()
+                # Upsert agent context preferences using repository
+                await repo.upsert_preference(
+                    user_id=user_id,
+                    category="agent_context",
+                    preference_key=key,
+                    preference_data={
+                        "value": value,
+                        "description": f"Agent {key} set by user",
+                        "is_active": True
+                    }
+                )
             
             # Invalidate cache
             cache_key = f"user_context:{user_id}"

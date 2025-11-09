@@ -16,31 +16,18 @@ __all__ = [
     # Core worker infrastructure
     "JobStatus",
     "JobResult",
-    "EmailData", 
+    "EmailData",
     "BriefingData",
     "WeeklyPulseData",
     "WorkerManager",
-    "create_worker_manager",
-    "run_workers",
-    "shutdown_workers",
-    
+
     # Scheduling workers
     "WorkerScheduler",
     "get_worker_scheduler",
-    "schedule_daily_briefings",
-    "schedule_weekly_pulses", 
-    "schedule_health_checks",
-    "TimezoneScheduler",
+    "TimezoneAwareScheduler",
     "get_timezone_scheduler",
-    "create_timezone_aware_jobs",
-    "optimize_scheduling_for_timezone",
-    "analyze_user_timezones",
-    
+
     # Communication workers
     "EmailService",
     "get_email_service",
-    "send_briefing_email", 
-    "send_notification_email",
-    "send_weekly_pulse_email",
-    "validate_email_delivery",
 ]

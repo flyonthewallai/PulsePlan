@@ -7,13 +7,12 @@ import asyncio
 from typing import Dict, Any, List, Set, Optional
 from datetime import datetime, time
 from collections import defaultdict
-import pytz
+from app.core.utils.timezone_utils import get_timezone_manager
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from ...config.database.supabase import get_supabase_client
-from .scheduler import WorkerScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +22,17 @@ class TimezoneAwareScheduler:
     
     def __init__(self):
         self.scheduler = AsyncIOScheduler()
-        self.worker_scheduler = WorkerScheduler()
+        self._job_runner = None
         self.supabase = get_supabase_client()
         self.active_timezone_jobs = set()
+
+    @property
+    def job_runner(self):
+        """Lazy import to avoid circular dependency."""
+        if self._job_runner is None:
+            from ...services.workers.briefing_job_runner import get_briefing_job_runner
+            self._job_runner = get_briefing_job_runner()
+        return self._job_runner
         
     async def start(self):
         """Start the scheduler and analyze user timezones"""
@@ -218,20 +225,15 @@ class TimezoneAwareScheduler:
             logger.error(f"Error creating weekly pulse jobs: {e}")
     
     def _convert_to_utc(self, timezone_name: str, hour: int, minute: int) -> tuple[int, int]:
-        """Convert local time to UTC for scheduling"""
+        """Convert local time (in a tz name) to UTC hour/minute using TimezoneManager"""
         try:
-            # Create timezone object
-            local_tz = pytz.timezone(timezone_name)
-            
-            # Create a datetime object for today at the specified time
-            now = datetime.now()
-            local_dt = local_tz.localize(datetime(now.year, now.month, now.day, hour, minute))
-            
-            # Convert to UTC
-            utc_dt = local_dt.utctimetuple()
-            
-            return utc_dt.tm_hour, utc_dt.tm_min
-            
+            tz_manager = get_timezone_manager()
+            now = datetime.utcnow()
+            # Build naive local time, then localize using tz_manager
+            local_naive = datetime(now.year, now.month, now.day, hour, minute)
+            localized = tz_manager.ensure_timezone_aware(local_naive, timezone_name)
+            utc_dt = localized.astimezone(tz_manager._default_timezone)
+            return utc_dt.hour, utc_dt.minute
         except Exception as e:
             logger.warning(f"Error converting {timezone_name} time to UTC: {e}, using original time")
             return hour, minute
@@ -266,29 +268,10 @@ class TimezoneAwareScheduler:
                 except Exception as e:
                     logger.warning(f"Error getting user info for {user['user_id']}: {e}")
             
-            # Process briefings using the existing worker scheduler logic
-            results = []
-            for formatted_user in formatted_users:
-                try:
-                    result = await self.worker_scheduler._process_daily_briefing(formatted_user)
-                    results.append(result)
-                    
-                    # Log result
-                    logger.info(
-                        f"Briefing processed for user {formatted_user['id']}: "
-                        f"{'Success' if result.success else 'Failed - ' + str(result.error)}"
-                    )
-                    
-                except Exception as e:
-                    logger.error(f"Failed to process briefing for user {formatted_user.get('id')}: {e}")
-            
-            # Log summary
-            success_count = sum(1 for r in results if r.success)
-            failure_count = len(results) - success_count
-            
+            result_counts = await self.job_runner.process_briefings_for_users(formatted_users)
             logger.info(
                 f"Timezone-specific briefing completed for {tz_time_key}: "
-                f"{success_count} success, {failure_count} failures"
+                f"{result_counts['success']} success, {result_counts['failed']} failures"
             )
             
         except Exception as e:
@@ -323,28 +306,10 @@ class TimezoneAwareScheduler:
                 except Exception as e:
                     logger.warning(f"Error getting user info for pulse {user['user_id']}: {e}")
             
-            # Process weekly pulse using existing logic
-            results = []
-            for formatted_user in formatted_users:
-                try:
-                    result = await self.worker_scheduler._process_weekly_pulse(formatted_user)
-                    results.append(result)
-                    
-                    logger.info(
-                        f"Weekly pulse processed for user {formatted_user['id']}: "
-                        f"{'Success' if result.success else 'Failed - ' + str(result.error)}"
-                    )
-                    
-                except Exception as e:
-                    logger.error(f"Failed to process weekly pulse for user {formatted_user.get('id')}: {e}")
-            
-            # Log summary
-            success_count = sum(1 for r in results if r.success)
-            failure_count = len(results) - success_count
-            
+            result_counts = await self.job_runner.process_weekly_pulse_for_users(formatted_users)
             logger.info(
                 f"Timezone-specific weekly pulse completed for {tz_time_key}: "
-                f"{success_count} success, {failure_count} failures"
+                f"{result_counts['success']} success, {result_counts['failed']} failures"
             )
             
         except Exception as e:

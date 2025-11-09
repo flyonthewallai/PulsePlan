@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 from enum import Enum
+import uuid
 
 from ..core.domain import ScheduleBlock, ScheduleSolution
 
@@ -233,7 +234,7 @@ class EnhancedScheduleSolution:
     diagnostics: DetailedDiagnostics
 
     # Fields with defaults come last
-    solution_id: str = field(default_factory=lambda: str(__import__('uuid').uuid4()))
+    solution_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=datetime.now)
     alternatives: List[AlternativeSolution] = field(default_factory=list)
     user_preferences_applied: Dict[str, Any] = field(default_factory=dict)

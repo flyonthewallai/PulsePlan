@@ -1,0 +1,133 @@
+🧪 Running Batch Inference on Test Set
+
+================================================================================
+
+Model: /Users/admin/PulsePlan/ml/intent_classifier/outputs/contrastive_model
+Specs: /Users/admin/PulsePlan/ml/intent_classifier/data/intent_specs_embedded.json
+Test data: /Users/admin/PulsePlan/data/intents/test.jsonl
+
+2025-10-26 19:42:06,623 - __main__ - INFO - Loading model...
+2025-10-26 19:42:08,038 - __main__ - INFO - Loading intent embeddings...
+Loaded 22 intent classes
+
+Loaded 100 test examples
+
+================================================================================
+
+Running inference...
+
+  Processed 20/100 examples...
+  Processed 40/100 examples...
+  Processed 60/100 examples...
+  Processed 80/100 examples...
+  Processed 100/100 examples...
+
+================================================================================
+📊 RESULTS
+================================================================================
+
+✅ Overall Accuracy: 88.00% (88/100)
+📈 Average Confidence: 0.922
+📉 Confidence Std Dev: 0.096
+
+📋 Per-Intent Accuracy:
+  ✅ adjust_plan               100.0% (5/5)
+  ⚠️ adjust_preferences         66.7% (2/3)
+  ✅ app_info_query            100.0% (2/2)
+  ✅ calendar_event            100.0% (5/5)
+  ✅ cancel                    100.0% (5/5)
+  ⚠️ chitchat                   75.0% (3/4)
+  ❌ clarification_request      33.3% (1/3)
+  ✅ confirm                    80.0% (4/5)
+  ✅ email                     100.0% (5/5)
+  ✅ greeting                  100.0% (5/5)
+  ✅ help                       80.0% (4/5)
+  ✅ reminder                   80.0% (4/5)
+  ✅ reschedule                100.0% (5/5)
+  ✅ scheduling                100.0% (5/5)
+  ✅ search                    100.0% (5/5)
+  ⚠️ status                     60.0% (3/5)
+  ✅ task_management            80.0% (4/5)
+  ✅ temporal_slot_fill        100.0% (5/5)
+  ✅ thanks                    100.0% (5/5)
+  ✅ time_slot_fill            100.0% (5/5)
+  ⚠️ unknown                    60.0% (3/5)
+  ✅ user_data_query           100.0% (3/3)
+
+⚠️  Worst Performing Intents:
+  clarification_request     33.3%
+  status                    60.0%
+  unknown                   60.0%
+  adjust_preferences        66.7%
+  chitchat                  75.0%
+
+❌ Classification Errors (showing up to 3 per intent):
+
+  adjust_preferences (1 errors):
+    Query: "enable productivity insights"
+    Predicted: help (conf: 0.717)
+    2nd choice: status (conf: 0.199)
+
+  chitchat (1 errors):
+    Query: "Weekend plans?"
+    Predicted: scheduling (conf: 0.927)
+    2nd choice: user_data_query (conf: 0.215)
+
+  clarification_request (2 errors):
+    Query: "i'm not following"
+    Predicted: unknown (conf: 0.868)
+    2nd choice: clarification_request (conf: 0.336)
+    Query: "what was that?"
+    Predicted: chitchat (conf: 0.789)
+    2nd choice: clarification_request (conf: 0.347)
+
+  confirm (1 errors):
+    Query: "Confirm"
+    Predicted: cancel (conf: 0.684)
+    2nd choice: reminder (conf: 0.423)
+
+  help (1 errors):
+    Query: "Show me around"
+    Predicted: user_data_query (conf: 0.929)
+    2nd choice: chitchat (conf: 0.198)
+
+  reminder (1 errors):
+    Query: "Heads up about meeting in 15 min"
+    Predicted: scheduling (conf: 0.706)
+    2nd choice: calendar_event (conf: 0.305)
+
+  status (2 errors):
+    Query: "What's my completion percentage?"
+    Predicted: user_data_query (conf: 0.969)
+    2nd choice: status (conf: 0.073)
+    Query: "Task progress report"
+    Predicted: task_management (conf: 0.965)
+    2nd choice: adjust_plan (conf: 0.091)
+
+  task_management (1 errors):
+    Query: "Pack for trip"
+    Predicted: scheduling (conf: 0.779)
+    2nd choice: task_management (conf: 0.506)
+
+  unknown (2 errors):
+    Query: "Can't figure this out"
+    Predicted: help (conf: 0.702)
+    2nd choice: clarification_request (conf: 0.392)
+    Query: "What are you saying"
+    Predicted: clarification_request (conf: 0.971)
+    2nd choice: unknown (conf: 0.051)
+
+🔀 Most Confused Intent Pairs:
+  task_management           → scheduling                (1 times)
+  reminder                  → scheduling                (1 times)
+  status                    → user_data_query           (1 times)
+  status                    → task_management           (1 times)
+  confirm                   → cancel                    (1 times)
+  help                      → user_data_query           (1 times)
+  unknown                   → help                      (1 times)
+  unknown                   → clarification_request     (1 times)
+  chitchat                  → scheduling                (1 times)
+  adjust_preferences        → help                      (1 times)
+
+================================================================================
+✅ Inference complete!

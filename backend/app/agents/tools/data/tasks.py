@@ -9,6 +9,9 @@ import logging
 from datetime import datetime
 
 from ..core.base import TaskTool, ToolResult, ToolError
+from app.services.task_service import TaskService
+from app.services.todo_service import TodoService
+from app.core.utils.error_handlers import ServiceError
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,8 @@ class TaskDatabaseTool(TaskTool):
             name="task_database",
             description="Comprehensive task CRUD operations with dependency validation and constraint checking"
         )
+        self.task_service = TaskService()
+        self.todo_service = TodoService()
     
     def get_required_tokens(self) -> List[str]:
         """Return list of required OAuth tokens for this tool"""
@@ -175,9 +180,6 @@ class TaskDatabaseTool(TaskTool):
     async def create_task(self, task_data: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
         """Create new task or todo based on task_type"""
         try:
-            from app.config.database.supabase import get_supabase
-            from .todos import TodoDatabaseTool
-
             # Validate required fields
             if not task_data.get("title"):
                 raise ToolError("Task title is required", self.name)
@@ -187,7 +189,6 @@ class TaskDatabaseTool(TaskTool):
 
             # If it's not an academic task type, create a todo instead
             if task_type not in ["assignment", "quiz", "exam"]:
-
                 # Convert task_data to todo_data format
                 todo_data = {
                     "title": task_data["title"],
@@ -198,67 +199,25 @@ class TaskDatabaseTool(TaskTool):
                     "estimated_minutes": task_data.get("estimated_minutes")
                 }
 
-                # Use TodoDatabaseTool to create the todo
-                todo_tool = TodoDatabaseTool()
-                return await todo_tool.create_todo(todo_data, context)
-
-            # For academic tasks (assignment, quiz, exam), continue with task creation
-
-            # Validate prerequisites exist if provided
-            prerequisites = task_data.get("prerequisites", [])
-            if prerequisites:
-                await self._validate_prerequisites_exist(prerequisites, user_id)
-
-            # Validate scheduling constraints
-            await self._validate_scheduling_constraints(task_data)
-
-            # Create task record for database
-            task_record = {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "title": task_data["title"],
-                "description": task_data.get("description", ""),
-                "task_type": task_type,  # Explicitly set the academic task type
-                "kind": task_data.get("kind", "admin"),
-                "estimated_minutes": task_data.get("estimated_minutes", 60),
-                "min_block_minutes": task_data.get("min_block_minutes", 30),
-                "max_block_minutes": task_data.get("max_block_minutes"),
-                "deadline": task_data.get("deadline"),
-                "earliest_start": task_data.get("earliest_start"),
-                "preferred_windows": task_data.get("preferred_windows", []),
-                "avoid_windows": task_data.get("avoid_windows", []),
-                "fixed": task_data.get("fixed", False),
-                "parent_task_id": task_data.get("parent_task_id"),
-                "prerequisites": prerequisites,
-                "weight": task_data.get("weight", 1.0),
-                "course_id": task_data.get("course_id"),
-                "must_finish_before": task_data.get("must_finish_before"),
-                "tags": task_data.get("tags", []),
-                "pinned_slots": task_data.get("pinned_slots", []),
-                "status": task_data.get("status", "pending"),
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat()
-            }
-
-            # Insert into Supabase database
-            supabase = get_supabase()
-            result = supabase.table("tasks").insert(task_record).execute()
-            
-            if result.data:
+                # Use TodoService to create the todo
+                todo = await self.todo_service.create_todo(user_id, todo_data)
                 return ToolResult(
                     success=True,
-                    data={"task": result.data[0]},
-                    metadata={"operation": "create", "user_id": user_id, "record_id": task_record["id"]}
+                    data={"todo": todo, "todo_id": todo["id"]},
+                    metadata={"operation": "create", "user_id": user_id, "todo_id": todo["id"]}
                 )
-            else:
-                raise ToolError("Failed to insert task into database", self.name)
+
+            # For academic tasks (assignment, quiz, exam), use TaskService
+            task = await self.task_service.create_task(user_id, task_data)
             
             return ToolResult(
                 success=True,
-                data={"task": task_record},
-                metadata={"operation": "create", "user_id": user_id}
+                data={"task": task},
+                metadata={"operation": "create", "user_id": user_id, "record_id": task["id"]}
             )
             
+        except ServiceError as e:
+            raise ToolError(str(e), self.name, recoverable=True)
         except Exception as e:
             raise ToolError(f"Failed to create task: {e}", self.name, recoverable=True)
 
@@ -276,39 +235,10 @@ class TaskDatabaseTool(TaskTool):
     async def update_task(self, task_id: str, task_data: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
         """Update existing task"""
         try:
-            from app.config.database.supabase import get_supabase
-            supabase = get_supabase()
-            
             user_id = context["user_id"]
             
-            # Prepare update data with only provided fields
-            update_data = {
-                "updated_at": datetime.utcnow().isoformat()
-            }
-            
-            # Only include fields that were provided
-            for field in ["title", "description", "status", "priority", "due_date", "tags", 
-                         "estimated_hours", "actual_hours", "project_id", "dependencies", 
-                         "progress_percentage", "metadata", "pinned_slots", "completed_at"]:
-                if field in task_data:
-                    update_data[field] = task_data[field]
-            
-            # Handle completed_at based on status field
-            if "status" in task_data:
-                # Only set completed_at if not explicitly provided
-                if "completed_at" not in task_data:
-                    if task_data["status"] == "completed":
-                        update_data["completed_at"] = datetime.utcnow().isoformat()
-                    else:
-                        update_data["completed_at"] = None
-            
-            # Update in database
-            response = supabase.table("tasks").update(update_data).eq("id", task_id).eq("user_id", user_id).execute()
-            
-            if not response.data:
-                raise Exception("Task not found or update failed")
-            
-            updated_task = response.data[0]
+            # Use TaskService to update
+            updated_task = await self.task_service.update_task(task_id, user_id, task_data)
             
             return ToolResult(
                 success=True,
@@ -316,6 +246,8 @@ class TaskDatabaseTool(TaskTool):
                 metadata={"operation": "update", "user_id": user_id, "task_id": task_id}
             )
             
+        except ServiceError as e:
+            raise ToolError(str(e), self.name, recoverable=True)
         except Exception as e:
             logger.error(f"Failed to update task {task_id}: {e}")
             raise ToolError(f"Failed to update task: {e}", self.name, recoverable=True)
@@ -323,27 +255,19 @@ class TaskDatabaseTool(TaskTool):
     async def delete_task(self, task_id: str, context: Dict[str, Any]) -> ToolResult:
         """Delete task"""
         try:
-            from app.config.database.supabase import get_supabase
-            supabase = get_supabase()
-            
             user_id = context["user_id"]
             
-            # Delete from database
-            response = supabase.table("tasks").delete().eq("id", task_id).eq("user_id", user_id).execute()
-            
-            if not response.data:
-                raise Exception("Task not found or deletion failed")
+            # Use TaskService to delete
+            result = await self.task_service.delete_task(task_id, user_id)
             
             return ToolResult(
                 success=True,
-                data={
-                    "deleted_task_id": task_id,
-                    "deleted_at": datetime.utcnow().isoformat(),
-                    "deleted_by": user_id
-                },
+                data=result,
                 metadata={"operation": "delete", "user_id": user_id, "task_id": task_id}
             )
             
+        except ServiceError as e:
+            raise ToolError(str(e), self.name, recoverable=True)
         except Exception as e:
             logger.error(f"Failed to delete task {task_id}: {e}")
             raise ToolError(f"Failed to delete task: {e}", self.name, recoverable=True)
@@ -351,18 +275,13 @@ class TaskDatabaseTool(TaskTool):
     async def get_task(self, task_id: str, context: Dict[str, Any]) -> ToolResult:
         """Get specific task"""
         try:
-            from app.config.database.supabase import get_supabase
-            supabase = get_supabase()
-            
             user_id = context["user_id"]
             
-            # Get from database
-            response = supabase.table("tasks").select("*").eq("id", task_id).eq("user_id", user_id).single().execute()
+            # Use TaskService to get task
+            task = await self.task_service.get_task(task_id, user_id)
             
-            if not response.data:
-                raise Exception("Task not found")
-            
-            task = response.data
+            if not task:
+                raise ToolError("Task not found", self.name, recoverable=True)
             
             return ToolResult(
                 success=True,
@@ -370,103 +289,54 @@ class TaskDatabaseTool(TaskTool):
                 metadata={"operation": "get", "user_id": user_id, "task_id": task_id}
             )
             
+        except ToolError:
+            raise
+        except ServiceError as e:
+            raise ToolError(str(e), self.name, recoverable=True)
         except Exception as e:
             raise ToolError(f"Failed to get task: {e}", self.name, recoverable=True)
     
     async def list_tasks(self, filters: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
         """List tasks with filters"""
         try:
-            from app.config.database.supabase import get_supabase
-            supabase = get_supabase()
-
             user_id = context["user_id"]
-
-            # Build query with course information (compact format to avoid encoding issues)
-            select_query = "*,courses(id,name,color,icon,canvas_course_code)"
-
-            query = supabase.table("tasks").select(select_query).eq("user_id", user_id)
             
-            # Apply filters
-            if filters.get("status"):
-                query = query.eq("status", filters["status"])
-            if filters.get("priority"):
-                query = query.eq("priority", filters["priority"])
-            if filters.get("project_id"):
-                query = query.eq("project_id", filters["project_id"])
-            if filters.get("due_before"):
-                query = query.lte("due_date", filters["due_before"])
-            if filters.get("due_after"):
-                query = query.gte("due_date", filters["due_after"])
-            if filters.get("tags"):
-                # Filter by tags array containment
-                query = query.contains("tags", filters["tags"])
-            
-            # Apply ordering
-            order_by = filters.get("order_by", "updated_at")
-            order_desc = filters.get("order_desc", True)
-            query = query.order(order_by, desc=order_desc)
-            
-            # Apply limit
-            limit = filters.get("limit", 100)  # Increased default limit to show more tasks
-            query = query.limit(limit)
-            
-            response = query.execute()
-            tasks = response.data or []
+            # Use TaskService to list tasks
+            result = await self.task_service.list_tasks(user_id, filters)
 
             return ToolResult(
                 success=True,
-                data={
-                    "tasks": tasks,
-                    "total": len(tasks),
-                    "filters_applied": filters
-                },
+                data=result,
                 metadata={"operation": "list", "user_id": user_id}
             )
             
+        except ServiceError as e:
+            raise ToolError(str(e), self.name, recoverable=True)
         except Exception as e:
             raise ToolError(f"Failed to list tasks: {e}", self.name, recoverable=True)
     
     async def search_tasks_by_title(self, title: str, context: Dict[str, Any]) -> ToolResult:
         """Search for tasks by title (case-insensitive partial match with exact match priority)"""
         try:
-            from app.config.database.supabase import get_supabase
-            supabase = get_supabase()
-
             user_id = context["user_id"]
-            title_trimmed = title.strip()
-
-            # First try exact match (case-insensitive)
-            exact_response = supabase.table("tasks").select("*").eq("user_id", user_id).ilike("title", title_trimmed).execute()
-            exact_tasks = exact_response.data or []
-
-            if exact_tasks:
-                # Found exact match(es)
-                tasks = exact_tasks
-            else:
-                # Fall back to partial match
-                partial_response = supabase.table("tasks").select("*").eq("user_id", user_id).ilike("title", f"%{title_trimmed}%").execute()
-                tasks = partial_response.data or []
+            
+            # Use TaskService to search
+            result = await self.task_service.search_by_title(user_id, title)
 
             return ToolResult(
                 success=True,
-                data={
-                    "tasks": tasks,
-                    "total": len(tasks),
-                    "search_term": title_trimmed,
-                    "match_type": "exact" if exact_tasks else "partial"
-                },
-                metadata={"operation": "search_by_title", "user_id": user_id, "search_term": title_trimmed}
+                data=result,
+                metadata={"operation": "search_by_title", "user_id": user_id, "search_term": title.strip()}
             )
             
+        except ServiceError as e:
+            raise ToolError(str(e), self.name, recoverable=True)
         except Exception as e:
             raise ToolError(f"Failed to search tasks by title: {e}", self.name, recoverable=True)
     
     async def delete_tasks_by_title_batch(self, titles: List[str], context: Dict[str, Any]) -> ToolResult:
         """Delete all tasks matching the given titles (handles multiple tasks with same title)"""
         try:
-            from app.config.database.supabase import get_supabase
-            supabase = get_supabase()
-            
             user_id = context["user_id"]
             deleted_tasks = []
             failed_tasks = []
@@ -513,9 +383,6 @@ class TaskDatabaseTool(TaskTool):
     async def update_task_by_title_batch(self, title: str, task_data: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
         """Update all tasks matching the given title (handles multiple tasks with same title)"""
         try:
-            from app.config.database.supabase import get_supabase
-            supabase = get_supabase()
-            
             user_id = context["user_id"]
             updated_tasks = []
             failed_tasks = []
@@ -608,29 +475,28 @@ class TaskDatabaseTool(TaskTool):
     async def validate_dependencies(self, task_id: str, context: Dict[str, Any]) -> ToolResult:
         """Validate task dependencies and constraints"""
         try:
-            from app.config.database.supabase import get_supabase
-            supabase = get_supabase()
-            
             user_id = context["user_id"]
-            
-            # Get the task and its dependencies
-            task_response = supabase.table("tasks").select("*").eq("id", task_id).eq("user_id", user_id).single().execute()
-            
-            if not task_response.data:
+
+            # Get the task and its dependencies - use service layer
+            task = await self.task_service.get_task(task_id, user_id)
+
+            if not task:
                 raise Exception("Task not found")
-            
-            task = task_response.data
+
             dependencies = task.get("dependencies", [])
-            
+
             # Validate dependencies exist and are not circular
             missing_prerequisites = []
             circular_dependencies = False
             warnings = []
-            
+
             if dependencies:
-                # Check if dependencies exist
-                deps_response = supabase.table("tasks").select("id, title, status").in_("id", dependencies).eq("user_id", user_id).execute()
-                found_deps = {dep["id"]: dep for dep in deps_response.data}
+                # Check if dependencies exist - use service layer
+                deps_result = await self.task_service.list_tasks(
+                    user_id=user_id,
+                    filters={"id__in": dependencies}
+                )
+                found_deps = {dep["id"]: dep for dep in deps_result.get("tasks", [])}
                 
                 for dep_id in dependencies:
                     if dep_id not in found_deps:
@@ -677,21 +543,21 @@ class TaskDatabaseTool(TaskTool):
         """Validate that prerequisite tasks exist"""
         if not prerequisites:
             return
-            
-        from app.config.database.supabase import get_supabase
-        supabase = get_supabase()
-        
+
         # Check each prerequisite ID
         for prereq_id in prerequisites:
             if not prereq_id or not prereq_id.strip():
                 raise ToolError(f"Invalid prerequisite task ID: {prereq_id}", self.name)
-        
-        # Check if all prerequisites exist in database
-        response = supabase.table("tasks").select("id").in_("id", prerequisites).eq("user_id", user_id).execute()
-        
-        found_ids = {task["id"] for task in response.data}
+
+        # Check if all prerequisites exist in database - use service layer
+        result = await self.task_service.list_tasks(
+            user_id=user_id,
+            filters={"id__in": prerequisites}
+        )
+
+        found_ids = {task["id"] for task in result.get("tasks", [])}
         missing_ids = set(prerequisites) - found_ids
-        
+
         if missing_ids:
             raise ToolError(f"Prerequisite tasks not found: {', '.join(missing_ids)}", self.name)
     

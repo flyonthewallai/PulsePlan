@@ -1,0 +1,9 @@
+{
+  "model_path": "model",
+  "intent_specs_path": "intent_specs_embedded.json",
+  "confidence_threshold": 0.5,
+  "max_sequence_length": 128,
+  "similarity_metric": "cosine",
+  "model_type": "sentence-transformers",
+  "pooling_strategy": "mean"
+}

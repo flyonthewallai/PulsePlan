@@ -106,19 +106,37 @@ class BaseHealthCheck:
 class DatabaseHealthCheck(BaseHealthCheck):
     """Health check for database connectivity"""
     
-    def __init__(self, get_supabase_client: Callable):
+    def __init__(self, todo_repository=None):
         super().__init__("database", timeout_seconds=10.0)
-        self.get_client = get_supabase_client
+        self._todo_repository = todo_repository
+    
+    def _get_todo_repository(self):
+        """Lazy-load todo repository"""
+        if self._todo_repository is None:
+            from app.database.repositories.task_repositories.todo_repository import TodoRepository
+            self._todo_repository = TodoRepository()
+        return self._todo_repository
     
     async def _perform_check(self) -> Dict[str, Any]:
         """Check database connectivity and performance"""
         try:
-            supabase = self.get_client()
+            # Use repository to test connectivity
+            todo_repo = self._get_todo_repository()
             
-            # Simple query to test connectivity
+            # Simple query to test connectivity using repository health check
             start_query_time = time.time()
-            result = supabase.table("todos").select("id").limit(1).execute()
+            is_healthy = await todo_repo.health_check()
             query_time = (time.time() - start_query_time) * 1000
+            
+            if not is_healthy:
+                return {
+                    "status": HealthStatus.UNHEALTHY,
+                    "message": "Database health check failed",
+                    "details": {
+                        "query_time_ms": round(query_time, 2)
+                    },
+                    "timestamp": datetime.utcnow()
+                }
             
             # Determine status based on response time
             if query_time < 100:

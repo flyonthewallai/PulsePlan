@@ -1,0 +1,3 @@
+usage: inference_contrastive.py [-h] [--model MODEL] [--specs SPECS]
+                                [--query QUERY] [--threshold THRESHOLD]
+inference_contrastive.py: error: unrecognized arguments: --test-file /Users/admin/PulsePlan/data/intents/test.jsonl

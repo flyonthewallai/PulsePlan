@@ -18,6 +18,7 @@ class OAuthToken(BaseModel):
     id: str
     user_id: str
     provider: Provider
+    service_type: str = "default"  # e.g., 'calendar', 'gmail', 'contacts', 'outlook'
     access_token: str  # Will be encrypted in storage
     refresh_token: Optional[str] = None  # Will be encrypted in storage
     expires_at: Optional[datetime] = None
@@ -35,6 +36,7 @@ class OAuthToken(BaseModel):
 class OAuthTokenCreate(BaseModel):
     """Schema for creating OAuth tokens"""
     provider: Provider
+    service_type: str  # e.g., 'calendar', 'gmail', 'contacts', 'outlook'
     access_token: str
     refresh_token: Optional[str] = None
     expires_at: Optional[datetime] = None
@@ -54,6 +56,7 @@ class OAuthTokenResponse(BaseModel):
     id: str
     user_id: str
     provider: Provider
+    service_type: str
     expires_at: Optional[datetime] = None
     scopes: List[str]
     email: Optional[str] = None

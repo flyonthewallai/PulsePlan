@@ -23,7 +23,8 @@ from .email import (
     GmailUserTool,
     OutlookUserTool,
     EmailIntegrationTool,
-    EmailManagerTool
+    EmailManagerTool,
+    SystemEmailTool
 )
 
 __all__ = [
@@ -39,4 +40,5 @@ __all__ = [
     "OutlookUserTool",
     "EmailIntegrationTool",
     "EmailManagerTool",
+    "SystemEmailTool",
 ]

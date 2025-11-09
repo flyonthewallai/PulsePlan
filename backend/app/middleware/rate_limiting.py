@@ -48,8 +48,44 @@ class HierarchicalRateLimitMiddleware(BaseHTTPMiddleware):
             provider = self._extract_provider(request)
             workflow_type = self._extract_workflow_type(request)
             
-            # Skip rate limiting for unauthenticated requests (let auth middleware handle)
+            # Apply IP-based rate limiting for unauthenticated requests to prevent DoS
             if not user_id:
+                ip_address = self._get_client_ip(request)
+                if ip_address and ip_address != "unknown":
+                    # Use IP-based rate limiting for unauthenticated requests
+                    rate_limit_status = await self.rate_limiter.check_rate_limits(
+                        user_id=f"ip:{ip_address}",
+                        provider=None,
+                        workflow_type="unauthenticated"
+                    )
+                    if not rate_limit_status.allowed:
+                        violation = rate_limit_status.violations[0]
+                        retry_after = int(violation.reset_time.timestamp() - violation.violation_time.timestamp())
+                        logger.warning(f"Rate limit exceeded for IP {ip_address}: unauthenticated level")
+                        return JSONResponse(
+                            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            content={
+                                "error": "Rate limit exceeded",
+                                "message": "unauthenticated level rate limit exceeded",
+                                "level": violation.level.value,
+                                "limit": violation.limit,
+                                "current": violation.current_count,
+                                "reset_time": violation.reset_time.isoformat()
+                            },
+                            headers={
+                                "Retry-After": str(retry_after),
+                                "X-RateLimit-Level": violation.level.value,
+                                "X-RateLimit-Limit": str(violation.limit),
+                                "X-RateLimit-Remaining": str(max(0, violation.limit - violation.current_count)),
+                                "X-RateLimit-Reset": str(int(violation.reset_time.timestamp()))
+                            }
+                        )
+                    # Record unauthenticated request
+                    await self.rate_limiter.record_request(
+                        user_id=f"ip:{ip_address}",
+                        provider=None,
+                        workflow_type="unauthenticated"
+                    )
                 return await call_next(request)
             
             # Check all applicable rate limits
@@ -121,17 +157,35 @@ class HierarchicalRateLimitMiddleware(BaseHTTPMiddleware):
                 return None
             
             # Decode JWT token to get user ID
+            # Note: We verify expiration here to prevent expired tokens from bypassing rate limits
             payload = jwt.decode(
                 token,
                 settings.SECRET_KEY,
-                algorithms=["HS256"],
-                options={"verify_exp": False}  # Simplified - proper verification should be done elsewhere
+                algorithms=["HS256"]
+                # verify_exp defaults to True - expired tokens will raise ExpiredSignatureError
             )
             
             return payload.get("sub") or payload.get("user_id")
             
         except Exception:
             return None
+    
+    def _get_client_ip(self, request: Request) -> str:
+        """Extract client IP address from request"""
+        # Check for forwarded headers first
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            return real_ip
+        
+        # Fallback to direct client IP
+        if hasattr(request, "client") and request.client:
+            return request.client.host
+        
+        return "unknown"
     
     def _extract_provider(self, request: Request) -> Optional[str]:
         """Extract provider from request path or body"""

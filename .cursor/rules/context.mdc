@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+// Always begin by reviewing CLAUDE.md to follow specific instructions carefully.
+// Strictly adhere to the guidelines in RULES.md, confirming compliance with each change.
+// Consult CONTEXT.md to gather necessary context for informed modifications.
+// Never create summary documents. Always update all relevant documentation files to reflect changes. For major features, create a new professional documentation document in the appropriate docs/ location.

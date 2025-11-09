@@ -545,3 +545,50 @@ class MicrosoftCalendarTool(CalendarTool):
             
         except Exception as e:
             raise ToolError(f"Failed to delete Microsoft Calendar event: {e}", self.name, recoverable=True)
+
+
+class UnifiedCalendarTool:
+    """Unified calendar tool that can handle multiple providers"""
+    
+    def __init__(self):
+        self.google_tool = GoogleCalendarTool()
+        self.microsoft_tool = MicrosoftCalendarTool()
+    
+    async def execute(self, input_data: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
+        """Execute calendar operation using appropriate provider"""
+        try:
+            operation = input_data.get("operation")
+            provider = input_data.get("provider", "auto")
+            
+            # Auto-detect provider based on available tokens
+            if provider == "auto":
+                oauth_tokens = context.get("oauth_tokens", {})
+                if "google_access_token" in oauth_tokens:
+                    provider = "google"
+                elif "microsoft_access_token" in oauth_tokens:
+                    provider = "microsoft"
+                else:
+                    return ToolResult(
+                        success=False,
+                        error="No calendar provider tokens available",
+                        metadata={"operation": operation}
+                    )
+            
+            # Route to appropriate tool
+            if provider == "google":
+                return await self.google_tool.execute(input_data, context)
+            elif provider == "microsoft":
+                return await self.microsoft_tool.execute(input_data, context)
+            else:
+                return ToolResult(
+                    success=False,
+                    error=f"Unsupported calendar provider: {provider}",
+                    metadata={"operation": operation}
+                )
+                
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"Calendar operation failed: {e}",
+                metadata={"operation": input_data.get("operation")}
+            )

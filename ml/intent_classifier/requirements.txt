@@ -1,0 +1,20 @@
+# Intent Classifier - Contrastive Learning Dependencies
+
+# Core ML libraries
+torch>=2.0.0
+sentence-transformers>=2.2.0
+
+# NumPy compatibility fix for PyTorch on Mac
+numpy<2.0.0
+
+# ONNX export and optimization
+onnx>=1.14.0
+onnxruntime>=1.15.0
+optimum>=1.13.0
+
+# Data processing
+pyyaml>=6.0
+scikit-learn>=1.3.0
+
+# Utilities
+tqdm>=4.65.0

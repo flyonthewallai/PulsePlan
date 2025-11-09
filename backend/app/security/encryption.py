@@ -20,10 +20,17 @@ class EncryptionService:
     """
     
     def __init__(self):
-        self.master_key = settings.TOKEN_ENCRYPTION_KEY.encode()
+        # Decode base64-encoded master key if needed
+        try:
+            # Try to decode as base64 first
+            self.master_key = base64.b64decode(settings.TOKEN_ENCRYPTION_KEY)
+        except Exception:
+            # If not base64, use as-is and encode
+            self.master_key = settings.TOKEN_ENCRYPTION_KEY.encode()
+
         self.key_version = settings.ENCRYPTION_KEY_VERSION
         self.use_kms = settings.USE_KMS
-        
+
         if not self.master_key:
             raise ValueError("TOKEN_ENCRYPTION_KEY must be configured")
         

@@ -9,34 +9,22 @@ This module contains all scheduling-related worker functionality including:
 
 from .scheduler import (
     WorkerScheduler,
-    get_worker_scheduler,
-    schedule_daily_briefings,
-    schedule_weekly_pulses,
-    schedule_health_checks
+    get_worker_scheduler
 )
 
 from .timezone_scheduler import (
-    TimezoneScheduler,
-    get_timezone_scheduler,
-    create_timezone_aware_jobs,
-    optimize_scheduling_for_timezone,
-    analyze_user_timezones
+    TimezoneAwareScheduler,
+    get_timezone_scheduler
 )
 
 __all__ = [
     # Core scheduling
     "WorkerScheduler",
     "get_worker_scheduler",
-    "schedule_daily_briefings",
-    "schedule_weekly_pulses", 
-    "schedule_health_checks",
-    
+
     # Timezone-aware scheduling
-    "TimezoneScheduler",
+    "TimezoneAwareScheduler",
     "get_timezone_scheduler",
-    "create_timezone_aware_jobs",
-    "optimize_scheduling_for_timezone",
-    "analyze_user_timezones",
 ]
 
 

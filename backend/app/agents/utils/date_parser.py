@@ -118,7 +118,7 @@ class NaturalDateParser:
                 
         except Exception as e:
             # Log error but don't raise - return None for graceful fallback
-            print(f"Date parsing error for '{date_str}': {e}")
+            logger.warning(f"Date parsing error for '{date_str}': {e}")
             
         return None
 

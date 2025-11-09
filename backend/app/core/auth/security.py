@@ -59,7 +59,8 @@ def setup_security_middleware(app: FastAPI):
         logger.info(f"CORS middleware enabled with origins: {settings.ALLOWED_ORIGINS}")
     
     # 3. Security headers middleware
-    # app.add_middleware(SecurityMiddleware)  # TODO: Implement SecurityMiddleware
+    from app.middleware.security_headers import SecurityHeadersMiddleware
+    app.add_middleware(SecurityHeadersMiddleware)
     logger.info("Security headers middleware enabled")
     
     # 4. Authentication middleware (optional - adds user context when available)
@@ -112,11 +113,11 @@ def get_csp_header(settings) -> str:
     Generate Content Security Policy header
     """
     if settings.is_production():
-        # Strict CSP for production
+        # Strict CSP for production (no 'unsafe-inline' for better XSS protection)
         return (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "script-src 'self' https://cdnjs.cloudflare.com; "
+            "style-src 'self' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
             "connect-src 'self' https:; "

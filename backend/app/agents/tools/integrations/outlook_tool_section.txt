@@ -1,0 +1,289 @@
+class OutlookUserTool(EmailTool):
+    """Outlook operations using user's OAuth token"""
+    
+    def __init__(self):
+        super().__init__(
+            name="outlook_user",
+            description="Outlook operations via user's Microsoft account"
+        )
+    
+    def get_required_tokens(self) -> List[str]:
+        return ["microsoft", "outlook"]
+    
+    def validate_input(self, input_data: Dict[str, Any]) -> bool:
+        """Validate Outlook input"""
+        operation = input_data.get("operation")
+        return operation in ["send", "list", "get", "draft"]
+    
+    async def execute(self, input_data: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
+        """Execute Outlook operation"""
+        try:
+            await asyncio.sleep(0.1)  # Simulate API call
+            
+            operation = input_data["operation"]
+            
+            if operation == "send":
+                return await self._send_email_outlook(input_data, context)
+            elif operation == "list":
+                return await self.list_messages(
+                    input_data.get("query", ""),
+                    input_data.get("limit", 50),
+                    context
+                )
+            elif operation == "get":
+                return await self.get_message(input_data["message_id"], context)
+            elif operation == "draft":
+                return await self._create_draft_outlook(input_data, context)
+            
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                data={},
+                error=f"Outlook operation failed: {str(e)}"
+            )
+    
+    async def _send_email_outlook(self, input_data: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
+        """Send email via Microsoft Graph API"""
+        try:
+            import httpx
+            
+            # Get Microsoft access token
+            access_token = context["oauth_tokens"]["microsoft_access_token"]
+            
+            # Prepare Graph API request
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Build email message
+            recipients = [{"emailAddress": {"address": email.strip()}} for email in input_data["to"]]
+            
+            message_payload = {
+                "message": {
+                    "subject": input_data["subject"],
+                    "body": {
+                        "contentType": "Text",
+                        "content": input_data["body"]
+                    },
+                    "toRecipients": recipients
+                }
+            }
+            
+            # Make Graph API call to send email
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://graph.microsoft.com/v1.0/me/sendMail",
+                    headers=headers,
+                    json=message_payload,
+                    timeout=30.0
+                )
+                
+                if response.status_code not in [200, 202]:
+                    raise Exception(f"Microsoft Graph API error: {response.status_code} - {response.text}")
+                
+                return ToolResult(
+                    success=True,
+                    data={
+                        "message_id": f"outlook_{int(datetime.utcnow().timestamp() * 1000)}",
+                        "to": input_data["to"],
+                        "subject": input_data["subject"],
+                        "sent_at": datetime.utcnow().isoformat(),
+                        "provider": "outlook",
+                        "sender_type": "user"
+                    }
+                )
+                
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"Failed to send email via Outlook: {str(e)}"
+            )
+    
+    async def _create_draft_outlook(self, input_data: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
+        """Create draft in Outlook"""
+        try:
+            import httpx
+            
+            # Get Microsoft access token
+            access_token = context["oauth_tokens"]["microsoft_access_token"]
+            
+            # Prepare Graph API request
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Build draft message
+            recipients = [{"emailAddress": {"address": email.strip()}} for email in input_data.get("to", [])]
+            
+            draft_payload = {
+                "subject": input_data.get("subject", ""),
+                "body": {
+                    "contentType": "Text",
+                    "content": input_data.get("body", "")
+                },
+                "toRecipients": recipients
+            }
+            
+            # Make Graph API call to create draft
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://graph.microsoft.com/v1.0/me/messages",
+                    headers=headers,
+                    json=draft_payload,
+                    timeout=30.0
+                )
+                
+                if response.status_code not in [200, 201]:
+                    raise Exception(f"Microsoft Graph API error: {response.status_code} - {response.text}")
+                
+                draft_data = response.json()
+                
+                return ToolResult(
+                    success=True,
+                    data={
+                        "draft_id": draft_data["id"],
+                        "to": input_data.get("to", []),
+                        "subject": input_data.get("subject", ""),
+                        "created_at": datetime.utcnow().isoformat(),
+                        "provider": "outlook"
+                    }
+                )
+                
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"Failed to create draft in Outlook: {str(e)}"
+            )
+    
+    async def list_messages(self, query: str, limit: int, context: Dict[str, Any]) -> ToolResult:
+        """List Outlook messages"""
+        try:
+            import httpx
+            
+            # Get Microsoft access token
+            access_token = context["oauth_tokens"]["microsoft_access_token"]
+            
+            # Prepare Graph API request
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Build query parameters
+            params = {
+                "$select": "id,subject,from,receivedDateTime,isRead,bodyPreview",
+                "$orderby": "receivedDateTime desc",
+                "$top": min(limit, 100)
+            }
+            
+            if query and query.strip():
+                params["$search"] = f'"{query}"'
+            
+            # Make Graph API call
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://graph.microsoft.com/v1.0/me/messages",
+                    headers=headers,
+                    params=params,
+                    timeout=30.0
+                )
+                
+                if response.status_code != 200:
+                    raise Exception(f"Microsoft Graph API error: {response.status_code} - {response.text}")
+                
+                graph_data = response.json()
+                messages = []
+                
+                for msg in graph_data.get("value", []):
+                    messages.append({
+                        "id": msg["id"],
+                        "subject": msg["subject"],
+                        "from": msg.get("from", {}).get("emailAddress", {}).get("address", "Unknown"),
+                        "received": msg["receivedDateTime"],
+                        "unread": not msg["isRead"],
+                        "preview": msg.get("bodyPreview", "")[:200]
+                    })
+                
+                return ToolResult(
+                    success=True,
+                    data={
+                        "messages": messages,
+                        "total": len(messages),
+                        "provider": "outlook"
+                    }
+                )
+                
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"Failed to list messages from Outlook: {str(e)}"
+            )
+    
+    async def get_message(self, message_id: str, context: Dict[str, Any]) -> ToolResult:
+        """Get Outlook message"""
+        try:
+            import httpx
+            
+            # Get Microsoft access token
+            access_token = context["oauth_tokens"]["microsoft_access_token"]
+            
+            # Prepare Graph API request
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Make Graph API call
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"https://graph.microsoft.com/v1.0/me/messages/{message_id}",
+                    headers=headers,
+                    timeout=30.0
+                )
+                
+                if response.status_code != 200:
+                    raise Exception(f"Microsoft Graph API error: {response.status_code} - {response.text}")
+                
+                msg_data = response.json()
+                
+                message = {
+                    "id": msg_data["id"],
+                    "subject": msg_data["subject"],
+                    "from": msg_data.get("from", {}).get("emailAddress", {}).get("address", "Unknown"),
+                    "to": [recipient["emailAddress"]["address"] for recipient in msg_data.get("toRecipients", [])],
+                    "body": msg_data.get("body", {}).get("content", ""),
+                    "received": msg_data["receivedDateTime"],
+                    "provider": "outlook"
+                }
+                
+                return ToolResult(
+                    success=True,
+                    data={"message": message}
+                )
+                
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"Failed to get message from Outlook: {str(e)}"
+            )
+    
+    async def send_email(self, email_data: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
+        """Send email via Outlook"""
+        input_data = {
+            "operation": "send",
+            "to": email_data.get("to"),
+            "subject": email_data.get("subject"),
+            "body": email_data.get("body")
+        }
+        return await self.execute(input_data, context)
+    
+    async def list_emails(self, filters: Dict[str, Any], context: Dict[str, Any]) -> ToolResult:
+        """List Outlook emails"""
+        return await self.list_messages(
+            filters.get("query", ""),
+            filters.get("limit", 50),
+            context
+        )
+

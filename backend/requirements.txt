@@ -21,7 +21,8 @@ redis[hiredis]==5.0.1
 
 # Scheduling and timezone handling
 APScheduler==3.10.4
-pytz==2023.3
+pytz==2025.2
+dateparser==1.2.2
 
 # Email services
 resend==0.8.0
@@ -37,9 +38,16 @@ langgraph==0.0.62
 langchain-core==0.2.16
 langchain-openai==0.1.7
 
+# NLU and ML
+sentence-transformers>=5.1.0
+numpy<2.0.0  # Keep <2.0 for sentence-transformers compatibility
+scikit-learn==1.7.2
+rapidfuzz==3.10.1  # Fast fuzzy string matching for typo handling
+
 # Monitoring and observability
 sentry-sdk[fastapi]==2.39.0
 structlog==23.2.0
+posthog==3.7.4
 
 # AWS (for future KMS integration)
 boto3==1.35.0
@@ -48,11 +56,7 @@ botocore==1.35.0
 # Environment and utilities
 python-dotenv==1.0.0
 typing-extensions==4.8.0
-
-# Additional dependencies for PulsePlan
 aiohttp==3.12.15
-numpy==2.3.3
-scikit-learn==1.7.2
 
 # Development and testing
 pytest==7.4.3
