@@ -165,7 +165,7 @@ async def execute_task_creation(intent_result, user_id: str, task_id: str) -> Di
             return {"success": False, "error": "No task information extracted"}
 
         # Use existing task tools
-        from app.agents.tools.tasks import TaskDatabaseTool
+        from app.agents.tools.data.tasks import TaskDatabaseTool
         task_tool = TaskDatabaseTool()
 
         # Update progress
@@ -233,7 +233,7 @@ async def execute_task_deletion(intent_result, user_id: str, task_id: str) -> Di
             return {"success": False, "error": "No task name provided for deletion"}
 
         # Use existing task tools
-        from app.agents.tools.tasks import TaskDatabaseTool
+        from app.agents.tools.data.tasks import TaskDatabaseTool
         task_tool = TaskDatabaseTool()
 
         # Update progress
@@ -291,7 +291,7 @@ async def execute_task_update(intent_result, user_id: str, task_id: str) -> Dict
         if not task_name:
             return {"success": False, "error": "No task name provided for update"}
 
-        from app.agents.tools.tasks import TaskDatabaseTool
+        from app.agents.tools.data.tasks import TaskDatabaseTool
         task_tool = TaskDatabaseTool()
 
         await task_manager.update_task_progress(task_id, progress=60)
@@ -359,7 +359,7 @@ async def execute_task_completion(intent_result, user_id: str, task_id: str) -> 
         if not task_name:
             return {"success": False, "error": "No task name provided for completion"}
 
-        from app.agents.tools.tasks import TaskDatabaseTool
+        from app.agents.tools.data.tasks import TaskDatabaseTool
         task_tool = TaskDatabaseTool()
 
         await task_manager.update_task_progress(task_id, progress=60)
@@ -416,7 +416,7 @@ async def execute_task_listing(intent_result, user_id: str, task_id: str) -> Dic
         if intent_result.entities.get("tags"):
             filters["tags"] = intent_result.entities["tags"]
 
-        from app.agents.tools.tasks import TaskDatabaseTool
+        from app.agents.tools.data.tasks import TaskDatabaseTool
         task_tool = TaskDatabaseTool()
 
         await task_manager.update_task_progress(task_id, progress=60)

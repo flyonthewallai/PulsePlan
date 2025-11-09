@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from .canvas import router as canvas_router
 from .calendar import router as calendar_router
 from .email import router as email_router
+from .settings import router as settings_router
 
 # Create main integrations router
 router = APIRouter()
@@ -16,3 +17,4 @@ router = APIRouter()
 router.include_router(canvas_router, prefix="/canvas", tags=["canvas"])
 router.include_router(calendar_router, prefix="/calendar", tags=["calendar"])
 router.include_router(email_router, prefix="/email", tags=["email"])
+router.include_router(settings_router, tags=["integration-settings"])

@@ -1,29 +1,60 @@
 """
 Canvas token service with envelope encryption
-Handles secure storage and retrieval of Canvas API tokens
+Handles secure storage and retrieval of Canvas API tokens in oauth_tokens table
+Supports both local AES-256-GCM and AWS KMS encryption
 """
 import logging
 import secrets
-import base64
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-from app.config.database.supabase import get_supabase_client
+from app.database.repositories.integration_repositories import (
+    OAuthTokenRepository,
+    get_oauth_token_repository
+)
+from app.database.repositories.task_repositories import (
+    TaskRepository,
+    get_task_repository
+)
 from app.security.encryption import get_encryption_service
-from app.database.models import CanvasIntegrationModel, IntegrationStatus
+from app.database.models import IntegrationStatus
+from app.config.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
 
 class CanvasTokenService:
-    """Service for securely storing and managing Canvas API tokens"""
+    """
+    Service for securely storing and managing Canvas API tokens
 
-    def __init__(self):
-        self.supabase = get_supabase_client()
+    Supports two encryption modes:
+    1. Local AES-256-GCM (default): User-specific key derivation from master key
+    2. AWS KMS (when USE_KMS=true): Envelope encryption with KMS-managed keys
+    """
+
+    def __init__(
+        self,
+        oauth_token_repository: Optional[OAuthTokenRepository] = None,
+        task_repository: Optional[TaskRepository] = None
+    ):
+        self._oauth_token_repository = oauth_token_repository
+        self._task_repository = task_repository
         self.encryption_service = get_encryption_service()
+        self.use_kms = getattr(settings, 'USE_KMS', False)
+    
+    @property
+    def oauth_token_repository(self) -> OAuthTokenRepository:
+        """Lazy-load OAuth token repository"""
+        if self._oauth_token_repository is None:
+            self._oauth_token_repository = get_oauth_token_repository()
+        return self._oauth_token_repository
+    
+    @property
+    def task_repository(self) -> TaskRepository:
+        """Lazy-load task repository"""
+        if self._task_repository is None:
+            self._task_repository = get_task_repository()
+        return self._task_repository
 
     async def store_canvas_token(
         self,
@@ -32,7 +63,11 @@ class CanvasTokenService:
         api_token: str
     ) -> Dict[str, Any]:
         """
-        Store Canvas API token with envelope encryption
+        Store Canvas API token with encryption in oauth_tokens table
+
+        Encryption method depends on USE_KMS setting:
+        - If USE_KMS=false: Uses local AES-256-GCM with user-derived key
+        - If USE_KMS=true: Uses AWS KMS envelope encryption
 
         Args:
             user_id: User ID
@@ -43,39 +78,47 @@ class CanvasTokenService:
             Dict with storage result
         """
         try:
-            # Generate user-specific encryption key
-            user_key = await self._generate_user_key(user_id)
+            # Encrypt the token using the encryption service (KMS or local)
+            encrypted_token = self.encryption_service.encrypt_token(api_token, user_id)
 
-            # Encrypt the token using envelope encryption
-            encrypted_token = await self._encrypt_token(api_token, user_key)
+            # Generate encryption metadata for tracking
+            encryption_method = "kms" if self.use_kms else f"aes256-gcm-v{self.encryption_service.key_version}"
+            kms_key_id = None
 
-            # Store KMS key ID for the user key
-            kms_key_id = await self._store_user_key(user_id, user_key)
+            if self.use_kms:
+                # For KMS, generate a tracking ID
+                kms_key_id = f"canvas_kms_{user_id}_{secrets.token_hex(8)}"
 
-            # Create integration record
-            integration = CanvasIntegrationModel(
-                user_id=user_id,
-                base_url=canvas_url.rstrip('/'),
-                token_ciphertext=encrypted_token,
-                kms_key_id=kms_key_id,
-                status=IntegrationStatus.OK,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+            # Store in oauth_tokens table using repository
+            # Canvas tokens expire 120 days from creation
+            expires_at = datetime.utcnow() + timedelta(days=120)
+
+            token_data = {
+                "user_id": user_id,
+                "provider": "canvas",
+                "service_type": "canvas",  # Add service_type to match constraint
+                "access_token": encrypted_token,
+                "refresh_token": encrypted_token,  # Store same encrypted token
+                "expires_at": expires_at.isoformat(),  # Canvas tokens expire in 120 days
+                "scopes": [],  # Canvas doesn't use OAuth scopes
+                "provider_url": canvas_url,  # Store Canvas URL in dedicated field
+                "is_active": True,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            result = await self.oauth_token_repository.upsert_token(
+                token_data=token_data,
+                conflict_columns="user_id,provider,service_type"
             )
 
-            # Store in database
-            result = self.supabase.table("integration_canvas").upsert(
-                integration.to_supabase_insert(),
-                on_conflict="user_id"
-            ).execute()
-
-            logger.info(f"Canvas token stored successfully for user {user_id}")
+            logger.info(f"Canvas token stored successfully for user {user_id} using {encryption_method}")
 
             return {
                 "success": True,
                 "user_id": user_id,
                 "canvas_url": canvas_url,
                 "status": "stored",
+                "encryption_method": encryption_method,
                 "stored_at": datetime.utcnow().isoformat()
             }
 
@@ -85,7 +128,9 @@ class CanvasTokenService:
 
     async def retrieve_canvas_token(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
-        Retrieve and decrypt Canvas API token for user
+        Retrieve and decrypt Canvas API token for user from oauth_tokens table
+
+        Automatically detects encryption method (KMS or local) from token format
 
         Args:
             user_id: User ID
@@ -94,43 +139,33 @@ class CanvasTokenService:
             Dict with token and metadata, or None if not found
         """
         try:
-            # Get integration record
-            response = self.supabase.table("integration_canvas").select("*").eq(
-                "user_id", user_id
-            ).single().execute()
-
-            if not response.data:
-                return None
-
-            integration_data = response.data
-
-            # Check integration status
-            if integration_data.get("status") == IntegrationStatus.NEEDS_REAUTH:
-                logger.warning(f"Canvas integration needs reauth for user {user_id}")
-                return None
-
-            # Retrieve user key
-            user_key = await self._retrieve_user_key(
-                user_id,
-                integration_data["kms_key_id"]
+            # Get Canvas token from oauth_tokens using repository
+            token_data = await self.oauth_token_repository.get_by_provider(
+                user_id=user_id,
+                provider="canvas"
             )
 
-            if not user_key:
-                logger.error(f"Could not retrieve user key for {user_id}")
-                await self._mark_integration_error(user_id, "key_retrieval_failed")
+            if not token_data:
                 return None
 
-            # Decrypt token
-            decrypted_token = await self._decrypt_token(
-                integration_data["token_ciphertext"],
-                user_key
+            # Check if active
+            if not token_data.get("is_active", True):
+                logger.warning(f"Canvas integration inactive for user {user_id}")
+                return None
+
+            # Decrypt token (automatically handles KMS vs local based on token format)
+            decrypted_token = self.encryption_service.decrypt_token(
+                token_data["access_token"],
+                user_id
             )
+
+            # Get Canvas URL from provider_url field
+            canvas_url = token_data.get("provider_url")
 
             return {
                 "api_token": decrypted_token,
-                "base_url": integration_data["base_url"],
-                "status": integration_data["status"],
-                "last_sync": integration_data.get("last_full_sync_at"),
+                "base_url": canvas_url,  # Retrieved from provider_url field
+                "status": "ok" if token_data.get("is_active") else "inactive",
                 "user_id": user_id
             }
 
@@ -142,13 +177,18 @@ class CanvasTokenService:
     async def mark_needs_reauth(self, user_id: str, error_code: str = "401_unauthorized"):
         """Mark Canvas integration as needing reauthorization"""
         try:
-            self.supabase.table("integration_canvas").update({
-                "status": IntegrationStatus.NEEDS_REAUTH,
-                "last_error_code": error_code,
+            update_data = {
+                "is_active": False,
                 "updated_at": datetime.utcnow().isoformat()
-            }).eq("user_id", user_id).execute()
+            }
+            
+            await self.oauth_token_repository.update_by_user_and_provider(
+                user_id=user_id,
+                provider="canvas",
+                update_data=update_data
+            )
 
-            logger.info(f"Canvas integration marked needs reauth for user {user_id}")
+            logger.info(f"Canvas integration marked needs reauth for user {user_id}: {error_code}")
 
         except Exception as e:
             logger.error(f"Failed to mark needs reauth for user {user_id}: {e}")
@@ -221,19 +261,26 @@ class CanvasTokenService:
     async def delete_canvas_integration(self, user_id: str) -> bool:
         """Delete Canvas integration and all associated data"""
         try:
-            # Delete integration record (this cascades to other tables via foreign keys)
-            self.supabase.table("integration_canvas").delete().eq("user_id", user_id).execute()
+            # Delete Canvas token from oauth_tokens using repository
+            await self.oauth_token_repository.delete_by_provider(
+                user_id=user_id,
+                provider="canvas"
+            )
 
-            # Delete user key from KMS
-            await self._delete_user_key(user_id)
-
+            # TODO: Create ExternalCursorRepository and use it here
+            # For now, keep direct Supabase access for external_cursor (low priority table)
+            from app.config.database.supabase import get_supabase_client
+            supabase = get_supabase_client()
+            
             # Delete external cursors
-            self.supabase.table("external_cursor").delete().eq(
+            supabase.table("external_cursor").delete().eq(
                 "user_id", user_id
             ).eq("source", "canvas").execute()
 
-            # Clear Canvas-sourced tasks
-            self.supabase.table("tasks").delete().eq(
+            # Clear Canvas-sourced tasks using task repository
+            # Note: TaskRepository doesn't have delete_by_filters yet, so we'd need to add it
+            # For now, using direct access
+            supabase.table("tasks").delete().eq(
                 "user_id", user_id
             ).eq("external_source", "canvas").execute()
 
@@ -244,75 +291,34 @@ class CanvasTokenService:
             logger.error(f"Failed to delete Canvas integration for user {user_id}: {e}")
             return False
 
-    async def _generate_user_key(self, user_id: str) -> bytes:
-        """Generate a unique encryption key for the user"""
-        # Create deterministic but secure key based on user ID and system secret
-        system_secret = self.encryption_service.get_master_key()
-
-        # Use PBKDF2 to derive user-specific key
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=user_id.encode(),
-            iterations=100000,
-        )
-
-        return kdf.derive(system_secret)
-
-    async def _encrypt_token(self, token: str, key: bytes) -> str:
-        """Encrypt token using Fernet symmetric encryption"""
-        f = Fernet(base64.urlsafe_b64encode(key))
-        encrypted_token = f.encrypt(token.encode())
-        return base64.b64encode(encrypted_token).decode()
-
-    async def _decrypt_token(self, encrypted_token: str, key: bytes) -> str:
-        """Decrypt token using Fernet symmetric encryption"""
-        f = Fernet(base64.urlsafe_b64encode(key))
-        token_bytes = base64.b64decode(encrypted_token.encode())
-        decrypted_token = f.decrypt(token_bytes)
-        return decrypted_token.decode()
-
-    async def _store_user_key(self, user_id: str, user_key: bytes) -> str:
-        """Store user key using KMS (simplified implementation)"""
-        # In production, this would use AWS KMS, Azure Key Vault, etc.
-        # For now, we'll use a simple key ID
-        key_id = f"canvas_key_{user_id}_{secrets.token_hex(8)}"
-
-        # In a real implementation, you'd store this in your KMS
-        # Here we'll just return the key ID
-        return key_id
-
-    async def _retrieve_user_key(self, user_id: str, kms_key_id: str) -> Optional[bytes]:
-        """Retrieve user key from KMS"""
-        # In production, this would retrieve from KMS
-        # For now, regenerate the deterministic key
-        return await self._generate_user_key(user_id)
-
-    async def _delete_user_key(self, user_id: str):
-        """Delete user key from KMS"""
-        # In production, this would delete from KMS
-        # For now, this is a no-op since we use deterministic keys
-        pass
-
     async def _mark_integration_error(self, user_id: str, error_code: str):
         """Mark integration as having an error"""
         try:
-            self.supabase.table("integration_canvas").update({
-                "status": IntegrationStatus.ERROR,
-                "last_error_code": error_code,
+            update_data = {
+                "is_active": False,
                 "updated_at": datetime.utcnow().isoformat()
-            }).eq("user_id", user_id).execute()
+            }
+            await self.oauth_token_repository.update_by_user_and_provider(
+                user_id=user_id,
+                provider="canvas",
+                update_data=update_data
+            )
+            logger.info(f"Marked Canvas integration as error for user {user_id}: {error_code}")
         except Exception as e:
             logger.error(f"Failed to mark integration error for user {user_id}: {e}")
 
     async def _mark_integration_ok(self, user_id: str):
         """Mark integration as OK"""
         try:
-            self.supabase.table("integration_canvas").update({
-                "status": IntegrationStatus.OK,
-                "last_error_code": None,
+            update_data = {
+                "is_active": True,
                 "updated_at": datetime.utcnow().isoformat()
-            }).eq("user_id", user_id).execute()
+            }
+            await self.oauth_token_repository.update_by_user_and_provider(
+                user_id=user_id,
+                provider="canvas",
+                update_data=update_data
+            )
         except Exception as e:
             logger.error(f"Failed to mark integration OK for user {user_id}: {e}")
 

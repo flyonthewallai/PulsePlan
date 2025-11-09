@@ -4,7 +4,7 @@ Single endpoint for all agent interactions with optimized processing
 """
 import logging
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 
 from app.core.auth import get_current_user, CurrentUser
 
@@ -30,7 +30,8 @@ router = APIRouter()
 async def process_unified_query(
     request: UnifiedAgentRequest,
     background_tasks: BackgroundTasks,
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(get_current_user),
+    fastapi_request: Request = None
 ):
     logger.info(f"🎯 [REQUEST] Starting process_unified_query for query: '{request.query}'")
     print(f"🎯 [REQUEST] Starting process_unified_query for query: '{request.query}'")
@@ -46,7 +47,8 @@ async def process_unified_query(
         logger.info(f"💬 [UNIFIED-AGENT] User query: '{request.query}'")
 
         # Get services
-        intent_processor = get_intent_processor()
+        classifier = fastapi_request.app.state.nlu_classifier if fastapi_request else None
+        intent_processor = get_intent_processor(classifier)
         conversation_manager = get_conversation_manager()
         conversation_state_manager = get_conversation_state_manager()
         websocket_manager = get_websocket_manager()
@@ -250,6 +252,93 @@ async def process_unified_query(
     except Exception as e:
         logger.error(f"Failed to process unified query: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process query: {str(e)}")
+
+
+@router.post("/event", response_model=dict)
+async def create_event_with_ai(
+    request: dict,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Create a calendar event/timeblock using AI extraction from natural language.
+    
+    Request body:
+        - prompt: str - Natural language description (e.g., "Study for linear algebra")
+        - start_date: str - ISO timestamp for event start
+        - end_date: str - ISO timestamp for event end
+    """
+    try:
+        from app.agents.core.services.llm_service import get_llm_service
+        from app.agents.core.services.user_context_service import get_user_context_service
+        from app.agents.tools.data.events import EventDatabaseTool
+        
+        user_id = current_user.user_id
+        prompt = request.get("prompt", "")
+        start_date = request.get("start_date")
+        end_date = request.get("end_date")
+        
+        if not prompt or not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="Missing required fields: prompt, start_date, end_date")
+        
+        logger.info(f"🎨 [EVENT-AI] Creating event for user {user_id}: '{prompt}' from {start_date} to {end_date}")
+        
+        # Get services
+        llm_service = get_llm_service()
+        user_context_service = get_user_context_service()
+        
+        # Get user context
+        user_context = await user_context_service.get_user_context(user_id)
+        
+        # Extract event details from prompt using LLM
+        event_extraction = await llm_service.extract_event_info(
+            user_query=prompt,
+            user_context=user_context
+        )
+        
+        logger.info(f"✅ [EVENT-AI] Extracted: {event_extraction.event_title}, kind={event_extraction.kind}, tags={event_extraction.tags}")
+        
+        # Create event using EventDatabaseTool
+        event_tool = EventDatabaseTool()
+        
+        event_data = {
+            "title": event_extraction.event_title,
+            "description": event_extraction.event_description,
+            "start_date": start_date,
+            "end_date": end_date,
+            "priority": event_extraction.priority,
+            "kind": event_extraction.kind,
+            "course": event_extraction.course,
+            "tags": event_extraction.tags or []
+        }
+        
+        tool_context = {
+            "user_id": user_id,
+            "user_timezone": user_context.timezone
+        }
+        
+        result = await event_tool.create_event(event_data, tool_context)
+        
+        if not result.success:
+            raise HTTPException(status_code=500, detail=result.error or "Failed to create event")
+        
+        logger.info(f"🎉 [EVENT-AI] Successfully created event: {result.data.get('event_id')}")
+        
+        return {
+            "success": True,
+            "event": result.data.get("event"),
+            "extraction": {
+                "title": event_extraction.event_title,
+                "kind": event_extraction.kind,
+                "course": event_extraction.course,
+                "tags": event_extraction.tags
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [EVENT-AI] Failed to create event: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create event: {str(e)}")
 
 
 @router.get("/task/{task_id}/status")

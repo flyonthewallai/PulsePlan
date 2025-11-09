@@ -11,7 +11,14 @@ try:
 except ImportError:
     httpx = None
 
-from app.config.database.supabase import get_supabase_client
+from app.database.repositories.task_repositories import (
+    TaskRepository,
+    get_task_repository
+)
+from app.database.repositories.integration_repositories import (
+    CanvasIntegrationRepository,
+    get_canvas_integration_repository
+)
 from app.services.infrastructure.cache_service import get_cache_service
 from app.services.auth.token_service import get_token_service
 from app.config.core.settings import get_settings
@@ -22,11 +29,30 @@ logger = logging.getLogger(__name__)
 class CanvasService:
     """Service for Canvas LMS integration and assignment synchronization"""
     
-    def __init__(self):
+    def __init__(
+        self,
+        task_repository: Optional[TaskRepository] = None,
+        canvas_integration_repository: Optional[CanvasIntegrationRepository] = None
+    ):
         self.settings = get_settings()
-        self.supabase = get_supabase_client()
+        self._task_repository = task_repository
+        self._canvas_integration_repository = canvas_integration_repository
         self.cache_service = get_cache_service()
         self.token_service = get_token_service()
+    
+    @property
+    def task_repository(self) -> TaskRepository:
+        """Lazy-load task repository"""
+        if self._task_repository is None:
+            self._task_repository = get_task_repository()
+        return self._task_repository
+    
+    @property
+    def canvas_integration_repository(self) -> CanvasIntegrationRepository:
+        """Lazy-load canvas integration repository"""
+        if self._canvas_integration_repository is None:
+            self._canvas_integration_repository = get_canvas_integration_repository()
+        return self._canvas_integration_repository
     
     async def sync_user_assignments(
         self,
@@ -257,7 +283,10 @@ class CanvasService:
         """Store Canvas assignments in consolidated tasks table"""
         try:
             # Clear existing Canvas assignments for this user from consolidated tasks table
-            await self.supabase.table("tasks").delete().eq("user_id", user_id).eq("source", "canvas").execute()
+            # TODO: Add delete_by_filters to TaskRepository
+            from app.config.database.supabase import get_supabase_client
+            supabase = get_supabase_client()
+            await supabase.table("tasks").delete().eq("user_id", user_id).eq("source", "canvas").execute()
 
             # Convert assignments to consolidated tasks format
             task_records = []
@@ -284,7 +313,8 @@ class CanvasService:
                 batch_size = 100
                 for i in range(0, len(task_records), batch_size):
                     batch = task_records[i:i + batch_size]
-                    await self.supabase.table("tasks").insert(batch).execute()
+                    # Use repository to insert tasks
+                    await self.task_repository.bulk_create(batch)
 
         except Exception as e:
             logger.error(f"Error storing Canvas assignments for user {user_id}: {e}")
@@ -303,10 +333,7 @@ class CanvasService:
             }
             
             # Upsert integration status
-            await self.supabase.table("canvas_integrations").upsert(
-                integration_data,
-                on_conflict="user_id"
-            ).execute()
+            await self.canvas_integration_repository.upsert_integration(integration_data)
             
         except Exception as e:
             logger.error(f"Error updating Canvas integration status for user {user_id}: {e}")
@@ -319,7 +346,11 @@ class CanvasService:
     ) -> List[Dict[str, Any]]:
         """Get Canvas assignments for user with optional filtering"""
         try:
-            query = self.supabase.table("tasks").select("*").eq("user_id", user_id).eq("source", "canvas").eq("task_type", "assignment")
+            # Use task repository with filters
+            # TODO: Add complex query support to TaskRepository for these filters
+            from app.config.database.supabase import get_supabase_client
+            supabase = get_supabase_client()
+            query = supabase.table("tasks").select("*").eq("user_id", user_id).eq("source", "canvas").eq("task_type", "assignment")
             
             if not include_completed:
                 query = query.neq("submission_status", "graded")
@@ -342,12 +373,10 @@ class CanvasService:
     async def get_integration_status(self, user_id: str) -> Dict[str, Any]:
         """Get Canvas integration status for user"""
         try:
-            response = await self.supabase.table("canvas_integrations").select("*").eq(
-                "user_id", user_id
-            ).single().execute()
+            response = await self.canvas_integration_repository.get_by_user(user_id)
             
-            if response.data:
-                return response.data
+            if response:
+                return response
             else:
                 return {
                     "user_id": user_id,
@@ -386,10 +415,7 @@ class CanvasService:
                 "updated_at": datetime.utcnow().isoformat()
             }
             
-            await self.supabase.table("canvas_integrations").upsert(
-                connection_data,
-                on_conflict="user_id"
-            ).execute()
+            await self.canvas_integration_repository.upsert_integration(connection_data)
             
             return code
             
@@ -401,7 +427,10 @@ class CanvasService:
         """Activate Canvas connection using connection code"""
         try:
             # Find user by connection code
-            response = await self.supabase.table("canvas_integrations").select("*").eq(
+            # TODO: Add get_by_connection_code to CanvasIntegrationRepository
+            from app.config.database.supabase import get_supabase_client
+            supabase = get_supabase_client()
+            response = await supabase.table("canvas_integrations").select("*").eq(
                 "connection_code", connection_code
             ).single().execute()
             
@@ -429,9 +458,7 @@ class CanvasService:
                 "updated_at": datetime.utcnow().isoformat()
             }
             
-            await self.supabase.table("canvas_integrations").update(update_data).eq(
-                "user_id", user_id
-            ).execute()
+            await self.canvas_integration_repository.upsert_integration({**update_data, "user_id": user_id})
             
             logger.info(f"Canvas integration activated for user {user_id}")
             return True
