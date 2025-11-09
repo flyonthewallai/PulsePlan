@@ -59,23 +59,27 @@ class BaseDBModel(BaseModel):
 
 class UserModel(BaseDBModel):
     """User model matching Supabase auth.users structure"""
-    
+
     email: Optional[str] = Field(None, description="User email")
     subscription_status: str = Field("free", description="Subscription status")
     apple_transaction_id: Optional[str] = Field(None, description="Apple transaction ID")
     subscription_expires_at: Optional[datetime] = Field(None, description="Subscription expiry")
     subscription_updated_at: Optional[datetime] = Field(None, description="Last subscription update")
-    
+
     # User preferences
     preferences: Optional[Dict[str, Any]] = Field(None, description="User preferences")
     timezone: Optional[str] = Field(None, description="User timezone")
-    
+
+    # Role-based access control
+    role: str = Field("user", description="User role: 'user' or 'admin'")
+
     class Config:
         json_schema_extra = {
             "example": {
                 "email": "user@example.com",
                 "subscription_status": "premium",
-                "timezone": "America/New_York"
+                "timezone": "America/New_York",
+                "role": "user"
             }
         }
 
@@ -140,24 +144,6 @@ class CourseModel(BaseDBModel):
             canvas_course_code=canvas_course.get("course_code"),
             external_source="canvas"
         )
-
-
-class OAuthTokenModel(BaseDBModel):
-    """OAuth token storage with encryption"""
-    
-    user_id: str = Field(..., description="User ID")
-    provider: str = Field(..., description="OAuth provider (google, microsoft, etc.)")
-    
-    # Encrypted token data
-    access_token: str = Field(..., description="Encrypted access token")
-    refresh_token: Optional[str] = Field(None, description="Encrypted refresh token")
-    token_type: str = Field("Bearer", description="Token type")
-    scope: Optional[str] = Field(None, description="Token scope")
-    
-    # Token metadata
-    expires_at: datetime = Field(..., description="Token expiration time")
-    last_refreshed: Optional[datetime] = Field(None, description="Last refresh timestamp")
-    status: TokenStatus = Field(TokenStatus.ACTIVE, description="Token status")
 
 
 class CanvasIntegrationModel(BaseDBModel):
@@ -443,38 +429,45 @@ class TodoModel(BaseDBModel):
 
 class CalendarEventModel(BaseDBModel):
     """Calendar event model for synced events"""
-    
+
     user_id: str = Field(..., description="User ID")
-    provider: str = Field(..., description="Calendar provider")
+    calendar_id_ref: Optional[str] = Field(None, description="Reference to calendar_calendars table")
+    provider: Optional[str] = Field(None, description="Calendar provider")
     external_id: str = Field(..., description="External event ID")
-    
+
     # Event details
     title: str = Field(..., description="Event title")
     description: Optional[str] = Field(None, description="Event description")
-    
+
     # Timing
     start_time: datetime = Field(..., description="Event start time")
     end_time: datetime = Field(..., description="Event end time")
     is_all_day: bool = Field(False, description="All-day event flag")
-    
+
     # Location and attendees
     location: Optional[str] = Field(None, description="Event location")
     attendees: Optional[List[str]] = Field(None, description="Attendee email addresses")
-    
+
+    # Status flags
+    is_cancelled: bool = Field(False, description="Event cancelled flag")
+
     # Sync metadata
     last_synced: Optional[datetime] = Field(None, description="Last sync timestamp")
     sync_status: str = Field("synced", description="Sync status")
-    
+    etag: Optional[str] = Field(None, description="Provider etag for concurrency control")
+
     class Config:
         json_schema_extra = {
             "example": {
                 "user_id": "user-uuid",
+                "calendar_id_ref": "calendar-uuid",
                 "provider": "google",
                 "external_id": "google_event_123",
                 "title": "Team Meeting",
                 "start_time": "2024-01-15T10:00:00Z",
                 "end_time": "2024-01-15T11:00:00Z",
-                "location": "Conference Room A"
+                "location": "Conference Room A",
+                "is_cancelled": False
             }
         }
 
@@ -558,18 +551,184 @@ class WorkflowExecutionModel(BaseDBModel):
         }
 
 
+class CalendarProvider(str, Enum):
+    """Calendar provider types"""
+    GOOGLE = "google"
+    OUTLOOK = "outlook"
+    APPLE = "apple"
+
+
+class CalendarCalendarModel(BaseDBModel):
+    """Calendar calendars - discovered calendars per provider account"""
+
+    user_id: str = Field(..., description="User ID")
+    oauth_token_id: str = Field(..., description="OAuth token ID reference")
+    provider: CalendarProvider = Field(..., description="Calendar provider")
+    provider_calendar_id: str = Field(..., description="Provider's calendar ID")
+    summary: Optional[str] = Field(None, description="Calendar name/summary")
+    timezone: Optional[str] = Field("UTC", description="Calendar timezone")
+    is_active: bool = Field(True, description="Show in PulsePlan central view")
+    is_primary_write: bool = Field(False, description="Is primary write calendar")
+
+    # Google incremental sync + webhook channel
+    sync_token: Optional[str] = Field(None, description="Incremental sync token")
+    watch_channel_id: Optional[str] = Field(None, description="Watch channel ID")
+    watch_resource_id: Optional[str] = Field(None, description="Watch resource ID")
+    watch_expiration_at: Optional[datetime] = Field(None, description="Watch expiration timestamp")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": "user-uuid",
+                "oauth_token_id": "token-uuid",
+                "provider": "google",
+                "provider_calendar_id": "primary",
+                "summary": "Personal Calendar",
+                "timezone": "America/New_York",
+                "is_active": True,
+                "is_primary_write": True
+            }
+        }
+
+
+class SourceOfTruth(str, Enum):
+    """Source of truth for calendar links"""
+    TASK = "task"
+    CALENDAR = "calendar"
+    LATEST_UPDATE = "latest_update"
+
+
+class CalendarLinkModel(BaseDBModel):
+    """Links PulsePlan tasks to provider calendar events for two-way sync"""
+
+    user_id: str = Field(..., description="User ID")
+    task_id: str = Field(..., description="Task ID reference")
+    calendar_id: str = Field(..., description="Calendar calendar ID reference")
+    provider: CalendarProvider = Field(..., description="Calendar provider")
+    provider_event_id: str = Field(..., description="Provider's event ID")
+    last_pushed_at: Optional[datetime] = Field(None, description="Last pushed to provider timestamp")
+    last_pulled_at: Optional[datetime] = Field(None, description="Last pulled from provider timestamp")
+    source_of_truth: SourceOfTruth = Field(SourceOfTruth.LATEST_UPDATE, description="Source of truth for conflicts")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": "user-uuid",
+                "task_id": "task-uuid",
+                "calendar_id": "calendar-uuid",
+                "provider": "google",
+                "provider_event_id": "google_event_123",
+                "source_of_truth": "latest_update"
+            }
+        }
+
+
+class NLUPromptLogModel(BaseDBModel):
+    """NLU prompt log for capturing and refining intent classification"""
+
+    user_id: str = Field(..., description="User ID")
+    prompt: str = Field(..., description="Raw user input")
+    predicted_intent: str = Field(..., description="Model's predicted intent")
+    confidence: float = Field(..., description="Prediction confidence (similarity score)")
+
+    # Multi-intent support
+    secondary_intents: Optional[List[Dict[str, Any]]] = Field(None, description="Secondary intents with scores")
+
+    # Human-in-the-loop corrections
+    corrected_intent: Optional[str] = Field(None, description="Manual correction if prediction was wrong")
+    correction_notes: Optional[str] = Field(None, description="Notes on why correction was needed")
+
+    # Workflow feedback
+    was_successful: Optional[bool] = Field(None, description="Whether the workflow succeeded")
+    workflow_type: Optional[str] = Field(None, description="The workflow that was executed")
+    execution_error: Optional[str] = Field(None, description="Error message if workflow failed")
+
+    # Context
+    conversation_id: Optional[str] = Field(None, description="Conversation/session ID")
+    message_index: Optional[int] = Field(None, description="Message index in conversation")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": "user-uuid",
+                "prompt": "schedule time to work on the assignment tomorrow",
+                "predicted_intent": "scheduling",
+                "confidence": 0.89,
+                "secondary_intents": [{"intent": "task_management", "score": 0.65}],
+                "was_successful": True,
+                "workflow_type": "scheduling"
+            }
+        }
+
+
+class TimeblockModel(BaseDBModel):
+    """Timeblock model for normalized temporal scheduling data"""
+
+    # Core fields
+    user_id: str = Field(..., description="User ID")
+    task_id: Optional[str] = Field(None, description="Optional link to parent task")
+    title: str = Field(..., description="Timeblock title")
+    start_time: datetime = Field(..., description="Start time (timezone-aware)")
+    end_time: datetime = Field(..., description="End time (timezone-aware)")
+
+    # Timeblock metadata
+    type: str = Field("task_block", description="Timeblock type: task_block, habit, focus, break, meeting, class, study, exam, assignment, project, hobby, admin")
+    status: str = Field("scheduled", description="Status: scheduled, completed, missed, cancelled, in_progress")
+    source: str = Field("pulse", description="Source: pulse, external, manual, agent, scheduler")
+
+    # Optional fields
+    agent_reasoning: Optional[Dict[str, Any]] = Field(None, description="AI agent reasoning for this scheduling decision")
+    location: Optional[str] = Field(None, description="Location")
+    all_day: bool = Field(False, description="All-day timeblock")
+    notes: Optional[str] = Field(None, description="Additional notes")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional flexible metadata (recurrence, preferences, etc.)")
+
+    @validator('end_time')
+    def validate_time_range(cls, v, values):
+        """Ensure end_time is after start_time"""
+        if 'start_time' in values and v <= values['start_time']:
+            raise ValueError('end_time must be after start_time')
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                "task_id": "223e4567-e89b-12d3-a456-426614174000",
+                "title": "Work on assignment - Part 1",
+                "start_time": "2025-10-28T14:00:00Z",
+                "end_time": "2025-10-28T16:00:00Z",
+                "type": "assignment",
+                "status": "scheduled",
+                "source": "agent",
+                "agent_reasoning": {
+                    "rationale": "Scheduled during optimal focus time",
+                    "confidence": 0.85,
+                    "alternatives_considered": 2
+                },
+                "metadata": {
+                    "priority": "high",
+                    "course": "CS101"
+                }
+            }
+        }
+
+
 # Model registry for dynamic access
 MODEL_REGISTRY = {
     'users': UserModel,
-    'oauth_tokens': OAuthTokenModel,
     'tasks': TaskModel,
     'todos': TodoModel,
+    'timeblocks': TimeblockModel,
     'predefined_tags': PredefinedTagModel,
     'user_tags': UserTagModel,
     'todo_tags': None,  # Junction table - no specific model needed
     'calendar_events': CalendarEventModel,
+    'calendar_calendars': CalendarCalendarModel,
+    'calendar_links': CalendarLinkModel,
     'memories': MemoryModel,
-    'workflow_executions': WorkflowExecutionModel
+    'workflow_executions': WorkflowExecutionModel,
+    'nlu_prompt_logs': NLUPromptLogModel
 }
 
 
