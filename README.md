@@ -1,22 +1,24 @@
 <div align="center">
   <img src="https://www.pulseplan.app/assets/logo.png" alt="PulsePlan Logo" width="90px" />
-  <h1>PulsePlan – AI-Powered Academic Planner</h1>
+  <h1>PulsePlan – AI-Powered Scheduling Agent</h1>
 </div>
 
 PulsePlan is an intelligent academic planning assistant powered by LangGraph agents that integrates with Canvas, Google Calendar, Microsoft Outlook, and other academic platforms. Built for students, it provides conversational AI assistance, automated scheduling, and comprehensive productivity analytics through a sophisticated multi-agent system.
 
-> 📱 Your personal AI academic agent.
+> Your personal AI scheduling agent.
 
 ---
 
 ## ✨ Key Features
 
-### 🤖 **LangGraph AI Agent System**
+### 🤖 **Advanced AI Agent System**
 
-- **Multi-Agent Architecture** – Specialized agents for different workflows (chat, scheduling, briefings)
-- **Conversational AI** – Natural language task management and scheduling assistance
-- **Context-Aware Intelligence** – Agents understand your preferences, patterns, and constraints
-- **Tool-Based Execution** – 15+ specialized tools for comprehensive productivity management
+- **Multi-Agent Architecture** – Specialized LangGraph agents for different workflows (chat, scheduling, email, briefings)
+- **Natural Language Understanding** – Custom-trained intent classification model with 95%+ accuracy
+- **Conversational AI** – Context-aware dialogue with clarification, slot-filling, and multi-turn planning
+- **Intent Processing** – Sophisticated NLU pipeline with entity extraction and ambiguity resolution
+- **Tool Ecosystem** – 20+ specialized tools for comprehensive productivity management
+- **Action Executors** – Domain-specific action handlers for calendar, tasks, emails, search, and more
 
 ### 📚 **Academic Integration**
 
@@ -27,17 +29,26 @@ PulsePlan is an intelligent academic planning assistant powered by LangGraph age
 
 ### 💡 **Intelligent Features**
 
-- **Memory System** – Semantic memory with vector storage for personalized assistance
-- **Weekly Pulse** – AI-generated productivity insights and performance analytics
-- **Automated Jobs** – Nightly Canvas sync and data processing workflows
-- **Preference Management** – Structured user constraints and scheduling rules
+- **Memory System** – Dual-layer semantic memory (pgvector + Redis) for personalized assistance
+- **Daily Briefings** – AI-generated morning briefings with agenda, priorities, and insights
+- **Weekly Pulse** – Comprehensive productivity analytics and performance tracking
+- **Focus Sessions** – Pomodoro timer with entity matching and productivity tracking
+- **Slash Commands** – Quick actions with natural language command parsing
+- **Smart Scheduling** – Context-aware time suggestions with conflict resolution
+- **Timeblocks** – Visual schedule representation merging tasks and calendar events
 
 ### 🔧 **Advanced Capabilities**
 
-- **Real-Time Processing** – WebSocket connections for live updates
-- **Caching Strategy** – Multi-layer Redis caching for optimal performance
-- **Background Jobs** – Automated synchronization and data processing
-- **Security First** – Encrypted token storage and comprehensive auth system
+- **Real-Time Updates** – WebSocket connections for live calendar, task, and notification updates
+- **Multi-Platform** – Web app (React), mobile app (React Native), and REST API
+- **Repository Pattern** – Clean data layer with domain-specific repositories
+- **Background Workers** – Automated Canvas sync, calendar sync, briefings, and notifications
+- **Usage Tracking** – Token usage monitoring with configurable limits and quotas
+- **Admin Tools** – NLU monitoring dashboard and system health metrics
+- **Subscription Management** – RevenueCat integration for premium features
+- **Multi-Provider Email** – Unified email interface supporting Gmail and Outlook
+- **Caching Strategy** – Multi-layer Redis caching with intelligent invalidation
+- **Security First** – Encrypted token storage, OAuth flows, and comprehensive auth system
 
 ---
 
@@ -109,60 +120,198 @@ User Query → Agent Router → Specialized Graph → Tool Execution → Respons
 
 ```
 PulsePlan/
-├── backend/                    # Python FastAPI backend with LangGraph agents
+├── backend/                           # Python FastAPI backend with LangGraph agents
 │   ├── app/
-│   │   ├── agents/            # LangGraph multi-agent system
-│   │   │   ├── core/          # Orchestration (intent, driver, gates, continuation)
-│   │   │   ├── graphs/        # Workflow implementations (email, chat)
-│   │   │   ├── nlu/           # Intent classification models
-│   │   │   ├── services/      # Action execution, planning, NLU
-│   │   │   ├── tools/         # Integration tools (calendar, email, Canvas)
-│   │   │   └── orchestrator.py
-│   │   ├── api/v1/           # REST API endpoints
-│   │   │   └── endpoints/    # Domain-specific endpoints
-│   │   ├── database/         # Supabase models and repositories
-│   │   ├── integrations/     # External integrations
-│   │   │   └── providers/    # Calendar providers (Google, Microsoft)
-│   │   ├── jobs/             # Background jobs (Canvas sync, etc.)
-│   │   ├── memory/           # Dual-layer memory (pgvector + Redis)
-│   │   ├── scheduler/        # OR-Tools scheduling engine
-│   │   ├── services/         # Business logic layer
-│   │   ├── workers/          # APScheduler workers
-│   │   └── security/         # Encryption and auth services
-│   ├── docs/                 # Technical documentation
-│   └── tests/               # Comprehensive test suite
-├── web/                     # React web app (Vite + TypeScript)
+│   │   ├── agents/                   # LangGraph multi-agent system
+│   │   │   ├── core/                 # Core orchestration layer
+│   │   │   │   ├── orchestration/   # Intent processing, driver, gates, continuation
+│   │   │   │   ├── services/        # LLM service, user context, action routing
+│   │   │   │   ├── conversation/    # Conversation state management
+│   │   │   │   └── state/           # Workflow state containers
+│   │   │   ├── graphs/              # Workflow implementations
+│   │   │   │   ├── briefing_graph.py    # Daily briefing generation
+│   │   │   │   ├── calendar_graph.py    # Calendar operations
+│   │   │   │   ├── email_graph.py       # Email management
+│   │   │   │   ├── event_graph.py       # Event CRUD operations
+│   │   │   │   ├── scheduling_graph.py  # Intelligent scheduling
+│   │   │   │   ├── search_graph.py      # Web search & research
+│   │   │   │   └── task_graph.py        # Task management
+│   │   │   ├── nlu/                 # Natural language understanding
+│   │   │   │   ├── classifier_contrastive.py  # Intent classification model
+│   │   │   │   ├── extractors/      # Entity extraction (date, time, duration, etc.)
+│   │   │   │   └── param_extractor.py   # Parameter extraction
+│   │   │   ├── services/            # Agent services layer
+│   │   │   │   ├── action_executor.py       # Action execution coordinator
+│   │   │   │   ├── action_executors/        # Domain-specific action handlers
+│   │   │   │   ├── planning/                # Multi-step planning & execution
+│   │   │   │   ├── conversational_responses.py  # Response generation
+│   │   │   │   ├── llm_clarification.py     # Ambiguity resolution
+│   │   │   │   └── nlu_service.py           # NLU integration service
+│   │   │   ├── tools/               # Agent tools ecosystem
+│   │   │   │   ├── communication/   # Briefings, notifications, email
+│   │   │   │   ├── data/            # Tasks, todos, events, memory
+│   │   │   │   ├── integrations/    # Calendar, Canvas, email providers
+│   │   │   │   ├── scheduling/      # Transparent scheduler
+│   │   │   │   └── search/          # Web search capabilities
+│   │   │   └── orchestrator.py      # Main agent orchestrator
+│   │   ├── api/v1/                  # REST API endpoints
+│   │   │   ├── endpoints/
+│   │   │   │   ├── admin.py         # Admin & NLU monitoring
+│   │   │   │   ├── agent_modules/   # Conversation, workflows, briefings, commands, gates
+│   │   │   │   ├── auth_modules/    # OAuth, tokens, refresh
+│   │   │   │   ├── calendar_modules/    # Calendar events, timeblocks, webhooks
+│   │   │   │   ├── focus_modules/       # Focus sessions, pomodoro, entity matching
+│   │   │   │   ├── infrastructure_modules/  # Health, usage tracking
+│   │   │   │   ├── integrations_modules/    # Calendar, Canvas, email settings
+│   │   │   │   ├── payments_modules/        # Subscriptions, RevenueCat
+│   │   │   │   ├── task_modules/    # Tasks, todos, tags
+│   │   │   │   └── user_modules/    # Users, contacts, courses, hobbies
+│   │   │   └── api.py               # API router configuration
+│   │   ├── database/                # Repository pattern & data layer
+│   │   │   ├── repositories/        # Domain-specific repositories
+│   │   │   │   ├── calendar_repositories/   # Calendar, timeblocks, sync status
+│   │   │   │   ├── integration_repositories/    # OAuth, Canvas, emails, briefings
+│   │   │   │   ├── task_repositories/       # Tasks, todos, tags
+│   │   │   │   └── user_repositories/       # Users, courses, focus, hobbies
+│   │   │   ├── base_repository.py   # Base repository class
+│   │   │   ├── manager.py           # Database connection manager
+│   │   │   └── models.py            # Database models
+│   │   ├── integrations/            # External integrations
+│   │   │   └── providers/           # Calendar/email provider abstraction
+│   │   │       └── google/          # Google Calendar client & mapping
+│   │   ├── jobs/                    # Background job runners
+│   │   │   ├── calendar/            # Calendar sync workers
+│   │   │   ├── canvas/              # Canvas backfill, delta sync, nightly jobs
+│   │   │   ├── notifications/       # Notification delivery
+│   │   │   └── usage_aggregation.py # Usage metrics aggregation
+│   │   ├── memory/                  # Dual-layer memory system
+│   │   │   ├── core/                # Chat memory, vector storage
+│   │   │   ├── processing/          # Ingestion, summarization
+│   │   │   └── retrieval/           # Semantic search, embeddings
+│   │   ├── scheduler/               # OR-Tools scheduling engine
+│   │   │   ├── core/                # Service, domain models, features
+│   │   │   ├── optimization/        # Constraints, objectives, CP-SAT solver
+│   │   │   ├── diagnostics/         # Quality analysis, constraint checking
+│   │   │   ├── learning/            # Completion models, bandits, safety rails
+│   │   │   ├── monitoring/          # Telemetry, distributed tracing
+│   │   │   └── io/                  # Repository layer, DTOs
+│   │   ├── services/                # Business logic layer
+│   │   │   ├── analytics/           # PostHog analytics integration
+│   │   │   ├── auth/                # Token management, refresh, OAuth
+│   │   │   ├── commands/            # Slash command handlers
+│   │   │   ├── focus/               # Focus sessions, entity matching
+│   │   │   ├── infrastructure/      # Cache, preferences, user settings
+│   │   │   ├── integrations/        # Calendar sync, Canvas, email
+│   │   │   ├── notifications/       # iOS notifications, push delivery
+│   │   │   ├── pomodoro/            # Pomodoro settings
+│   │   │   ├── scheduling/          # Smart slot finding
+│   │   │   ├── usage/               # Token tracking, usage limits
+│   │   │   ├── user/                # Hobby parsing, user utilities
+│   │   │   └── workers/             # Job runner implementations
+│   │   ├── workers/                 # APScheduler worker processes
+│   │   │   ├── calendar_scheduler.py    # Calendar sync scheduling
+│   │   │   ├── canvas_scheduler.py      # Canvas sync scheduling
+│   │   │   └── focus_profile_worker.py  # Focus analytics
+│   │   ├── core/                    # Core infrastructure
+│   │   │   ├── auth/                # Authentication & security
+│   │   │   ├── infrastructure/      # WebSocket, cache, circuit breaker
+│   │   │   ├── llm/                 # Tracked LLM for observability
+│   │   │   └── utils/               # Timezone utils, error handlers
+│   │   ├── middleware/              # HTTP middleware
+│   │   ├── models/                  # Domain models
+│   │   │   ├── auth/                # OAuth tokens
+│   │   │   ├── calendar/            # Timeblocks
+│   │   │   ├── integrations/        # Integration settings
+│   │   │   └── user/                # User hobbies
+│   │   ├── config/                  # Configuration management
+│   │   └── security/                # Encryption, secrets management
+│   ├── migrations/                  # Database migrations
+│   ├── scripts/                     # Utility scripts
+│   ├── docs/                        # Technical documentation
+│   │   ├── 01-getting-started/      # Setup guides
+│   │   ├── 02-architecture/         # System architecture
+│   │   ├── 03-ai-agents/            # Agent system docs
+│   │   ├── 04-development/          # Development guidelines
+│   │   ├── 05-systems/              # System-specific docs
+│   │   ├── 06-security/             # Security documentation
+│   │   ├── 07-mobile/               # Mobile platform docs
+│   │   └── 08-plans/                # Future plans & roadmap
+│   └── tests/                       # Comprehensive test suite
+├── web/                             # React web application (Vite + TypeScript)
 │   ├── src/
-│   │   ├── components/      # Reusable UI components
-│   │   ├── contexts/        # React contexts for state
-│   │   ├── features/        # Feature-based modules
-│   │   ├── hooks/           # Custom React hooks
-│   │   ├── pages/           # Page components
-│   │   └── services/        # API integration layer
-│   └── public/             # Static assets
-└── setup.sh               # Cross-platform setup script
+│   │   ├── components/              # Reusable UI components
+│   │   │   ├── ui/                  # Base UI components (shadcn/ui)
+│   │   │   ├── layout/              # Layout components
+│   │   │   └── tasks/               # Task-specific components
+│   │   ├── features/                # Feature modules
+│   │   │   ├── calendar/            # Calendar views (daily, weekly, monthly)
+│   │   │   └── tasks/               # Task management, kanban
+│   │   ├── pages/                   # Page components
+│   │   │   ├── HomePage.tsx         # Dashboard
+│   │   │   ├── CalendarPage.tsx     # Calendar interface
+│   │   │   ├── ChatPage.tsx         # AI chat interface
+│   │   │   ├── TaskboardPage.tsx    # Task board
+│   │   │   ├── PomodoroPage.tsx     # Pomodoro timer
+│   │   │   ├── IntegrationsPage.tsx # Integration management
+│   │   │   ├── PricingPage.tsx      # Subscription tiers
+│   │   │   └── AdminNLUPage.tsx     # NLU monitoring (admin)
+│   │   ├── contexts/                # React context providers
+│   │   ├── hooks/                   # Custom React hooks
+│   │   ├── services/                # API integration layer
+│   │   ├── lib/                     # Utilities & helpers
+│   │   │   ├── api/                 # API SDK
+│   │   │   ├── commands/            # Command parsing
+│   │   │   ├── utils/               # Utilities
+│   │   │   └── validation/          # Input validation
+│   │   └── types/                   # TypeScript types
+│   └── public/                      # Static assets
+├── mobile/                          # React Native mobile app (Expo)
+│   ├── app/                         # Expo Router pages
+│   ├── components/                  # Mobile-specific components
+│   ├── contexts/                    # Mobile state management
+│   └── services/                    # Mobile API integration
+├── ml/                              # Machine learning models
+│   └── intent_classifier/           # Intent classification model
+│       ├── scripts/                 # Training & inference scripts
+│       ├── data/                    # Training data
+│       ├── outputs/                 # Trained models
+│       └── docs/                    # ML documentation
+├── data/                            # Training data & datasets
+│   └── intents/                     # Intent classification datasets
+├── docs/                            # Root documentation
+└── tests/                           # Integration tests
 ```
 
 ---
 
 ## 🔠 Tech Stack
 
-| Layer                 | Technology                                       |
-| --------------------- | ------------------------------------------------ |
-| **AI Agents**         | LangGraph + OpenAI GPT-4o + Google Gemini        |
-| **Backend API**       | Python FastAPI + Pydantic + asyncio              |
-| **Agent Tools**       | Custom tool ecosystem (15+ specialized tools)    |
-| **Scheduling Engine** | OR-Tools CP-SAT + Constraint Programming + ML    |
-| **Memory System**     | Dual-layer: pgvector + Redis + OpenAI Embeddings |
-| **Learning Models**   | Contextual Bandits + Logistic Regression         |
-| **Frontend**          | React + Vite + TypeScript + Tailwind CSS         |
-| **Database**          | Supabase (PostgreSQL) + Row Level Security       |
-| **Caching**           | Redis + Multi-layer caching strategy             |
-| **Authentication**    | Supabase Auth + JWT + OAuth2                     |
-| **Background Jobs**   | Python asyncio + APScheduler                     |
-| **Real-time**         | WebSockets + Server-Sent Events                  |
-| **Integrations**      | Canvas LMS + Google APIs + Microsoft Graph       |
-| **Deployment**        | Docker + Kubernetes ready                        |
+| Layer                    | Technology                                                 |
+| ------------------------ | ---------------------------------------------------------- |
+| **AI Agents**            | LangGraph + OpenAI GPT-4o + Google Gemini                  |
+| **NLU**                  | Custom Sentence Transformers + Contrastive Learning        |
+| **Backend API**          | Python FastAPI + Pydantic + asyncio                        |
+| **Agent Tools**          | Custom tool ecosystem (20+ specialized tools)              |
+| **Intent Classification**| Fine-tuned BERT model (95%+ accuracy)                      |
+| **Entity Extraction**    | Custom extractors (date/time, duration, participants, etc.)|
+| **Scheduling Engine**    | OR-Tools CP-SAT + Constraint Programming + ML              |
+| **Memory System**        | Dual-layer: pgvector + Redis + OpenAI Embeddings          |
+| **Learning Models**      | Contextual Bandits + Logistic Regression                   |
+| **Web Frontend**         | React 18 + Vite + TypeScript + Tailwind CSS + shadcn/ui   |
+| **Mobile App**           | React Native + Expo Router + TypeScript                    |
+| **Database**             | Supabase (PostgreSQL) + Row Level Security                 |
+| **Data Layer**           | Repository Pattern + Domain-driven design                  |
+| **Caching**              | Redis + Multi-layer caching strategy                       |
+| **Authentication**       | Supabase Auth + JWT + OAuth2 (Google, Microsoft)           |
+| **Background Jobs**      | Python asyncio + APScheduler + Worker processes            |
+| **Real-time**            | WebSockets + Server-Sent Events                            |
+| **Email Integration**    | Provider abstraction (Gmail, Outlook, System)              |
+| **Calendar Integration** | Google Calendar + Microsoft Outlook + Provider pattern     |
+| **LMS Integration**      | Canvas API + Automated sync jobs                           |
+| **Analytics**            | PostHog + Custom telemetry                                 |
+| **Payments**             | RevenueCat + Subscription management                       |
+| **Observability**        | Sentry + Structured logging + Health checks                |
+| **Deployment**           | Docker + Kubernetes ready + Multi-environment support      |
 
 ---
 
@@ -529,38 +678,115 @@ PulsePlan features a sophisticated scheduling system built on OR-Tools constrain
 
 ## 🔧 API Endpoints
 
-### **Agent Interactions**
+### **Agent System**
+- `POST /api/v1/agent/chat` – Conversational AI interface
+- `POST /api/v1/agent/workflows` – Execute specific workflows
+- `GET /api/v1/agent/conversations/{id}` – Get conversation history
+- `POST /api/v1/agent/briefings` – Generate daily briefings
+- `POST /api/v1/agent/commands` – Execute slash commands
+- `GET /api/v1/agent/gates` – Get workflow gate status
 
-- `POST /api/v1/agents/chat` – Conversational AI interface
-- `POST /api/v1/agents/task` – Task management operations
-- `POST /api/v1/agents/schedule` – Scheduling requests
-- `GET /api/v1/agents/status` – Agent system health
+### **Tasks & Todos**
+- `GET /api/v1/tasks` – List tasks with filters
+- `POST /api/v1/tasks` – Create new task
+- `PUT /api/v1/tasks/{id}` – Update task
+- `DELETE /api/v1/tasks/{id}` – Delete task
+- `GET /api/v1/todos` – List todos
+- `POST /api/v1/todos` – Create todo
+- `GET /api/v1/tags` – List tags
+- `POST /api/v1/tags` – Create tag
 
-### **Integration Management**
+### **Calendar & Events**
+- `GET /api/v1/calendar/events` – List calendar events
+- `POST /api/v1/calendar/events` – Create event
+- `PUT /api/v1/calendar/events/{id}` – Update event
+- `DELETE /api/v1/calendar/events/{id}` – Delete event
+- `GET /api/v1/calendar/timeblocks` – Get merged schedule view
+- `POST /api/v1/calendar/webhooks` – Handle calendar webhooks
 
+### **Focus & Productivity**
+- `GET /api/v1/focus/sessions` – List focus sessions
+- `POST /api/v1/focus/sessions` – Start focus session
+- `PUT /api/v1/focus/sessions/{id}` – Update session
+- `GET /api/v1/focus/pomodoro/settings` – Get pomodoro settings
+- `PUT /api/v1/focus/pomodoro/settings` – Update settings
+
+### **Integrations**
 - `POST /api/v1/integrations/canvas/sync` – Manual Canvas sync
-- `GET /api/v1/integrations/calendar/events` – Calendar data
-- `POST /api/v1/integrations/oauth/connect` – OAuth setup
+- `GET /api/v1/integrations/canvas/courses` – List courses
+- `POST /api/v1/integrations/calendar/connect` – Connect calendar
+- `GET /api/v1/integrations/settings` – Get integration settings
+- `POST /api/v1/integrations/oauth/{provider}` – OAuth flow
 
-### **Analytics & Insights**
+### **User Management**
+- `GET /api/v1/users/me` – Get current user profile
+- `PUT /api/v1/users/me` – Update user profile
+- `GET /api/v1/users/contacts` – List contacts
+- `GET /api/v1/users/courses` – List courses
+- `GET /api/v1/users/hobbies` – List hobbies
+- `POST /api/v1/users/hobbies` – Add hobby
 
-- `GET /api/v1/analytics/weekly-pulse` – Productivity insights
-- `GET /api/v1/analytics/performance` – Performance metrics
-- `POST /api/v1/analytics/generate` – Custom report generation
+### **Admin & Monitoring**
+- `GET /api/v1/admin/nlu/monitoring` – NLU performance metrics
+- `GET /api/v1/infrastructure/health` – System health check
+- `GET /api/v1/infrastructure/usage` – Usage statistics
+
+### **Payments**
+- `POST /api/v1/payments/subscriptions` – Manage subscriptions
+- `POST /api/v1/payments/revenuecat/webhook` – RevenueCat webhook
 
 ---
 
 ## 📚 Documentation
 
-**Project Guidelines:**
-- **[RULES.md](RULES.md)** – Architecture rules, coding standards, and module organization (required reading)
-- **[CLAUDE.md](CLAUDE.md)** – AI assistant guidance for working with this codebase
+**Getting Started:**
+- **[Setup Guide](docs/01-getting-started/SETUP.md)** – Complete installation and configuration guide
+- **[Development Guide](docs/01-getting-started/DEVELOPMENT.md)** – Local development environment setup
 
-**Technical Documentation:**
-- **[Calendar System](backend/docs/CALENDAR_SYSTEM.md)** – Centralized calendar architecture and Google sync
-- **[KMS Setup Guide](backend/docs/KMS_SETUP_GUIDE.md)** – AWS KMS encryption configuration
-- **[Memory System](backend/docs/MEMORY_SYSTEM_DOCUMENTATION.md)** – Vector memory implementation
-- **[LangGraph Workflows](backend/docs/LANGGRAPH_AGENT_WORKFLOWS.md)** – Agent system architecture (if exists)
+**Architecture & Design:**
+- **[System Architecture](docs/02-architecture/ARCHITECTURE.md)** – Overall system design and patterns
+- **[Interface Design](docs/02-architecture/INTERFACES.md)** – API and integration interfaces
+- **[Development Rules](docs/02-architecture/RULES.md)** – Coding standards and best practices
+
+**AI Agent System:**
+- **[Agent Overview](docs/03-ai-agents/README.md)** – Multi-agent architecture overview
+- **[Agent Workflows](docs/05-systems/agents/AGENT_WORKFLOW_SYSTEM.md)** – LangGraph workflow implementations
+- **[Conversation System](docs/05-systems/agents/CONVERSATION_CONTINUATION_SYSTEM.md)** – Conversation state management
+- **[Acceptance Gates](docs/05-systems/agents/ACCEPTANCE_GATE.md)** – Quality assurance gates
+
+**Systems Documentation:**
+- **[Calendar System](docs/05-systems/integrations/CALENDAR_SYSTEM.md)** – Calendar integration architecture
+- **[Canvas Integration](docs/05-systems/integrations/CANVAS_INTEGRATION.md)** – Canvas LMS integration
+- **[Email Security](docs/05-systems/integrations/EMAIL_SECURITY_IMPLEMENTATION.md)** – Email integration security
+- **[Memory System](docs/05-systems/infrastructure/MEMORY_SYSTEM_DOCUMENTATION.md)** – Dual-layer memory architecture
+- **[Scheduler](docs/05-systems/scheduling/SCHEDULER_SYSTEM_DOCUMENTATION.md)** – OR-Tools scheduling engine
+- **[Timeblocks](docs/05-systems/scheduling/TIMEBLOCKS_ARCHITECTURE.md)** – Time blocking system
+- **[WebSocket Implementation](docs/05-systems/infrastructure/WEBSOCKET_IMPLEMENTATION.md)** – Real-time updates
+
+**Development:**
+- **[API Organization](docs/04-development/API_ENDPOINTS_ORGANIZATION.md)** – API structure and conventions
+- **[Service Layer Patterns](docs/04-development/SERVICE_LAYER_PATTERNS.md)** – Service architecture patterns
+- **[Testing Guide](docs/04-development/TESTING.md)** – Testing strategies and examples
+- **[Common Pitfalls](docs/04-development/PITFALLS.md)** – Known issues and solutions
+- **[Web Guidelines](docs/04-development/WEB_RULES.md)** – Frontend development rules
+
+**Security:**
+- **[Security Overview](docs/06-security/SECURITY.md)** – Security architecture and practices
+- **[Gmail OAuth](docs/06-security/GMAIL_OAUTH_SECURITY_STATUS.md)** – OAuth implementation status
+- **[KMS Setup](docs/05-systems/infrastructure/KMS_SETUP_GUIDE.md)** – Encryption key management
+
+**Job Systems:**
+- **[Briefing Jobs](docs/05-systems/scheduling/BRIEFING_JOB_SYSTEM.md)** – Daily briefing generation
+- **[Canvas Jobs](docs/05-systems/integrations/CANVAS_JOB_SYSTEM.md)** – Canvas sync automation
+- **[Calendar Jobs](docs/05-systems/integrations/CALENDAR_AUTOSYNC_SYSTEM.md)** – Calendar sync automation
+- **[Focus Jobs](docs/05-systems/observability/FOCUS_JOB_SYSTEM.md)** – Focus tracking automation
+- **[Notification Jobs](docs/05-systems/notifications/NOTIFICATION_JOB_SYSTEM.md)** – Notification delivery
+- **[Usage Jobs](docs/05-systems/infrastructure/USAGE_JOB_SYSTEM.md)** – Usage tracking and limits
+
+**ML & NLU:**
+- **[Intent Classifier](ml/intent_classifier/README.md)** – Intent classification model documentation
+- **[Training Guide](ml/intent_classifier/docs/TRAINING_GUIDE.md)** – Model training instructions
+- **[Dataset Summary](ml/intent_classifier/docs/DATASET_SUMMARY.md)** – Training data overview
 
 ---
 
@@ -587,22 +813,10 @@ cp .env.production .env
 
 ---
 
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
 ## 🏢 About
 
 PulsePlan is built by **Fly on the Wall** – creating AI-powered products with personality.
 
-- **Website**: [flyonthewalldev.com](https://flyonthewalldev.com)
+- **Website**: [flyonthewall.xyz](https://flyonthewall.xyz)
 - **App**: [pulseplan.app](https://pulseplan.app)
-- **Contact**: [hello@flyonthewalldev.com](mailto:hello@flyonthewalldev.com)
-
----
-
-_Built with ❤️ for students who want their schedule to find its rhythm._
+- **Contact**: [hello@flyonthewall.xyz](mailto:hello@flyonthewall.xyz)
