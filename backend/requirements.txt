@@ -31,11 +31,11 @@ resend==0.8.0
 httpx==0.24.1
 
 # WebSocket support
-python-socketio==5.10.0
+python-socketio>=5.14.0  
 
 # LangGraph and AI workflows
 langgraph==0.0.62
-langchain-core==0.2.16
+langchain-core>=0.3.0  
 langchain-openai==0.1.7
 
 # NLU and ML
