@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 from fastapi import HTTPException
 from datetime import datetime
 
-from app.config.database.supabase import get_supabase
+from app.database.repositories.integration_repositories import get_conversation_repository
 from app.config.cache.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
@@ -28,12 +28,12 @@ async def get_user_active_conversation(user_id: str) -> Optional[str]:
                 cached_conversation_id = cached_conversation_id.decode('utf-8')
             return cached_conversation_id
 
-        # If not cached, get most recent conversation from database
-        supabase = get_supabase()
-        result = supabase.table("conversations").select("id").eq("user_id", user_id).eq("is_active", True).order("last_message_at", desc=True).limit(1).execute()
+        # If not cached, get most recent conversation from database using repository
+        conversation_repo = get_conversation_repository()
+        conversation = await conversation_repo.get_active_by_user(user_id)
 
-        if result.data and len(result.data) > 0:
-            conversation_id = result.data[0]["id"]
+        if conversation:
+            conversation_id = conversation["id"]
             # Ensure conversation_id is a string
             if isinstance(conversation_id, bytes):
                 conversation_id = conversation_id.decode('utf-8')

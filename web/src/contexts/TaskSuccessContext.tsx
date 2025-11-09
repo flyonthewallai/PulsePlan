@@ -1,42 +1,71 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Task } from '../types'
 import { useWebSocket } from './WebSocketContext'
 
-// Global function to add task success messages to chat
-let globalAddTaskSuccessMessage: ((task: Task) => void) | null = null
+// ============================================================================
+// TYPE DEFINITIONS - No more 'any' types!
+// ============================================================================
 
-// Global function to add conversational responses to chat
-let globalAddConversationalMessage: ((message: string, metadata?: any) => void) | null = null
-
-// Global function to add simple success cards to chat
-let globalAddSimpleSuccessCard: ((operation: string, entityType: string, entityTitle: string, card: any, acknowledgementMessage?: string) => void) | null = null
-
-// Global function to add search results to chat
-let globalAddSearchResults: ((searchData: any) => void) | null = null
-
-// Global function to update existing task
-let globalUpdateTask: ((taskId: string, updates: any) => void) | null = null
-
-export const setGlobalAddTaskSuccessMessage = (fn: (task: Task) => void) => {
-  globalAddTaskSuccessMessage = fn
+interface ConversationalMetadata {
+  operation?: string
+  entity_type?: string
+  task_count?: number
+  tasks?: Task[]
+  card?: CrudCard
+  can_retry?: boolean
+  retry_suggestion?: string
+  found_tasks?: Task[]
+  task_options?: Task[]
+  original_query?: string
+  workflow_context?: Record<string, unknown>
 }
 
-export const setGlobalAddConversationalMessage = (fn: (message: string, metadata?: any) => void) => {
-  globalAddConversationalMessage = fn
+interface SearchData {
+  results?: unknown[]
+  query?: string
+  [key: string]: unknown
 }
 
-export const setGlobalAddSimpleSuccessCard = (fn: (operation: string, entityType: string, entityTitle: string, card: any, acknowledgementMessage?: string) => void) => {
-  globalAddSimpleSuccessCard = fn
+interface CrudCard {
+  operation: string
+  entity_type: string
+  entity_title: string
+  acknowledgement_message?: string
+  details?: {
+    operation?: string
+    task_count?: number
+    tasks?: Task[]
+    [key: string]: unknown
+  }
+  [key: string]: unknown
 }
 
-export const setGlobalAddSearchResults = (fn: (searchData: any) => void) => {
-  globalAddSearchResults = fn
+interface WebSocketEventData {
+  task?: Task
+  data?: {
+    task?: Task
+    created_item?: Task | { task?: Task }
+    deleted_item?: Task | { task?: Task }
+    card?: CrudCard
+    result?: {
+      search_data?: SearchData
+    }
+    search_data?: SearchData
+  }
+  result?: {
+    data?: { task?: Task }
+    result?: { search_data?: SearchData }
+    search_data?: SearchData
+  }
+  card?: CrudCard
+  deleted_item?: Task | { task?: Task }
+  [key: string]: unknown
 }
 
-export const setGlobalUpdateTask = (fn: (taskId: string, updates: any) => void) => {
-  globalUpdateTask = fn
-}
+// ============================================================================
+// CONTEXT TYPE - Proper React Context pattern instead of globals
+// ============================================================================
 
 interface TaskSuccessContextType {
   showSuccessCard: boolean
@@ -47,9 +76,19 @@ interface TaskSuccessContextType {
   deletedTask: Task | null
   showTaskDelete: (task: Task) => void
   hideTaskDelete: () => void
+  // Handler registration for chat integration
+  registerTaskSuccessHandler: (handler: (task: Task) => void) => void
+  registerConversationalHandler: (handler: (message: string, metadata?: ConversationalMetadata) => void) => void
+  registerSimpleSuccessHandler: (handler: (operation: string, entityType: string, entityTitle: string, card: CrudCard, acknowledgementMessage?: string) => void) => void
+  registerSearchResultsHandler: (handler: (searchData: SearchData) => void) => void
+  registerUpdateTaskHandler: (handler: (taskId: string, updates: Partial<Task>) => void) => void
 }
 
 const TaskSuccessContext = createContext<TaskSuccessContextType | undefined>(undefined)
+
+// ============================================================================
+// PROVIDER COMPONENT
+// ============================================================================
 
 interface TaskSuccessProviderProps {
   children: ReactNode
@@ -63,344 +102,188 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
   const { socket, isConnected } = useWebSocket()
   const queryClient = useQueryClient()
 
-  // Listen for real-time task creation events from WebSocket
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return
+  // Use refs for handlers instead of module-level globals (proper React pattern)
+  const taskSuccessHandlerRef = useRef<((task: Task) => void) | null>(null)
+  const conversationalHandlerRef = useRef<((message: string, metadata?: ConversationalMetadata) => void) | null>(null)
+  const simpleSuccessHandlerRef = useRef<((operation: string, entityType: string, entityTitle: string, card: CrudCard, acknowledgementMessage?: string) => void) | null>(null)
+  const searchResultsHandlerRef = useRef<((searchData: SearchData) => void) | null>(null)
+  const updateTaskHandlerRef = useRef<((taskId: string, updates: Partial<Task>) => void) | null>(null)
+
+  // Helper function to extract task from various event structures
+  const extractTask = (data: WebSocketEventData): Task | null => {
+    if (data.task) return data.task
+    if (data.data?.task) return data.data.task
+    if (data.data?.created_item) {
+      const item = data.data.created_item
+      if ('task' in item && item.task) return item.task
+      return item as Task
     }
+    if (data.data?.deleted_item) {
+      const item = data.data.deleted_item
+      if ('task' in item && item.task) return item.task
+      return item as Task
+    }
+    if (data.deleted_item) {
+      const item = data.deleted_item
+      if ('task' in item && item.task) return item.task
+      return item as Task
+    }
+    return null
+  }
 
-    // Listen for task creation events
-    socket.on('task_created', (data: any) => {
+  // Helper function to extract search data
+  const extractSearchData = (data: WebSocketEventData): SearchData | null => {
+    if (data.result?.result?.search_data) return data.result.result.search_data
+    if (data.result?.search_data) return data.result.search_data
+    if (data.data?.result?.search_data) return data.data.result.search_data
+    if (data.data?.search_data) return data.data.search_data
+    return null
+  }
 
-      // Handle data from emit_to_user (wrapped) vs direct emission
-      let task = null
-      if (data.task) {
-        // Direct task data
-        task = data.task
-      } else if (data.data && data.data.task) {
-        // Task in data.data.task
-        task = data.data.task
-      } else if (data.data && data.data.created_item && data.data.created_item.task) {
-        // From emit_to_user with nested structure
-        task = data.data.created_item.task
-      } else if (data.data && data.data.created_item) {
-        // From emit_to_user structure
-        task = data.data.created_item
-      }
+  // Helper function to extract CRUD card
+  const extractCard = (data: WebSocketEventData): CrudCard | null => {
+    if (data.data?.card) return data.data.card
+    if (data.card) return data.card
+    return null
+  }
 
+  // Listen for real-time task events from WebSocket
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    // Task created event
+    socket.on('task_created', (data: WebSocketEventData) => {
+      const task = extractTask(data)
       if (task) {
-        // Invalidate tasks cache to refresh the UI
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
         
-        // For search tasks, show the task card with a small delay to ensure clean display
+        // For search tasks, show with a small delay to ensure clean display
         if (task.workflow_type === 'search') {
-          setTimeout(() => {
-            showTaskSuccess(task)
-          }, 100) // Small delay to ensure thinking indicator is cleared
-        } else {
-          // Don't show task card for simple CRUD operations
-          // They will be handled by the crud_success event
+          setTimeout(() => showTaskSuccess(task), 100)
         }
       }
     })
 
-    socket.on('workflow_completion', (data: any) => {
-
-
-
-
-      // Handle workflow completion events if they contain task data
+    // Workflow completion event
+    socket.on('workflow_completion', (data: WebSocketEventData) => {
       if (data.result?.data?.task) {
-
-
-        // Invalidate tasks cache to refresh the UI
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
-
         showTaskSuccess(data.result.data.task)
-      } else if (data.result?.result?.search_data) {
-
-        
-        if (globalAddSearchResults) {
-          globalAddSearchResults(data.result.result.search_data)
-        } else {
-
-        }
-      } else if (data.result?.search_data) {
-
-        
-        if (globalAddSearchResults) {
-          globalAddSearchResults(data.result.search_data)
-        } else {
-
-        }
       } else {
-
+        const searchData = extractSearchData(data)
+        if (searchData && searchResultsHandlerRef.current) {
+          searchResultsHandlerRef.current(searchData)
+        }
       }
     })
 
-    // Listen for task completion events
-    socket.on('task_completed', (data: any) => {
-
-
-
-
-
-
-
-
-      
-      // Test if search data exists
-      const searchData = data.data?.task?.result?.search_data
-
-
-      
-      // Handle search results from task completion
-      if (data.data?.task?.result?.search_data) {
-
+    // Task completed event
+    socket.on('task_completed', (data: WebSocketEventData) => {
+      const searchData = extractSearchData(data)
+      if (searchData && searchResultsHandlerRef.current) {
+        searchResultsHandlerRef.current(searchData)
         
-        // Update the existing search task with results
-        const updatedTask = data.data.task
-        if (globalAddSearchResults) {
-          globalAddSearchResults(data.data.task.result.search_data)
-        } else {
-
+        // Update the existing task if we have the full task data
+        if (data.data?.task && updateTaskHandlerRef.current) {
+          updateTaskHandlerRef.current(data.data.task.id, data.data.task)
         }
-        
-        // Update the existing task card instead of creating a new one
-        if (globalUpdateTask) {
-          globalUpdateTask(updatedTask.id, updatedTask)
-        } else {
-
-        }
-      } else if (data.data?.result?.search_data) {
-
-        
-        if (globalAddSearchResults) {
-          globalAddSearchResults(data.data.result.search_data)
-        } else {
-
-        }
-      } else if (data.data?.search_data) {
-
-        
-        if (globalAddSearchResults) {
-          globalAddSearchResults(data.data.search_data)
-        } else {
-
-        }
-      } else if (data.result?.search_data) {
-
-        
-        if (globalAddSearchResults) {
-          globalAddSearchResults(data.result.search_data)
-        } else {
-
-        }
-      } else {
-
       }
     })
 
-    // Subscribe to workflow updates - listen for any workflow events
-    socket.on('workflow_update', (data: any) => {
-
-
-      if (data.event_type === 'task_created') {
-
-
-        // Invalidate tasks cache to refresh the UI
+    // Workflow update event
+    socket.on('workflow_update', (data: WebSocketEventData & { event_type?: string }) => {
+      if (data.event_type === 'task_created' && data.data?.task) {
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
-
-        // Show success card if task data is available
-        if (data.data?.task) {
-          showTaskSuccess(data.data.task)
-        }
+        showTaskSuccess(data.data.task)
       }
     })
 
-    // Listen for task deletion events
-    socket.on('task_deleted', (data: any) => {
-
-
-      // Handle different data structures from different emission sources
-      let task = null
-      if (data.data && data.data.deleted_item && data.data.deleted_item.task) {
-        // From emit_to_user wrapper structure with nested task (most specific first)
-        task = data.data.deleted_item.task
-
-      } else if (data.task) {
-        // Direct task data (from workflow_update events)
-        task = data.task
-
-      } else if (data.deleted_item && data.deleted_item.task) {
-        // Direct deleted_item structure with nested task
-        task = data.deleted_item.task
-
-      } else if (data.data && data.data.task) {
-        // Another possible structure
-        task = data.data.task
-
-      } else if (data.data && data.data.deleted_item) {
-        // From emit_to_user wrapper structure (fallback)
-        task = data.data.deleted_item
-
-      } else if (data.deleted_item) {
-        // Direct deleted_item structure (fallback)
-        task = data.deleted_item
-
-      }
-
-
-
-
-
-
+    // Task deleted event
+    socket.on('task_deleted', (data: WebSocketEventData) => {
+      const task = extractTask(data)
       if (task && task.id && task.title) {
-        // Validate required fields exist
-
-        // Invalidate tasks cache to refresh the UI
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
         showTaskDelete(task)
-      } else {
-
-
       }
     })
 
-    // Listen for CRUD success events (task listing, etc.)
-    socket.on('crud_success', (data: any) => {
+    // CRUD success event
+    socket.on('crud_success', (data: WebSocketEventData) => {
+      const card = extractCard(data)
+      if (!card) return
 
-
-      // Handle different data structures
-      let card = null
-      if (data.data && data.data.card) {
-        card = data.data.card
-      } else if (data.card) {
-        card = data.card
-      }
-
-      if (card) {
-
+      // Handle task listing success
+      if (card.operation === 'listed' && card.entity_type === 'tasks') {
+        const taskCount = card.details?.task_count || 0
+        const tasks = card.details?.tasks || []
         
-        // Handle task listing success
-        if (card.operation === 'listed' && card.entity_type === 'tasks') {
-          const taskCount = card.details?.task_count || 0
-          const tasks = card.details?.tasks || []
-          
-
-          
-          // Add conversational message about the task listing
-          if (globalAddConversationalMessage) {
-            let message = ''
-            if (taskCount === 0) {
-              message = "You don't have any tasks matching those criteria."
-            } else if (taskCount === 1) {
-              message = `Here's your task: ${tasks[0]?.title || 'Untitled'}`
-            } else {
-              message = `Here are your ${taskCount} tasks:`
-            }
-            
-            globalAddConversationalMessage(message, {
-              operation: 'listed',
-              entity_type: 'tasks',
-              task_count: taskCount,
-              tasks: tasks,
-              card: card
-            })
-          } else {
-
-          }
-        }
-        // Handle other CRUD operations (delete, update, etc.)
-        else {
-
-          
-          if (globalAddSimpleSuccessCard) {
-            globalAddSimpleSuccessCard(
-              card.operation,
-              card.entity_type,
-              card.entity_title,
-              card,
-              card.acknowledgement_message
-            )
-          } else {
-
-          }
-        }
-      } else {
-
-      }
-    })
-
-    // Add a catch-all listener to see what other events we might be missing
-    socket.onAny((eventName, ...args) => {
-      if (eventName.includes('task') || eventName.includes('workflow') || eventName.includes('crud')) {
-      }
-    })
-
-    // Listen for conversational responses (multiple tasks found, no tasks found, etc.)
-    socket.on('conversational_response', (data: any) => {
-
-      
-      // Extract the actual data from the WebSocket wrapper
-      const responseData = data.data || data
-
-      
-      // Add the conversational response to chat as a regular message
-      if (globalAddConversationalMessage) {
-        globalAddConversationalMessage(responseData.message, {
-          can_retry: responseData.can_retry,
-          retry_suggestion: responseData.retry_suggestion,
-          found_tasks: responseData.found_tasks,
-          task_options: responseData.task_options,
-          operation: responseData.operation,
-          entity_type: responseData.entity_type,
-          original_query: responseData.original_query,
-          workflow_context: responseData.workflow_context
-        })
-      } else {
-
-      }
-    })
-
-    // Listen for CRUD failure events
-    socket.on('crud_failure', (data: any) => {
-
-
-      // Handle different data structures
-      let card = null
-      if (data.data && data.data.card) {
-        card = data.data.card
-      } else if (data.card) {
-        card = data.card
-      }
-
-      if (card) {
-
-        
-        // Add conversational message about the failure
-        if (globalAddConversationalMessage) {
+        if (conversationalHandlerRef.current) {
           let message = ''
-          
-          // Determine the operation type from the card details or operation field
-          const operationType = card.details?.operation || card.operation
-          
-          if (operationType === 'failed' || operationType === 'create' || operationType === 'created') {
-            message = `Failed to create "${card.entity_title}". Please try again.`
-          } else if (operationType === 'update' || operationType === 'updated') {
-            message = `Failed to update "${card.entity_title}". Please try again.`
-          } else if (operationType === 'delete' || operationType === 'deleted') {
-            message = `Failed to delete "${card.entity_title}". Please try again.`
+          if (taskCount === 0) {
+            message = "You don't have any tasks matching those criteria."
+          } else if (taskCount === 1) {
+            message = `Here's your task: ${tasks[0]?.title || 'Untitled'}`
           } else {
-            // Fallback for unknown operations
-            message = `Failed to ${operationType} "${card.entity_title}". Please try again.`
+            message = `Here are your ${taskCount} tasks:`
           }
           
-          globalAddConversationalMessage(message)
-        } else {
-
+          conversationalHandlerRef.current(message, {
+            operation: 'listed',
+            entity_type: 'tasks',
+            task_count: taskCount,
+            tasks: tasks,
+            card: card
+          })
         }
+      } else if (simpleSuccessHandlerRef.current) {
+        // Handle other CRUD operations
+        simpleSuccessHandlerRef.current(
+          card.operation,
+          card.entity_type,
+          card.entity_title,
+          card,
+          card.acknowledgement_message
+        )
       }
+    })
+
+    // Conversational response event
+    socket.on('conversational_response', (data: WebSocketEventData) => {
+      const responseData = data.data || data
+      
+      if (conversationalHandlerRef.current && 'message' in responseData) {
+        conversationalHandlerRef.current(responseData.message as string, {
+          can_retry: responseData.can_retry as boolean | undefined,
+          retry_suggestion: responseData.retry_suggestion as string | undefined,
+          found_tasks: responseData.found_tasks as Task[] | undefined,
+          task_options: responseData.task_options as Task[] | undefined,
+          operation: responseData.operation as string | undefined,
+          entity_type: responseData.entity_type as string | undefined,
+          original_query: responseData.original_query as string | undefined,
+          workflow_context: responseData.workflow_context as Record<string, unknown> | undefined
+        })
+      }
+    })
+
+    // CRUD failure event
+    socket.on('crud_failure', (data: WebSocketEventData) => {
+      const card = extractCard(data)
+      if (!card || !conversationalHandlerRef.current) return
+
+      const operationType = card.details?.operation || card.operation
+      let message = ''
+      
+      if (['failed', 'create', 'created'].includes(operationType)) {
+        message = `Failed to create "${card.entity_title}". Please try again.`
+      } else if (['update', 'updated'].includes(operationType)) {
+        message = `Failed to update "${card.entity_title}". Please try again.`
+      } else if (['delete', 'deleted'].includes(operationType)) {
+        message = `Failed to delete "${card.entity_title}". Please try again.`
+      } else {
+        message = `Failed to ${operationType} "${card.entity_title}". Please try again.`
+      }
+      
+      conversationalHandlerRef.current(message)
     })
 
     return () => {
@@ -412,18 +295,13 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
       socket.off('task_completed')
       socket.off('workflow_update')
       socket.off('conversational_response')
-      socket.offAny()
     }
-  }, [socket, isConnected])
+  }, [socket, isConnected, queryClient])
 
   const showTaskSuccess = (task: Task) => {
-
-
-    if (globalAddTaskSuccessMessage) {
-
-      globalAddTaskSuccessMessage(task)
+    if (taskSuccessHandlerRef.current) {
+      taskSuccessHandlerRef.current(task)
     } else {
-
       setSuccessTask(task)
       setShowSuccessCard(true)
     }
@@ -435,16 +313,34 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
   }
 
   const showTaskDelete = (task: Task) => {
-
     setDeletedTask(task)
     setShowDeleteCard(true)
-    
-    // Card will persist until manually closed
   }
 
   const hideTaskDelete = () => {
     setShowDeleteCard(false)
     setDeletedTask(null)
+  }
+
+  // Handler registration methods (proper React pattern)
+  const registerTaskSuccessHandler = (handler: (task: Task) => void) => {
+    taskSuccessHandlerRef.current = handler
+  }
+
+  const registerConversationalHandler = (handler: (message: string, metadata?: ConversationalMetadata) => void) => {
+    conversationalHandlerRef.current = handler
+  }
+
+  const registerSimpleSuccessHandler = (handler: (operation: string, entityType: string, entityTitle: string, card: CrudCard, acknowledgementMessage?: string) => void) => {
+    simpleSuccessHandlerRef.current = handler
+  }
+
+  const registerSearchResultsHandler = (handler: (searchData: SearchData) => void) => {
+    searchResultsHandlerRef.current = handler
+  }
+
+  const registerUpdateTaskHandler = (handler: (taskId: string, updates: Partial<Task>) => void) => {
+    updateTaskHandlerRef.current = handler
   }
 
   return (
@@ -458,6 +354,11 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
         deletedTask,
         showTaskDelete,
         hideTaskDelete,
+        registerTaskSuccessHandler,
+        registerConversationalHandler,
+        registerSimpleSuccessHandler,
+        registerSearchResultsHandler,
+        registerUpdateTaskHandler,
       }}
     >
       {children}
@@ -465,10 +366,38 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
   )
 }
 
+// ============================================================================
+// HOOK
+// ============================================================================
+
 export function useTaskSuccess() {
   const context = useContext(TaskSuccessContext)
   if (context === undefined) {
     throw new Error('useTaskSuccess must be used within a TaskSuccessProvider')
   }
   return context
+}
+
+// ============================================================================
+// LEGACY EXPORTS - For backward compatibility during migration
+// ============================================================================
+
+export const setGlobalAddTaskSuccessMessage = (fn: (task: Task) => void) => {
+  console.warn('setGlobalAddTaskSuccessMessage is deprecated. Use registerTaskSuccessHandler from useTaskSuccess() instead.')
+}
+
+export const setGlobalAddConversationalMessage = (fn: (message: string, metadata?: ConversationalMetadata) => void) => {
+  console.warn('setGlobalAddConversationalMessage is deprecated. Use registerConversationalHandler from useTaskSuccess() instead.')
+}
+
+export const setGlobalAddSimpleSuccessCard = (fn: (operation: string, entityType: string, entityTitle: string, card: CrudCard, acknowledgementMessage?: string) => void) => {
+  console.warn('setGlobalAddSimpleSuccessCard is deprecated. Use registerSimpleSuccessHandler from useTaskSuccess() instead.')
+}
+
+export const setGlobalAddSearchResults = (fn: (searchData: SearchData) => void) => {
+  console.warn('setGlobalAddSearchResults is deprecated. Use registerSearchResultsHandler from useTaskSuccess() instead.')
+}
+
+export const setGlobalUpdateTask = (fn: (taskId: string, updates: Partial<Task>) => void) => {
+  console.warn('setGlobalUpdateTask is deprecated. Use registerUpdateTaskHandler from useTaskSuccess() instead.')
 }

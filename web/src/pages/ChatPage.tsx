@@ -1,13 +1,57 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { Paperclip, ArrowUp, BrainCircuit } from 'lucide-react'
-import { agentAPI } from '../lib/api/sdk'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft } from 'lucide-react'
+import { agentAPI, commandsAPI } from '../lib/api/sdk'
+import { CommandInput } from '../components/CommandInput'
 import AnimatedThinkingText from '../components/AnimatedThinkingText'
 import { TaskSuccessCard } from '../components/TaskSuccessCard'
 import { CollapsibleTaskList } from '../components/CollapsibleTaskList'
 import { CollapsibleSearchResults } from '../components/CollapsibleSearchResults'
 import { MarkdownText } from '../components/MarkdownText'
 import { SimpleSuccessCard } from '../components/SimpleSuccessCard'
-import { setGlobalAddTaskSuccessMessage, setGlobalAddConversationalMessage, setGlobalAddSearchResults, setGlobalUpdateTask, setGlobalAddSimpleSuccessCard } from '../contexts/TaskSuccessContext'
+import PulseTrace from '../components/PulseTrace'
+import { extractParameters } from '@/lib/commands/extractors'
+import { getCommand } from '@/lib/commands/definitions'
+import { useTaskSuccess } from '../contexts/TaskSuccessContext'
+import { ErrorBoundary } from '../components/ui/ErrorBoundary'
+import type { Task } from '../types'
+import { TODO_CACHE_KEYS } from '../hooks/cacheKeys'
+
+interface ConversationalMetadata {
+  operation?: string
+  entity_type?: string
+  task_count?: number
+  tasks?: Task[]
+  card?: SimpleSuccessCardData
+  can_retry?: boolean
+  retry_suggestion?: string
+  found_tasks?: Task[]
+  task_options?: Task[]
+  original_query?: string
+  workflow_context?: Record<string, unknown>
+}
+
+interface SearchData {
+  results?: unknown[]
+  query?: string
+  [key: string]: unknown
+}
+
+interface SimpleSuccessCardData {
+  operation: string
+  entityType: string
+  entityTitle: string
+  card: {
+    operation: string
+    entity_type: string
+    entity_title: string
+    acknowledgement_message?: string
+    details?: Record<string, unknown>
+    [key: string]: unknown
+  }
+  acknowledgementMessage?: string
+}
 
 interface Message {
   id: string
@@ -15,26 +59,30 @@ interface Message {
   isUser: boolean
   timestamp: Date
   type?: 'text' | 'task_success' | 'conversational' | 'search_results' | 'simple_success'
-  task?: any // Task data for success cards
-  metadata?: any // Metadata for conversational responses
-  searchData?: any // Search results data
-  successCard?: any // Simple success card data
+  task?: Task
+  metadata?: ConversationalMetadata
+  searchData?: SearchData
+  successCard?: SimpleSuccessCardData
 }
 
 interface ChatPageProps {
   initialMessage?: string
-  onBack?: () => void
 }
 
-export function ChatPage({ initialMessage, onBack }: ChatPageProps) {
+function ChatPageCore({ initialMessage }: ChatPageProps) {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const queryClient = useQueryClient()
+  const taskSuccess = useTaskSuccess()
   const [messages, setMessages] = useState<Message[]>([])
   const [messageText, setMessageText] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const hasInitialized = useRef(false)
 
   // Function to add task success message to chat
-  const addTaskSuccessMessage = (task: any) => {
+  const addTaskSuccessMessage = (task: Task) => {
     const taskMessage: Message = {
       id: `task-success-${Date.now()}`,
       text: '', // Empty text since we'll render the TaskSuccessCard
@@ -50,7 +98,7 @@ export function ChatPage({ initialMessage, onBack }: ChatPageProps) {
   }
 
   // Function to add conversational response to chat
-  const addConversationalMessage = (message: string, metadata?: any) => {
+  const addConversationalMessage = (message: string, metadata?: ConversationalMetadata) => {
     const conversationalMessage: Message = {
       id: `conversational-${Date.now()}`,
       text: message,
@@ -63,15 +111,13 @@ export function ChatPage({ initialMessage, onBack }: ChatPageProps) {
   }
 
   // Function to add search results to chat
-  const addSearchResults = (searchData: any) => {
-    console.log('🔍 addSearchResults called with:', searchData)
-    
+  const addSearchResults = (searchData: SearchData) => {
     // Don't add separate messages - everything will be in the task card
     // The task card will be updated with the search results
   }
 
   // Function to add simple success card to chat
-  const addSimpleSuccessCard = (operation: string, entityType: string, entityTitle: string, card: any, acknowledgementMessage?: string) => {
+  const addSimpleSuccessCard = (operation: string, entityType: string, entityTitle: string, card: Record<string, unknown>, acknowledgementMessage?: string) => {
     const successMessage: Message = {
       id: `simple-success-${Date.now()}`,
       text: '', // Empty text since we'll render the SimpleSuccessCard
@@ -87,8 +133,7 @@ export function ChatPage({ initialMessage, onBack }: ChatPageProps) {
   }
 
   // Function to update existing task
-  const updateTask = (taskId: string, updates: any) => {
-    console.log('🔄 updateTask called with:', taskId, updates)
+  const updateTask = (taskId: string, updates: Partial<Task>) => {
     setMessages(prev => prev.map(message => {
       if (message.type === 'task_success' && message.task?.id === taskId) {
         return {
@@ -109,53 +154,39 @@ export function ChatPage({ initialMessage, onBack }: ChatPageProps) {
     scrollToBottom()
   }, [messages])
 
-  // Register the task success message function
+  // Register the task success message function with context
   useEffect(() => {
-    console.log('🔍 Registering global functions')
-    setGlobalAddTaskSuccessMessage(addTaskSuccessMessage)
-    setGlobalAddConversationalMessage(addConversationalMessage)
-    setGlobalAddSearchResults(addSearchResults)
-    setGlobalUpdateTask(updateTask)
-    setGlobalAddSimpleSuccessCard(addSimpleSuccessCard)
-    console.log('🔍 Global functions registered')
-    return () => {
-      setGlobalAddTaskSuccessMessage(() => {})
-      setGlobalAddConversationalMessage(() => {})
-      setGlobalAddSearchResults(() => {})
-      setGlobalUpdateTask(() => {})
-      setGlobalAddSimpleSuccessCard(() => {})
-    }
-  }, [addTaskSuccessMessage, addConversationalMessage, addSearchResults, updateTask, addSimpleSuccessCard])
+    taskSuccess.registerTaskSuccessHandler(addTaskSuccessMessage)
+    taskSuccess.registerConversationalHandler(addConversationalMessage)
+    taskSuccess.registerSearchResultsHandler(addSearchResults)
+    taskSuccess.registerUpdateTaskHandler(updateTask)
+    taskSuccess.registerSimpleSuccessHandler(addSimpleSuccessCard)
+  }, [taskSuccess, addTaskSuccessMessage, addConversationalMessage, addSearchResults, updateTask, addSimpleSuccessCard])
 
   // Send initial message if provided
   useEffect(() => {
-    if (initialMessage && initialMessage.trim() && !hasInitialized.current) {
+    if (!hasInitialized.current) {
       hasInitialized.current = true
       
-      // Add welcome message first
-      const welcomeMessage: Message = {
-        id: 'welcome',
-        text: getGreeting() + '! What can I help you with today?',
-        isUser: false,
-        timestamp: new Date()
-      }
-      setMessages([welcomeMessage])
+      // Check for message from URL params first, then props
+      const messageFromUrl = searchParams.get('message')
+      const messageToSend = messageFromUrl || initialMessage
       
-      // Send initial message
-      sendMessage(initialMessage.trim())
-    } else if (!initialMessage && !hasInitialized.current) {
-      hasInitialized.current = true
-      
-      // Add just welcome message
-      const welcomeMessage: Message = {
-        id: 'welcome',
-        text: getGreeting() + '! What can I help you with today?',
-        isUser: false,
-        timestamp: new Date()
+      if (messageToSend && messageToSend.trim()) {
+        // Send initial message (sendMessage will add the user message)
+        sendMessage(messageToSend.trim())
+      } else {
+        // Add just welcome message
+        const welcomeMessage: Message = {
+          id: 'welcome',
+          text: getGreeting() + '! What can I help you with today?',
+          isUser: false,
+          timestamp: new Date()
+        }
+        setMessages([welcomeMessage])
       }
-      setMessages([welcomeMessage])
     }
-  }, []) // Empty dependency array to run only once
+  }, [initialMessage, searchParams])
 
   const getGreeting = () => {
     const hour = new Date().getHours()
@@ -177,6 +208,79 @@ export function ChatPage({ initialMessage, onBack }: ChatPageProps) {
     setIsTyping(true)
     
     try {
+      // Check if this is a command (starts with /)
+      if (message.trim().startsWith('/')) {
+        // Execute command directly
+        const commandParts = message.trim().slice(1).split(/\s+/)
+        const commandName = commandParts[0]
+        const commandText = commandParts.slice(1).join(' ')
+
+        // Get command definition
+        const command = getCommand(commandName)
+        
+        if (command) {
+          // Extract parameters
+          const parameters = extractParameters(commandText, command.id)
+          
+          // Execute command
+          const commandResult = await commandsAPI.execute(
+            commandName,
+            parameters,
+            message
+          )
+
+          // Check if this is a todo/task creation (command returns data with task/todo)
+          if (commandResult.success && commandResult.result?.todo && commandName === 'todo') {
+            const todo = commandResult.result.todo
+            
+            // Invalidate todo cache to refresh the UI
+            queryClient.invalidateQueries({ queryKey: TODO_CACHE_KEYS.TODOS })
+            
+            // Show CRUD success card
+            addSimpleSuccessCard(
+              'created',
+              'todo',
+              todo.title,
+              {
+                details: {
+                  created_tasks: [todo.title],
+                  due_date: todo.due_date,
+                  tags: todo.tags || [],
+                  priority: todo.priority || 'medium'
+                }
+              },
+              commandResult.immediate_response
+            )
+            return
+          }
+
+          // For other commands, just show the response message
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: commandResult.immediate_response,
+            isUser: false,
+            timestamp: new Date(),
+            type: 'text'
+          }
+          setMessages(prev => [...prev, aiMessage])
+          setIsTyping(false)
+          return
+        } else {
+          // Unknown command - show help
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `Unknown command: /${commandName}. Type /help to see available commands.`,
+            isUser: false,
+            timestamp: new Date(),
+            type: 'text'
+          }
+          setMessages(prev => [...prev, aiMessage])
+          setIsTyping(false)
+          return
+        }
+      }
+
+      // Regular message - use existing LLM flow
       const context = {
         currentPage: 'chat',
         timestamp: new Date().toISOString()
@@ -184,14 +288,25 @@ export function ChatPage({ initialMessage, onBack }: ChatPageProps) {
 
       const response = await agentAPI.sendQuery({
         query: message,
-        context
+        context: {
+          ...context,
+          conversation_id: conversationId,
+          include_history: true
+        }
       })
 
-      console.log('🔍 [FRONTEND] Full response object:', response)
-      console.log('🔍 [FRONTEND] response type:', typeof response)
-      console.log('🔍 [FRONTEND] response keys:', Object.keys(response))
-      console.log('🔍 [FRONTEND] response.immediate_response:', (response as any)?.immediate_response)
-      console.log('🔍 [FRONTEND] response.success:', response?.success)
+      // Debug logging only in development
+      if (import.meta.env.DEV) {
+        console.log('🔍 [FRONTEND] Response received:', { 
+          success: response?.success,
+          hasData: !!response?.data 
+        })
+      }
+
+      // Store conversation_id from response for follow-up questions
+      if ((response as any)?.conversation_id) {
+        setConversationId((response as any).conversation_id)
+      }
 
       // Handle successful responses - response is the AgentResponse directly
       if (response?.success !== false && response) {
@@ -305,49 +420,38 @@ export function ChatPage({ initialMessage, onBack }: ChatPageProps) {
     sendMessage(message)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-neutral-900 flex flex-col">
-      {/* Header */}
-      <div className="w-full px-6 py-4 flex items-center justify-between">
-        {onBack && (
-          <button 
-            onClick={onBack}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
-            ← Back
-          </button>
-        )}
-        <div></div> {/* Spacer for centering */}
-        <div></div> {/* Spacer for centering */}
-      </div>
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#0f0f0f' }}>
+      {/* Fixed Back Button */}
+      <button 
+        onClick={() => navigate('/')}
+        className="fixed top-4 px-3 py-2 rounded-lg hover:bg-neutral-800/20 transition-colors z-50 group flex items-center gap-2"
+        style={{ left: 'calc(var(--sidebar-width, 4rem) + 1rem)' }}
+        aria-label="Back"
+      >
+        <ArrowLeft size={16} className="text-gray-400 group-hover:text-white transition-colors" />
+        <span className="text-gray-400 group-hover:text-white transition-colors text-sm font-medium">Back</span>
+      </button>
 
       {/* Messages Container - Centered within max-w-4xl */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 overflow-y-auto px-6 pt-24 pb-4">
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.map((message) => (
             <div key={message.id}>
               {message.isUser ? (
                 // User message - Right aligned with gray bubble
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] bg-[#3C3C3E] rounded-3xl px-4 py-3">
+                  <div className="max-w-[85%] bg-[#2E2E30] rounded-3xl px-4 py-3">
                     <p className="text-white text-base leading-5 font-normal">{message.text}</p>
                   </div>
                 </div>
               ) : (
                 // AI message - Left aligned with icon and name
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 bg-neutral-800 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
-                    <BrainCircuit size={24} className="text-white" />
+                  <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 mt-1">
+                    <PulseTrace active={false} width={24} height={24} />
                   </div>
                   <div className="flex-1">
-                    <div className="text-white font-bold text-base mb-2">Pulse</div>
                     {message.type === 'task_success' && message.task ? (
                       <div className="space-y-4">
                         {/* Acknowledgement text for search tasks */}
@@ -405,11 +509,10 @@ export function ChatPage({ initialMessage, onBack }: ChatPageProps) {
           {/* Typing indicator */}
           {isTyping && (
             <div className="flex gap-3">
-              <div className="w-8 h-8 bg-neutral-800 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
-                <BrainCircuit size={24} className="text-white" />
+              <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                <PulseTrace active={true} width={24} height={24} />
               </div>
-              <div className="flex-1">
-                <div className="text-white font-bold text-base mb-2">Pulse</div>
+              <div className="flex-1 flex items-center">
                 <AnimatedThinkingText 
                   text="Thinking"
                   className="text-white text-lg leading-7 opacity-70"
@@ -423,48 +526,26 @@ export function ChatPage({ initialMessage, onBack }: ChatPageProps) {
       </div>
 
       {/* Input Container - Fixed at bottom, centered within max-w-4xl */}
-      <div className="px-6 py-4 bg-neutral-900">
+      <div className="px-6 py-4" style={{ backgroundColor: '#0f0f0f' }}>
         <div className="max-w-4xl mx-auto">
-          <div className="bg-neutral-800/80 border border-gray-700/50 rounded-2xl p-3">
-            <div className="flex items-center gap-2">
-              <textarea
-                placeholder="Message"
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="flex-1 bg-transparent text-white placeholder-gray-400 text-base focus:outline-none min-h-[42px] max-h-32 resize-none"
-                rows={1}
-                style={{
-                  height: 'auto',
-                  minHeight: '42px',
-                  maxHeight: '128px',
-                }}
-                onInput={(e) => {
-                  const target = e.target as HTMLTextAreaElement;
-                  target.style.height = 'auto';
-                  target.style.height = Math.min(target.scrollHeight, 128) + 'px';
-                }}
-              />
-            </div>
-            <div className="flex justify-between items-center mt-1.5">
-              <button className="p-1">
-                <Paperclip size={16} className="text-gray-400 hover:text-gray-300 transition-colors" />
-              </button>
-              <button
-                onClick={handleSendMessage}
-                disabled={messageText.trim() === '' || isTyping}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all bg-white hover:bg-gray-100 ${
-                  messageText.trim() === '' || isTyping
-                    ? 'opacity-30 cursor-not-allowed' 
-                    : 'opacity-100'
-                }`}
-              >
-                <ArrowUp size={16} className="text-black" />
-              </button>
-            </div>
-          </div>
+          <CommandInput
+            value={messageText}
+            onChange={setMessageText}
+            onSubmit={handleSendMessage}
+            disabled={isTyping}
+            placeholder="How can I help you today?"
+          />
         </div>
       </div>
     </div>
+  )
+}
+
+// Wrap with ErrorBoundary to prevent chat errors from breaking the entire app
+export function ChatPage(props: ChatPageProps) {
+  return (
+    <ErrorBoundary>
+      <ChatPageCore {...props} />
+    </ErrorBoundary>
   )
 }

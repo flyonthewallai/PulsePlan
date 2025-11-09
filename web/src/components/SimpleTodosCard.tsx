@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { X, Calendar, Clock, Loader2, Check, List, Search } from 'lucide-react'
+import { X, Calendar, Clock, Loader2, Check, List, Search, Tag } from 'lucide-react'
 import { useTodos, useToggleTodo } from '../hooks/useTodos'
 import { TODO_CACHE_KEYS } from '../hooks/cacheKeys'
 import { useTodoUpdates, pendingTodoMutations } from '../hooks/useTodoUpdates'
@@ -28,7 +28,7 @@ export function SimpleTodosCard() {
   
   // Use React Query for caching and data fetching
   const queryClient = useQueryClient()
-  const { data: todosResponse, isLoading, error, refetch } = useTodos()
+  const { data: todosResponse, isLoading, error } = useTodos()
   const toggleTodo = useToggleTodo()
 
 
@@ -271,7 +271,7 @@ export function SimpleTodosCard() {
 
   return (
     <div 
-      className="bg-neutral-800/80 border border-gray-700/50 rounded-xl p-4 cursor-pointer hover:bg-neutral-800 transition-colors"
+      className="bg-neutral-800/40 border border-gray-700/50 rounded-xl p-4 cursor-pointer hover:bg-neutral-800/60 transition-colors h-full flex flex-col"
       onClick={() => setShowModal(true)}
     >
       <div className="flex items-center justify-between mb-4 px-1">
@@ -283,7 +283,7 @@ export function SimpleTodosCard() {
         </div>
       </div>
       
-      <div className="space-y-3">
+      <div className="space-y-2.5 flex-1 flex flex-col">
         {isLoading ? (
           <div className="space-y-3">
             <div className="flex items-start gap-3">
@@ -317,14 +317,14 @@ export function SimpleTodosCard() {
             </div>
           </div>
         ) : cardTodos.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {/* Show filtered to-dos */}
-            {cardTodos.slice(0, 3).map((todo: Todo, index: number) => (
+            {cardTodos.slice(0, 4).map((todo: Todo, index: number) => (
               <div key={todo.id} className="flex items-start gap-3 relative">
                 <button
                   className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors duration-150 ${
                     getEffectiveCompletedState(todo)
-                      ? 'bg-green-500 border-green-500' 
+                      ? 'bg-blue-500 border-blue-500' 
                       : 'border-gray-500'
                   }`}
                   onClick={(e) => {
@@ -337,12 +337,22 @@ export function SimpleTodosCard() {
                   )}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-medium leading-tight ${
-                    getEffectiveCompletedState(todo) 
-                      ? 'line-through text-gray-400' 
-                      : 'text-white'
-                  }`}>
-                    {todo.title}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className={`text-sm font-medium leading-tight ${
+                      getEffectiveCompletedState(todo) 
+                        ? 'line-through text-gray-400' 
+                        : 'text-white'
+                    }`}>
+                      {todo.title}
+                    </div>
+                    {todo.tags && todo.tags.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 bg-neutral-800/60 rounded px-1.5 py-0.5">
+                          <Tag size={8} className="text-gray-500" />
+                          <span className="text-xs text-gray-400">{todo.tags[0]}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {todo.due_date && (
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -362,9 +372,9 @@ export function SimpleTodosCard() {
                   )}
                 </div>
                 {/* Show "more" count on the last todo */}
-                {index === 2 && cardTodos.length > 3 && (
+                {index === 3 && cardTodos.length > 4 && (
                   <div className="absolute bottom-0 right-0 text-xs text-gray-500">
-                    +{cardTodos.length - 3} more
+                    +{cardTodos.length - 4} more
                   </div>
                 )}
               </div>
@@ -391,131 +401,126 @@ export function SimpleTodosCard() {
 
       {/* Persistent Modal - Always Mounted, Visibility Controlled */}
       <div
-        className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 transition-all duration-300 cursor-default ${
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-300 cursor-default ${
           showModal ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={handleModalBackdropClick}
       >
-          <div 
-            className={`bg-neutral-800 border border-gray-700/50 w-full max-w-2xl rounded-2xl h-[80vh] min-h-[600px] flex flex-col cursor-default transition-all duration-300 ${
+          <div
+            className={`border border-gray-700/50 w-full max-w-3xl rounded-xl h-[75vh] flex flex-col cursor-default transition-all duration-300 shadow-2xl ${
               showModal ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
             }`}
+            style={{ backgroundColor: '#121212' }}
             onClick={(e) => e.stopPropagation()}
           >
             {showModal ? (
               <>
-                {/* Header */}
-                <div className="p-6 border-b border-gray-700/50">
-                  {/* Top row: Title and Close button */}
+                {/* Header - Matching Card Style */}
+                <div className="p-5 border-b border-gray-700/30">
+                  {/* Title Row */}
                   <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <List size={20} className="text-gray-400" />
-                      <h2 className="text-xl font-semibold text-white">
-                        {timeFilter === 'all' ? 'All To-dos' : 'Due Soon'}
-                      </h2>
-                    </div>
-                    <button 
+                    <h2 className="text-lg font-semibold text-white tracking-tight">
+                      To-Dos
+                    </h2>
+                    <button
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
                         handleModalClose()
                       }}
-                      className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/60"
                       aria-label="Close modal"
                       type="button"
                     >
-                      <X size={24} className="text-gray-400 hover:text-white" />
+                      <X size={18} />
                     </button>
                   </div>
 
-                  {/* Count Display - Context Aware */}
-                  <div className="flex items-baseline justify-center gap-2 mb-6">
-                    {timeFilter === 'all' ? (
-                      // Large numbers for "All"
-                      <>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-bold text-white">
-                            {currentTodos.length + undatedTodos.length}
-                          </span>
-                          <span className="text-sm text-gray-300">total to-dos</span>
-                        </div>
-                      </>
-                    ) : (
-                      // Small overview for "Due Soon"
-                      <div className="text-sm text-gray-400">
-                        Due soon: {currentTodos.length} to-dos
-                      </div>
-                    )}
+                  {/* Stats Bar - Clean Inline */}
+                  <div className="flex items-center gap-5 text-sm">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl font-bold text-white tabular-nums">
+                        {currentTodos.length + (undatedTodos.length || 0)}
+                      </span>
+                      <span className="text-gray-400 font-medium">
+                        {timeFilter === 'all' ? 'total' : 'due soon'}
+                      </span>
+                    </div>
+                    <div className="h-3 w-px bg-gray-700/50"></div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-lg font-semibold text-white tabular-nums">
+                        {currentTodos.filter((t: Todo) => !getEffectiveCompletedState(t)).length}
+                      </span>
+                      <span className="text-gray-400 font-medium">incomplete</span>
+                    </div>
                   </div>
                 </div>
 
-            {/* Search and Toggle Controls */}
-            <div className="px-6 pt-2 pb-6">
-              <div className="bg-neutral-800 rounded-lg p-5 mb-6">
-                <div className="flex items-center gap-4">
-                  {/* Search Bar */}
-                  <div className="relative flex-1">
-                    <Search size={16} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search to-dos..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2 bg-neutral-700 rounded-lg text-white placeholder-gray-400 focus:outline-none text-sm"
-                    />
-                  </div>
+            {/* Controls Bar - Clean Inline Layout */}
+            <div className="px-5 py-3 border-b border-gray-700/30">
+              <div className="flex items-center gap-3">
+                {/* Search Bar */}
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search to-dos..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-neutral-900/50 border border-gray-700/50 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors text-sm"
+                  />
+                </div>
 
-                  {/* Time Filter Buttons */}
-                  <div className="relative flex bg-neutral-700 rounded-lg p-1.5">
-                    <div 
-                      className="absolute top-1 bottom-1 bg-white rounded-md transition-all duration-300 ease-out"
-                      style={highlightStyle}
-                    />
-                    <button
-                      ref={allRef}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTimeFilter('all'); }}
-                      className={`relative px-2 py-1 text-xs font-medium rounded-md transition-colors duration-200 z-10 ${
-                        timeFilter === 'all'
-                          ? 'text-neutral-900'
-                          : 'text-gray-300 hover:text-white'
-                      }`}
-                    >
-                      All
-                    </button>
-                    <button
-                      ref={dueSoonRef}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTimeFilter('due_soon'); }}
-                      className={`relative px-2 py-1 text-xs font-medium rounded-md transition-colors duration-200 z-10 ${
-                        timeFilter === 'due_soon'
-                          ? 'text-neutral-900'
-                          : 'text-gray-300 hover:text-white'
-                      }`}
-                    >
-                      Due Soon
-                    </button>
-                  </div>
+                {/* Time Filter Buttons - Sleek Segmented Control */}
+                <div className="relative flex rounded-lg p-1 bg-neutral-900/50 border border-gray-700/50">
+                  <div
+                    className="absolute top-1 bottom-1 bg-white rounded-md transition-all duration-300 ease-out shadow-sm"
+                    style={highlightStyle}
+                  />
+                  <button
+                    ref={allRef}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTimeFilter('all'); }}
+                    className={`relative px-3 py-1.5 text-xs font-semibold rounded-md transition-colors duration-200 z-10 ${
+                      timeFilter === 'all'
+                        ? 'text-neutral-900'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    ref={dueSoonRef}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTimeFilter('due_soon'); }}
+                    className={`relative px-3 py-1.5 text-xs font-semibold rounded-md transition-colors duration-200 z-10 ${
+                      timeFilter === 'due_soon'
+                        ? 'text-neutral-900'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Due Soon
+                  </button>
                 </div>
               </div>
             </div>
 
             {/* To-dos list */}
             <div
-              className="flex-1 overflow-y-auto"
+              className="flex-1 overflow-y-auto px-5 py-3"
               style={{
-                scrollbarWidth: 'auto',
-                scrollbarColor: 'rgba(75, 85, 99, 0.5) transparent'
+                scrollbarWidth: 'thin',
+                scrollbarColor: 'rgba(75, 85, 99, 0.3) transparent'
               }}
             >
               {isLoading ? (
-                <div className="flex items-center justify-center py-20">
+                <div className="flex items-center justify-center py-8">
                   <div className="text-center">
-                    <div className="w-12 h-12 bg-gray-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Loader2 size={24} className="text-gray-400 animate-spin" />
+                    <div className="w-8 h-8 bg-gray-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Loader2 size={16} className="text-gray-400 animate-spin" />
                     </div>
-                    <div className="text-base font-semibold text-gray-400 mb-2">
+                    <div className="text-sm font-medium text-gray-400 mb-1">
                       Loading to-dos...
                     </div>
-                    <div className="text-sm text-gray-400">
+                    <div className="text-xs text-gray-400">
                       Please wait
                     </div>
                   </div>
@@ -535,10 +540,10 @@ export function SimpleTodosCard() {
                   </div>
                 </div>
               ) : (
-                <div className="px-6 pt-2 pb-6">
+                <div>
                   {/* To-dos Section */}
                   {currentTodos.length > 0 || (timeFilter === 'all' && undatedTodos.length > 0) ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {/* Show dated todos first */}
                       {currentTodos.map((todo: Todo, index: number) => {
                         // Check if we should show a date divider
@@ -551,41 +556,41 @@ export function SimpleTodosCard() {
                         return (
                           <React.Fragment key={todo.id}>
                             {showDateDivider && (
-                              <div className="flex items-center gap-2 mb-3 mt-4 first:mt-0">
-                                <div className="h-px bg-gray-600 flex-1"></div>
-                                <span className="text-xs font-medium text-gray-500 px-2">
+                              <div className="flex items-center gap-3 py-3 first:pt-0">
+                                <div className="h-px bg-gray-700/50 flex-1"></div>
+                                <span className="text-xs font-semibold text-gray-400">
                                   {(() => {
                                     if (!todo.due_date) {
                                       return 'No due date'
                                     }
-                                    
+
                                     const taskDate = new Date(todo.due_date)
                                     const today = new Date()
                                     today.setHours(0, 0, 0, 0)
                                     const tomorrow = new Date(today)
                                     tomorrow.setDate(tomorrow.getDate() + 1)
-                                    
+
                                     if (taskDate.toDateString() === today.toDateString()) {
                                       return 'Today'
                                     } else if (taskDate.toDateString() === tomorrow.toDateString()) {
                                       return 'Tomorrow'
                                     } else {
-                                      return taskDate.toLocaleDateString('en-US', { 
-                                        weekday: 'short', 
-                                        month: 'short', 
-                                        day: 'numeric' 
+                                      return taskDate.toLocaleDateString('en-US', {
+                                        weekday: 'short',
+                                        month: 'short',
+                                        day: 'numeric'
                                       })
                                     }
                                   })()}
                                 </span>
-                                <div className="h-px bg-gray-600 flex-1"></div>
+                                <div className="h-px bg-gray-700/50 flex-1"></div>
                               </div>
                             )}
-                            <div className="flex items-start gap-3 p-4 bg-neutral-700/50 rounded-lg hover:bg-neutral-700/60 transition-colors duration-150">
+                            <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-800/40 border border-gray-700/50 hover:bg-neutral-800/50 transition-colors group">
                               <button
                                 className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors duration-150 ${
                                   getEffectiveCompletedState(todo)
-                                    ? 'bg-green-500 border-green-500' 
+                                    ? 'bg-blue-500 border-blue-500'
                                     : 'border-gray-500'
                                 }`}
                                 onClick={(e) => {
@@ -598,29 +603,41 @@ export function SimpleTodosCard() {
                                 )}
                               </button>
                               <div className="flex-1 min-w-0">
-                                <div className={`text-base font-medium leading-tight ${
-                                  getEffectiveCompletedState(todo) 
-                                    ? 'line-through text-gray-400' 
-                                    : 'text-white'
-                                }`}>
-                                  {todo.title}
-                                </div>
-                                {todo.due_date && (
-                                  <div className="flex items-center gap-3 mt-2 flex-wrap">
-                                    <div className="flex items-center gap-1">
-                                      <Calendar size={12} className="text-gray-400" />
-                                      <span className="text-xs font-medium text-gray-400">
-                                        {formatDate(todo.due_date)}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Clock size={12} className="text-gray-400" />
-                                      <span className="text-xs font-medium text-gray-400">
-                                        {formatTime(todo.due_date)}
-                                      </span>
-                                    </div>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className={`text-base font-medium leading-tight flex-shrink ${
+                                    getEffectiveCompletedState(todo)
+                                      ? 'line-through text-gray-400'
+                                      : 'text-white'
+                                  }`}>
+                                    {todo.title}
                                   </div>
-                                )}
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    {todo.tags && todo.tags.length > 0 && (
+                                      <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1 bg-neutral-800/60 rounded px-2 py-0.5">
+                                          <Tag size={9} className="text-gray-500" />
+                                          <span className="text-xs text-gray-400">{todo.tags[0]}</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {todo.due_date && (
+                                      <>
+                                        <div className="flex items-center gap-1.5">
+                                          <Calendar size={11} className="text-gray-500" />
+                                          <span className="text-xs text-gray-400">
+                                            {formatDate(todo.due_date)}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <Clock size={11} className="text-gray-500" />
+                                          <span className="text-xs text-gray-400">
+                                            {formatTime(todo.due_date)}
+                                          </span>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </React.Fragment>
@@ -631,21 +648,21 @@ export function SimpleTodosCard() {
                       {timeFilter === 'all' && undatedTodos.length > 0 && (
                         <>
                           {/* No due date divider */}
-                          <div className="flex items-center gap-2 mb-3 mt-4">
-                            <div className="h-px bg-gray-600 flex-1"></div>
-                            <span className="text-xs font-medium text-gray-500 px-2">
+                          <div className="flex items-center gap-3 py-3">
+                            <div className="h-px bg-gray-700/50 flex-1"></div>
+                            <span className="text-xs font-semibold text-gray-400">
                               No due date
                             </span>
-                            <div className="h-px bg-gray-600 flex-1"></div>
+                            <div className="h-px bg-gray-700/50 flex-1"></div>
                           </div>
-                          
+
                           {/* Undated todos */}
                           {undatedTodos.map((todo: Todo) => (
-                            <div key={todo.id} className="flex items-start gap-3 p-4 bg-neutral-700/50 rounded-lg hover:bg-neutral-700/60 transition-colors duration-150">
+                            <div key={todo.id} className="flex items-start gap-3 p-3 rounded-lg bg-neutral-900/30 hover:bg-neutral-900/50 transition-colors group">
                               <button
                                 className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors duration-150 ${
                                   getEffectiveCompletedState(todo)
-                                    ? 'bg-green-500 border-green-500' 
+                                    ? 'bg-blue-500 border-blue-500'
                                     : 'border-gray-500'
                                 }`}
                                 onClick={(e) => {
@@ -658,12 +675,22 @@ export function SimpleTodosCard() {
                                 )}
                               </button>
                               <div className="flex-1 min-w-0">
-                                <div className={`text-base font-medium leading-tight ${
-                                  getEffectiveCompletedState(todo) 
-                                    ? 'line-through text-gray-400' 
-                                    : 'text-white'
-                                }`}>
-                                  {todo.title}
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className={`text-base font-medium leading-tight flex-shrink ${
+                                    getEffectiveCompletedState(todo)
+                                      ? 'line-through text-gray-400'
+                                      : 'text-white'
+                                  }`}>
+                                    {todo.title}
+                                  </div>
+                                  {todo.tags && todo.tags.length > 0 && (
+                                    <div className="flex items-center gap-1">
+                                      <div className="flex items-center gap-1 bg-neutral-800/60 rounded px-2 py-0.5">
+                                        <Tag size={9} className="text-gray-500" />
+                                        <span className="text-xs text-gray-400">{todo.tags[0]}</span>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -673,8 +700,8 @@ export function SimpleTodosCard() {
                     </div>
                   ) : (
                     // No to-dos message
-                    <div className="text-center py-20">
-                      <div className="text-base font-semibold text-gray-400 mb-2">
+                    <div className="text-center py-16">
+                      <div className="text-sm font-medium text-gray-400 mb-1">
                         {(() => {
                           if (searchQuery.trim()) {
                             return `No results for "${searchQuery}"`
@@ -685,12 +712,12 @@ export function SimpleTodosCard() {
                           }
                         })()}
                       </div>
-                      <div className="text-sm text-gray-400">
+                      <div className="text-xs text-gray-500">
                         {(() => {
                           if (searchQuery.trim()) {
-                            return 'Try a different search term or check your spelling.'
+                            return 'Try a different search term'
                           } else if (timeFilter === 'all') {
-                            return 'You\'re all caught up!'
+                            return 'All caught up!'
                           } else {
                             return 'Nothing due in the next week!'
                           }

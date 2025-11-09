@@ -1,6 +1,20 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.action_records (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  intent text NOT NULL,
+  params jsonb NOT NULL DEFAULT '{}'::jsonb,
+  status USER-DEFINED NOT NULL DEFAULT 'draft'::action_status,
+  idempotency_key text UNIQUE,
+  external_refs jsonb NOT NULL DEFAULT '{}'::jsonb,
+  error_message text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  user_message text,
+  CONSTRAINT action_records_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.agent_tasks (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -70,6 +84,37 @@ CREATE TABLE public.auth_provider_sync_history (
   error text,
   CONSTRAINT auth_provider_sync_history_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.briefings (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  briefing_date date NOT NULL,
+  content jsonb NOT NULL,
+  generated_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT briefings_pkey PRIMARY KEY (id),
+  CONSTRAINT briefings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.calendar_calendars (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  oauth_token_id uuid NOT NULL,
+  provider text NOT NULL CHECK (provider = ANY (ARRAY['google'::text, 'outlook'::text, 'apple'::text])),
+  provider_calendar_id text NOT NULL,
+  summary text,
+  timezone text,
+  is_active boolean NOT NULL DEFAULT true,
+  is_primary_write boolean NOT NULL DEFAULT false,
+  sync_token text,
+  watch_channel_id text,
+  watch_resource_id text,
+  watch_expiration_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT calendar_calendars_pkey PRIMARY KEY (id),
+  CONSTRAINT calendar_calendars_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT calendar_calendars_oauth_token_id_fkey FOREIGN KEY (oauth_token_id) REFERENCES public.oauth_tokens(id)
+);
 CREATE TABLE public.calendar_events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -99,8 +144,28 @@ CREATE TABLE public.calendar_events (
   created_at timestamp with time zone,
   updated_at timestamp with time zone,
   synced_at timestamp with time zone NOT NULL DEFAULT now(),
+  calendar_id_ref uuid,
+  span tstzrange DEFAULT tstzrange(start_time, end_time),
   CONSTRAINT calendar_events_pkey PRIMARY KEY (id),
-  CONSTRAINT calendar_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+  CONSTRAINT calendar_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT fk_calendar_events_calendar FOREIGN KEY (calendar_id_ref) REFERENCES public.calendar_calendars(id)
+);
+CREATE TABLE public.calendar_links (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  task_id uuid NOT NULL UNIQUE,
+  calendar_id uuid NOT NULL,
+  provider text NOT NULL CHECK (provider = ANY (ARRAY['google'::text, 'outlook'::text, 'apple'::text])),
+  provider_event_id text NOT NULL,
+  last_pushed_at timestamp with time zone,
+  last_pulled_at timestamp with time zone,
+  source_of_truth text NOT NULL DEFAULT 'latest_update'::text CHECK (source_of_truth = ANY (ARRAY['task'::text, 'calendar'::text, 'latest_update'::text])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT calendar_links_pkey PRIMARY KEY (id),
+  CONSTRAINT calendar_links_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT calendar_links_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.tasks(id),
+  CONSTRAINT calendar_links_calendar_id_fkey FOREIGN KEY (calendar_id) REFERENCES public.calendar_calendars(id)
 );
 CREATE TABLE public.calendar_preferences (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -119,49 +184,16 @@ CREATE TABLE public.calendar_preferences (
   CONSTRAINT calendar_preferences_pkey PRIMARY KEY (id),
   CONSTRAINT calendar_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
-CREATE TABLE public.calendar_sync_conflicts (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
-  event1_id uuid NOT NULL,
-  event2_id uuid NOT NULL,
-  conflict_type text NOT NULL CHECK (conflict_type = ANY (ARRAY['duplicate'::text, 'overlap'::text, 'similar'::text])),
-  confidence_score numeric DEFAULT 0.0,
-  resolution_status text DEFAULT 'unresolved'::text CHECK (resolution_status = ANY (ARRAY['unresolved'::text, 'resolved'::text, 'ignored'::text])),
-  resolution_action text,
-  detected_at timestamp with time zone NOT NULL DEFAULT now(),
-  resolved_at timestamp with time zone,
-  CONSTRAINT calendar_sync_conflicts_pkey PRIMARY KEY (id),
-  CONSTRAINT calendar_sync_conflicts_event1_id_fkey FOREIGN KEY (event1_id) REFERENCES public.calendar_events(id),
-  CONSTRAINT calendar_sync_conflicts_event2_id_fkey FOREIGN KEY (event2_id) REFERENCES public.calendar_events(id),
-  CONSTRAINT calendar_sync_conflicts_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
-);
-CREATE TABLE public.calendar_sync_logs (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
-  sync_type text NOT NULL CHECK (sync_type = ANY (ARRAY['manual'::text, 'auto'::text, 'webhook'::text])),
-  provider text NOT NULL,
-  operation text NOT NULL CHECK (operation = ANY (ARRAY['sync'::text, 'create'::text, 'update'::text, 'delete'::text])),
-  status text NOT NULL CHECK (status = ANY (ARRAY['success'::text, 'failure'::text, 'partial'::text])),
-  events_processed integer DEFAULT 0,
-  conflicts_detected integer DEFAULT 0,
-  execution_time_ms integer,
-  error_details jsonb,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT calendar_sync_logs_pkey PRIMARY KEY (id),
-  CONSTRAINT calendar_sync_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
-);
 CREATE TABLE public.calendar_sync_status (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL UNIQUE,
   last_sync_at timestamp with time zone,
-  sync_status text NOT NULL DEFAULT 'never_synced'::text CHECK (sync_status = ANY (ARRAY['success'::text, 'partial_failure'::text, 'failure'::text, 'never_synced'::text, 'in_progress'::text])),
+  sync_status text NOT NULL DEFAULT 'pending'::text CHECK (sync_status = ANY (ARRAY['pending'::text, 'success'::text, 'partial_failure'::text, 'failure'::text])),
   synced_events_count integer DEFAULT 0,
-  errors jsonb,
-  conflicts_count integer DEFAULT 0,
+  errors jsonb DEFAULT '[]'::jsonb,
   google_events integer DEFAULT 0,
   microsoft_events integer DEFAULT 0,
-  apple_events integer DEFAULT 0,
-  sync_settings jsonb,
+  sync_settings jsonb DEFAULT '{}'::jsonb,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT calendar_sync_status_pkey PRIMARY KEY (id),
@@ -179,22 +211,6 @@ CREATE TABLE public.calendar_webhook_subscriptions (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT calendar_webhook_subscriptions_pkey PRIMARY KEY (id),
   CONSTRAINT calendar_webhook_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
-);
-CREATE TABLE public.canvas_integrations (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL UNIQUE,
-  is_active boolean DEFAULT false,
-  last_sync timestamp with time zone,
-  assignments_synced integer DEFAULT 0,
-  extension_version character varying,
-  sync_source character varying,
-  connection_code character varying,
-  connection_code_expiry timestamp with time zone,
-  connected_at timestamp with time zone,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT canvas_integrations_pkey PRIMARY KEY (id),
-  CONSTRAINT canvas_integrations_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.chat_turns (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -316,6 +332,16 @@ CREATE TABLE public.goals (
   CONSTRAINT goals_pkey PRIMARY KEY (id),
   CONSTRAINT goals_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+CREATE TABLE public.idempotency_keys (
+  idempotency_key text NOT NULL,
+  action_id uuid NOT NULL,
+  last_result jsonb NOT NULL DEFAULT '{}'::jsonb,
+  operation_type text NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  expires_at timestamp with time zone NOT NULL DEFAULT (now() + '30 days'::interval),
+  CONSTRAINT idempotency_keys_pkey PRIMARY KEY (idempotency_key),
+  CONSTRAINT idempotency_keys_action_id_fkey FOREIGN KEY (action_id) REFERENCES public.action_records(id)
+);
 CREATE TABLE public.insights_by_period (
   id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
   metaId integer NOT NULL,
@@ -343,20 +369,18 @@ CREATE TABLE public.insights_raw (
   CONSTRAINT insights_raw_pkey PRIMARY KEY (id),
   CONSTRAINT FK_6e2e33741adef2a7c5d66befa4e FOREIGN KEY (metaId) REFERENCES public.insights_metadata(metaId)
 );
-CREATE TABLE public.integration_canvas (
+CREATE TABLE public.intent_thresholds (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL UNIQUE,
-  base_url text NOT NULL,
-  token_ciphertext text NOT NULL,
-  kms_key_id text NOT NULL,
-  status text NOT NULL DEFAULT 'ok'::text CHECK (status = ANY (ARRAY['ok'::text, 'needs_reauth'::text, 'error'::text])),
-  last_full_sync_at timestamp with time zone,
-  last_delta_at timestamp with time zone,
-  last_error_code text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT integration_canvas_pkey PRIMARY KEY (id),
-  CONSTRAINT integration_canvas_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+  intent character varying NOT NULL UNIQUE,
+  high_confidence numeric NOT NULL CHECK (high_confidence >= 0::numeric AND high_confidence <= 1::numeric),
+  low_confidence numeric NOT NULL CHECK (low_confidence >= 0::numeric AND low_confidence <= 1::numeric),
+  requires_context boolean DEFAULT false,
+  context_intents jsonb DEFAULT '[]'::jsonb,
+  description text,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT intent_thresholds_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.invalid_auth_token (
   token character varying NOT NULL,
@@ -390,11 +414,44 @@ CREATE TABLE public.llm_cache (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT llm_cache_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.llm_usage (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid,
+  session_id uuid,
+  intent text,
+  tokens_used integer NOT NULL,
+  model text NOT NULL,
+  timestamp timestamp with time zone DEFAULT now(),
+  operation_type text NOT NULL,
+  cost_usd numeric DEFAULT 0,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT llm_usage_pkey PRIMARY KEY (id),
+  CONSTRAINT llm_usage_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.migrations (
   id integer NOT NULL DEFAULT nextval('migrations_id_seq'::regclass),
   timestamp bigint NOT NULL,
   name character varying NOT NULL,
   CONSTRAINT migrations_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.nlu_prompt_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  prompt text NOT NULL,
+  predicted_intent text NOT NULL,
+  confidence real NOT NULL CHECK (confidence >= 0::double precision AND confidence <= 1::double precision),
+  secondary_intents jsonb DEFAULT '[]'::jsonb,
+  corrected_intent text,
+  correction_notes text,
+  was_successful boolean,
+  workflow_type text,
+  execution_error text,
+  conversation_id uuid,
+  message_index integer,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT nlu_prompt_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT nlu_prompt_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.notification_logs (
   id integer NOT NULL DEFAULT nextval('notification_logs_id_seq'::regclass),
@@ -468,7 +525,7 @@ CREATE TABLE public.notification_templates (
 CREATE TABLE public.oauth_tokens (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
-  provider text NOT NULL CHECK (provider = ANY (ARRAY['google'::text, 'outlook'::text, 'apple'::text])),
+  provider text NOT NULL CHECK (provider = ANY (ARRAY['google'::text, 'microsoft'::text, 'outlook'::text, 'apple'::text, 'canvas'::text, 'notion'::text])),
   access_token text NOT NULL,
   refresh_token text NOT NULL,
   expires_at timestamp with time zone NOT NULL,
@@ -478,8 +535,23 @@ CREATE TABLE public.oauth_tokens (
   updated_at timestamp with time zone DEFAULT now(),
   is_active boolean NOT NULL DEFAULT true,
   last_refreshed timestamp with time zone NOT NULL DEFAULT now(),
+  service_type text NOT NULL,
+  provider_url text,
   CONSTRAINT oauth_tokens_pkey PRIMARY KEY (id),
   CONSTRAINT calendar_connections_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.pending_gates (
+  action_id uuid NOT NULL,
+  gate_token text NOT NULL UNIQUE,
+  required_confirmations jsonb NOT NULL,
+  policy_reasons jsonb NOT NULL DEFAULT '[]'::jsonb,
+  intent text NOT NULL,
+  expires_at timestamp with time zone NOT NULL,
+  confirmed_at timestamp with time zone,
+  cancelled_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT pending_gates_pkey PRIMARY KEY (action_id),
+  CONSTRAINT pending_gates_action_id_fkey FOREIGN KEY (action_id) REFERENCES public.action_records(id)
 );
 CREATE TABLE public.predefined_tags (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -494,7 +566,30 @@ CREATE TABLE public.processed_data (
   createdAt timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updatedAt timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   value text NOT NULL,
-  CONSTRAINT processed_data_pkey PRIMARY KEY (context, workflowId)
+  CONSTRAINT processed_data_pkey PRIMARY KEY (workflowId, context)
+);
+CREATE TABLE public.prompt_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  session_id uuid NOT NULL,
+  turn_index integer NOT NULL,
+  utterance text NOT NULL,
+  intent_predicted text,
+  intent_confidence numeric,
+  slots jsonb,
+  slot_confidences jsonb,
+  planner_decision text,
+  decision_reasons jsonb,
+  action_id uuid,
+  status text,
+  success boolean,
+  error_type text,
+  latency_ms integer,
+  model_version text,
+  rule_matched text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT prompt_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT prompt_logs_action_id_fkey FOREIGN KEY (action_id) REFERENCES public.action_records(id)
 );
 CREATE TABLE public.schedule_blocks_backup (
   id uuid,
@@ -549,6 +644,7 @@ CREATE TABLE public.scheduler_busy_events (
   location text,
   metadata jsonb DEFAULT '{}'::jsonb,
   created_at timestamp with time zone DEFAULT now(),
+  span tstzrange DEFAULT tstzrange(start_time, end_time),
   CONSTRAINT scheduler_busy_events_pkey PRIMARY KEY (id),
   CONSTRAINT scheduler_busy_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
@@ -730,6 +826,7 @@ CREATE TABLE public.tasks (
   external_source text DEFAULT 'manual'::text CHECK (external_source = ANY (ARRAY['canvas'::text, 'manual'::text, 'calendar'::text])),
   external_course_id text,
   external_updated_at timestamp with time zone,
+  span tstzrange DEFAULT tstzrange(start_date, end_date),
   CONSTRAINT tasks_pkey PRIMARY KEY (id),
   CONSTRAINT tasks_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id),
   CONSTRAINT tasks_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
@@ -799,6 +896,27 @@ CREATE TABLE public.todos (
   CONSTRAINT todos_pkey PRIMARY KEY (id),
   CONSTRAINT todos_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
+CREATE TABLE public.usage_quotas (
+  user_id uuid NOT NULL,
+  monthly_token_limit integer DEFAULT 10000,
+  tokens_used_this_month integer DEFAULT 0,
+  last_reset_at timestamp with time zone DEFAULT now(),
+  subscription_tier text DEFAULT 'free'::text CHECK (subscription_tier = ANY (ARRAY['free'::text, 'premium'::text])),
+  CONSTRAINT usage_quotas_pkey PRIMARY KEY (user_id),
+  CONSTRAINT usage_quotas_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.usage_summary (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid,
+  year integer NOT NULL,
+  month integer NOT NULL,
+  total_tokens integer NOT NULL DEFAULT 0,
+  total_cost_usd numeric DEFAULT 0,
+  operation_breakdown jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT usage_summary_pkey PRIMARY KEY (id),
+  CONSTRAINT usage_summary_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.user (
   id uuid NOT NULL DEFAULT uuid_in((OVERLAY(OVERLAY(md5((((random())::text || ':'::text) || (clock_timestamp())::text)) PLACING '4'::text FROM 13) PLACING to_hex((floor(((random() * (((11 - 8) + 1))::double precision) + (8)::double precision)))::integer) FROM 17))::cstring),
   email character varying UNIQUE,
@@ -835,6 +953,37 @@ CREATE TABLE public.user_context_cache (
   expires_at timestamp with time zone DEFAULT (now() + '01:00:00'::interval),
   CONSTRAINT user_context_cache_pkey PRIMARY KEY (user_id),
   CONSTRAINT user_context_cache_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.user_hobbies (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  name text NOT NULL,
+  icon text NOT NULL DEFAULT 'Target'::text,
+  preferred_time text NOT NULL CHECK (preferred_time = ANY (ARRAY['morning'::text, 'afternoon'::text, 'evening'::text, 'night'::text, 'any'::text])),
+  specific_time jsonb,
+  days ARRAY NOT NULL DEFAULT ARRAY['Mon'::text, 'Tue'::text, 'Wed'::text, 'Thu'::text, 'Fri'::text, 'Sat'::text, 'Sun'::text],
+  duration_min integer NOT NULL CHECK (duration_min >= 5 AND duration_min <= 480),
+  duration_max integer NOT NULL,
+  flexibility text NOT NULL DEFAULT 'medium'::text CHECK (flexibility = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text])),
+  notes text DEFAULT ''::text,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_hobbies_pkey PRIMARY KEY (id),
+  CONSTRAINT user_hobbies_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.user_integration_settings (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  integration_id text NOT NULL,
+  account_email text,
+  instructions text,
+  signature text,
+  settings jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_integration_settings_pkey PRIMARY KEY (id),
+  CONSTRAINT user_integration_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.user_preferences (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -898,6 +1047,7 @@ CREATE TABLE public.users (
   onboarding_completed_at timestamp with time zone,
   city text,
   updated_at timestamp with time zone DEFAULT now(),
+  role text DEFAULT 'user'::text CHECK (role = ANY (ARRAY['user'::text, 'admin'::text])),
   CONSTRAINT users_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.variables (

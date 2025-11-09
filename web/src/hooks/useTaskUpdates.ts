@@ -4,6 +4,32 @@ import { useWebSocket } from '../contexts/WebSocketContext'
 import { TASK_CACHE_KEYS, TODO_CACHE_KEYS } from './cacheKeys'
 import { supabase } from '../lib/supabase'
 import { pendingTodoMutations } from './useTodoUpdates'
+import type { Task } from '../types'
+
+// WebSocket event data types
+interface TaskItem {
+  id: string
+  type?: 'todo' | 'task'
+  [key: string]: unknown
+}
+
+interface WebSocketTaskEvent {
+  task?: TaskItem
+  data?: {
+    task?: TaskItem
+    created_item?: TaskItem | { task?: TaskItem }
+    updated_item?: TaskItem | { task?: TaskItem }
+    deleted_item?: TaskItem | { task?: TaskItem }
+    id?: string
+    type?: string
+    [key: string]: unknown
+  }
+  result?: {
+    data?: { task?: TaskItem }
+    task?: TaskItem
+  }
+  [key: string]: unknown
+}
 
 // Track pending task mutations to prevent race conditions
 export const pendingTaskMutations = new Set<string>()
@@ -53,7 +79,7 @@ export const useTaskUpdates = () => {
     }
     
     // Listen for task creation events
-    const handleTaskCreated = (data: any) => {
+    const handleTaskCreated = (data: WebSocketTaskEvent) => {
       // Extract task/todo from various possible data structures
       let task = null
       if (data.task) {
@@ -86,7 +112,7 @@ export const useTaskUpdates = () => {
     }
     
     // Listen for task update events
-    const handleTaskUpdated = (data: any) => {
+    const handleTaskUpdated = (data: WebSocketTaskEvent) => {
       // Extract task/todo from various possible data structures
       let task = null
       if (data.task) {
@@ -124,7 +150,7 @@ export const useTaskUpdates = () => {
     }
     
     // Listen for task deletion events
-    const handleTaskDeleted = (data: any) => {
+    const handleTaskDeleted = (data: WebSocketTaskEvent) => {
       
       // Extract task/todo from various possible data structures
       let task = null
@@ -157,12 +183,12 @@ export const useTaskUpdates = () => {
     }
     
     // Listen for Canvas sync completion
-    const handleCanvasSync = (data: any) => {
+    const handleCanvasSync = (data: WebSocketTaskEvent) => {
       queryClient.invalidateQueries({ queryKey: TASK_CACHE_KEYS.TASKS })
     }
     
     // Listen for workflow completion that might affect tasks
-    const handleWorkflowCompletion = (data: any) => {
+    const handleWorkflowCompletion = (data: WebSocketTaskEvent) => {
       // Check if workflow completion includes task data
       if (data.result?.data?.task || data.result?.task) {
         queryClient.invalidateQueries({ queryKey: TASK_CACHE_KEYS.TASKS })

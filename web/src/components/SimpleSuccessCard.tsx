@@ -63,13 +63,13 @@ export function SimpleSuccessCard({ operation, entityType, entityTitle, card, ac
     return (
       <div className="flex flex-wrap gap-1 mt-2">
         {tags.map((tag, index) => (
-          <span
+          <div
             key={index}
-            className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-700/50 text-gray-300 rounded-md border border-gray-600/50"
+            className="flex items-center gap-1 bg-neutral-800 rounded-lg px-2 py-1"
           >
-            <Tag size={10} />
-            {tag}
-          </span>
+            <Tag size={10} className="text-gray-400" />
+            <span className="text-xs text-white">{tag}</span>
+          </div>
         ))}
       </div>
     )
@@ -123,7 +123,7 @@ export function SimpleSuccessCard({ operation, entityType, entityTitle, card, ac
   return (
     <div className="mb-6">
       {/* Success Card */}
-      <div className="bg-neutral-800/80 border border-gray-700/50 rounded-xl p-4">
+      <div className="bg-neutral-900/80 border border-gray-700/50 rounded-xl p-4">
         {/* Task Title(s) with White Bullet Point(s) */}
         {(card?.details?.created_tasks && card.details.created_tasks.length > 1) || 
          (card?.details?.deleted_tasks && card.details.deleted_tasks.length > 1) ||

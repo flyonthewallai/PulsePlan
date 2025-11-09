@@ -434,7 +434,7 @@ async def get_contacts_connection_status(
             }
         
         # Check if contacts scope is available
-        scopes = user_tokens.google.scope.split() if user_tokens.google.scope else []
+        scopes = user_tokens.google.scopes if user_tokens.google.scopes else []
         has_contacts_scope = any("contacts" in scope for scope in scopes)
         
         return {

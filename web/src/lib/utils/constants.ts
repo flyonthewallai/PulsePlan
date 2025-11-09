@@ -74,6 +74,8 @@ export const CALENDAR_CONSTANTS = {
   GRID_HOUR_HEIGHT: 120, // pixels per hour (taller blocks to match reference)
   GRID_MARGIN_LEFT: 60, // pixels for hour labels
   GRID_DAY_WIDTH: 160, // pixels per day column
+  HEADER_HEIGHT: 56, // pixels for calendar header (h-14)
+  ALL_DAY_ROW_HEIGHT: 48, // pixels for all-day events row (h-12)
   MIN_EVENT_HEIGHT: 20, // minimum height for an event
   EVENT_BORDER_RADIUS: 4,
   EVENT_PADDING: 8,
@@ -119,6 +121,9 @@ export const API_ENDPOINTS = {
   // User
   USER_PROFILE: '/api/v1/user/profile',
   USER_PREFERENCES: '/api/v1/user/preferences',
+  
+  // Referrals
+  REFERRALS_SEND: '/api/v1/referrals/send',
   
   // Analytics
   ANALYTICS_DASHBOARD: '/api/v1/analytics/dashboard',

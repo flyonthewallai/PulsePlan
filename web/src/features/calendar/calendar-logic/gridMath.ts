@@ -25,10 +25,12 @@ export class GridMath {
   private static readonly SLOT_HEIGHT = GRID_HOUR_HEIGHT / (60 / DEFAULT_SLOT_DURATION);
   
   // Convert time to Y position with pixel precision
+  // Uses local timezone to match user's view
   static timeToY(date: Date, startHour = 0): number {
     const hours = date.getHours() - startHour;
     const minutes = date.getMinutes();
-    return (hours * this.HOUR_HEIGHT) + (minutes * this.HOUR_HEIGHT / 60);
+    const totalMinutes = hours * 60 + minutes;
+    return (totalMinutes / 60) * this.HOUR_HEIGHT;
   }
 
   // Convert Y position to time with snapping

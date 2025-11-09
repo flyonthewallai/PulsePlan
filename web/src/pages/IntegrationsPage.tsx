@@ -1,19 +1,18 @@
 import { useState, useEffect } from 'react'
+import { usePageTitle } from '../hooks/usePageTitle'
+import { useQueryClient } from '@tanstack/react-query'
 import {
-  Loader2,
-  AlertCircle,
-  RefreshCw,
-  CheckCircle,
-  XCircle
+  Loader2
 } from 'lucide-react'
 import { InlineAlert } from '../components/ui/InlineAlert'
-import { cn } from '../lib/utils'
 import { toast } from '../lib/toast'
 import { useWebSocket } from '../contexts/WebSocketContext'
 import { useOAuthConnections } from '../hooks/useOAuthConnections'
 import type { OAuthProvider, OAuthService } from '../services/oauthService'
 import { CanvasAPIConnectionModal } from '../components/CanvasAPIConnectionModal'
-import { canvasService, type CanvasIntegrationStatus, formatLastSync } from '../services/canvasService'
+import { ManageConnectionModal } from '../components/ManageConnectionModal'
+import { canvasService, type CanvasIntegrationStatus } from '../services/canvasService'
+import { OAUTH_CACHE_KEYS } from '../hooks/cacheKeys'
 
 interface Integration {
   id: string
@@ -26,20 +25,16 @@ interface Integration {
 }
 
 export function IntegrationsPage() {
+  usePageTitle('Integrations')
+  const queryClient = useQueryClient()
   const [connectingIntegration, setConnectingIntegration] = useState<string | null>(null)
+  // Tracks a connection in-flight so we can keep UI loading until server reflects it
+  const [pendingConnection, setPendingConnection] = useState<{ provider: OAuthProvider; service: OAuthService; integrationId: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showCanvasModal, setShowCanvasModal] = useState(false)
+  const [showManageModal, setShowManageModal] = useState(false)
+  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null)
   const [canvasStatus, setCanvasStatus] = useState<CanvasIntegrationStatus | null>(null)
-  const [isSyncingCanvas, setIsSyncingCanvas] = useState(false)
-  const [syncProgress, setSyncProgress] = useState<{
-    coursesProcessed: number
-    totalCourses: number
-    assignmentsSynced: number
-    status: 'starting' | 'in_progress' | 'completed' | 'error'
-    message?: string
-  } | null>(null)
-  const [isPollingStatus, setIsPollingStatus] = useState(false)
-  const [pollTimer, setPollTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
   const { socket, isConnected: wsConnected } = useWebSocket()
 
   const {
@@ -48,28 +43,11 @@ export function IntegrationsPage() {
     disconnect,
     isConnected,
     connectError,
-    disconnectError
+    disconnectError,
+    refetch: refetchConnections
   } = useOAuthConnections()
 
   const integrations: Integration[] = [
-    // Email
-    {
-      id: 'gmail',
-      name: 'Gmail',
-      icon: '/gmail.png',
-      category: 'Email',
-      provider: 'google',
-      service: 'gmail'
-    },
-    {
-      id: 'outlook-mail',
-      name: 'Outlook Mail',
-      icon: '/applecalendar.png',
-      category: 'Email',
-      provider: 'microsoft',
-      service: 'outlook'
-    },
-
     // Calendar
     {
       id: 'google-calendar',
@@ -80,19 +58,37 @@ export function IntegrationsPage() {
       service: 'calendar'
     },
     {
-      id: 'apple-calendar',
-      name: 'Apple Calendar',
-      icon: '/applecalendar.png',
-      category: 'Calendar',
-      comingSoon: true
-    },
-    {
       id: 'outlook-calendar',
       name: 'Outlook Calendar',
-      icon: '/applecalendar.png',
+      icon: '/assets/integrations/OutlookCalendar.svg',
       category: 'Calendar',
       provider: 'microsoft',
       service: 'calendar'
+    },
+    {
+      id: 'apple-calendar',
+      name: 'Apple Calendar',
+      icon: '/assets/integrations/AppleCalendar.svg',
+      category: 'Calendar',
+      comingSoon: true
+    },
+
+    // Email
+    {
+      id: 'gmail',
+      name: 'Gmail',
+      icon: '/assets/integrations/Gmail.svg',
+      category: 'Email',
+      provider: 'google',
+      service: 'gmail'
+    },
+    {
+      id: 'outlook-mail',
+      name: 'Outlook Mail',
+      icon: '/assets/integrations/OutlookMail.svg',
+      category: 'Email',
+      provider: 'microsoft',
+      service: 'outlook'
     },
 
     // Productivity
@@ -103,9 +99,16 @@ export function IntegrationsPage() {
       category: 'Productivity'
     },
     {
+      id: 'google-drive',
+      name: 'Google Drive',
+      icon: '/assets/integrations/GoogleDrive.svg',
+      category: 'Productivity',
+      comingSoon: true
+    },
+    {
       id: 'notion',
       name: 'Notion',
-      icon: '/notion.png',
+      icon: '/assets/integrations/Notion.svg',
       category: 'Productivity',
       comingSoon: true
     },
@@ -122,7 +125,7 @@ export function IntegrationsPage() {
     {
       id: 'apple-contacts',
       name: 'Apple Contacts',
-      icon: '/applecontacts.webp',
+      icon: '/assets/integrations/AppleContacts.svg',
       category: 'Messaging & Contacts',
       comingSoon: true
     },
@@ -145,17 +148,52 @@ export function IntegrationsPage() {
 
     setError(null)
     setConnectingIntegration(integration.id)
+    if (integration.provider && integration.service) {
+      setPendingConnection({ provider: integration.provider, service: integration.service, integrationId: integration.id })
+      try {
+        sessionStorage.setItem('oauth_in_progress', JSON.stringify({
+          provider: integration.provider,
+          service: integration.service,
+          integrationId: integration.id,
+          timestamp: Date.now()
+        }))
+      } catch {
+        // Ignore sessionStorage errors
+      }
+    }
 
     try {
       const result = await connect(integration.provider, integration.service)
       if (!result.success) {
         setError(result.error || 'Failed to connect')
+        setPendingConnection(null)
+        setConnectingIntegration(null)
+        try {
+          sessionStorage.removeItem('oauth_in_progress')
+        } catch {
+          // Ignore sessionStorage errors
+        }
+        return
       }
+
+      // WebSocket/postMessage will handle success notification
+      // Don't clear loading states here - let WebSocket, postMessage, or cleanup timeout handle it
+      // This ensures "Connecting..." shows until we actually get confirmation
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error occurred')
-    } finally {
+      setPendingConnection(null)
       setConnectingIntegration(null)
+      try {
+        sessionStorage.removeItem('oauth_in_progress')
+      } catch {
+        // Ignore sessionStorage errors
+      }
     }
+  }
+
+  const handleManage = (integration: Integration) => {
+    setSelectedIntegration(integration)
+    setShowManageModal(true)
   }
 
   const handleDisconnect = async (integration: Integration) => {
@@ -166,8 +204,14 @@ export function IntegrationsPage() {
       if (integration.id === 'canvas') {
         await canvasService.disconnect()
         await loadCanvasStatus() // Refresh status after disconnect
-      } else if (integration.provider) {
-        await disconnect(integration.provider)
+        toast.success('Disconnected', `${integration.name} disconnected`)
+      } else if (integration.provider && integration.service) {
+        // Pass both provider AND service to disconnect only this specific service
+        await disconnect(integration.provider, integration.service)
+
+        // Single refetch after disconnect - backend will handle the state update
+        await refetchConnections()
+        toast.success('Disconnected', `${integration.name} disconnected`)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error occurred')
@@ -181,72 +225,55 @@ export function IntegrationsPage() {
       return canvasStatus?.connected ? 'connected' : 'disconnected'
     }
     if (integration.comingSoon) return 'coming-soon'
-    if (!integration.provider) return 'coming-soon'
-    return isConnected(integration.provider) ? 'connected' : 'disconnected'
+    if (!integration.provider || !integration.service) return 'coming-soon'
+
+    // Check if this specific service is connected
+    const connected = isConnected(integration.provider, integration.service)
+
+    if (connectingIntegration === integration.id || (pendingConnection && pendingConnection.integrationId === integration.id)) {
+      return 'connecting'
+    }
+    return connected ? 'connected' : 'disconnected'
   }
 
   const getStatusButton = (integration: Integration) => {
     const status = getIntegrationStatus(integration)
     const isCurrentlyConnecting = connectingIntegration === integration.id
 
-    if (isCurrentlyConnecting) {
+    if (isCurrentlyConnecting || status === 'connecting') {
+      const isDisconnecting = status === 'connected' && isCurrentlyConnecting
       return (
-        <button disabled className="px-3 py-1.5 border border-gray-400 text-white text-xs font-medium rounded-md flex items-center gap-2">
+        <button disabled className="px-3 py-1.5 bg-neutral-800 text-white text-xs font-medium rounded-lg flex items-center gap-2">
           <Loader2 className="w-3 h-3 animate-spin" />
-          {status === 'connected' ? 'Disconnecting...' : 'Connecting...'}
+          {isDisconnecting ? 'Disconnecting...' : 'Connecting...'}
         </button>
       )
     }
 
-    // Special handling for Canvas with sync functionality
-    if (integration.id === 'canvas' && status === 'connected') {
-      return (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCanvasSync}
-            disabled={isSyncingCanvas}
-            className={cn(
-              "px-3 py-1.5 text-white text-xs font-medium rounded-md transition-colors flex items-center gap-2",
-              isSyncingCanvas 
-                ? "bg-blue-600 cursor-not-allowed opacity-70"
-                : "bg-blue-600 hover:bg-blue-700"
-            )}
-          >
-            <RefreshCw className={cn("w-3 h-3", isSyncingCanvas && "animate-spin")} />
-            {isSyncingCanvas ? 'Syncing...' : 'Sync'}
-          </button>
-          <button
-            onClick={() => handleDisconnect(integration)}
-            className="px-3 py-1.5 border border-gray-400 text-white text-xs font-medium rounded-md hover:bg-gray-800 transition-colors"
-          >
-            Disconnect
-          </button>
-        </div>
-      )
-    }
+    // Canvas now uses standard connected status with Manage button only
 
     switch (status) {
       case 'connected':
         return (
           <button
-            onClick={() => handleDisconnect(integration)}
-            className="px-3 py-1.5 border border-gray-400 text-white text-xs font-medium rounded-md hover:bg-gray-800 transition-colors"
+            onClick={() => handleManage(integration)}
+            className="px-3 py-1.5 bg-neutral-800 text-white text-xs font-medium rounded-lg hover:bg-neutral-700 transition-colors"
           >
-            Disconnect
+            Manage
           </button>
         )
       case 'disconnected':
         return (
           <button
             onClick={() => handleConnect(integration)}
-            className="px-3 py-1.5 bg-white text-black text-xs font-medium rounded-md hover:bg-gray-100 transition-colors"
+            className="px-3 py-1.5 bg-white text-black text-xs font-medium rounded-lg hover:bg-gray-100 transition-colors"
           >
             Connect
           </button>
         )
       case 'coming-soon':
         return (
-          <span className="px-3 py-1.5 bg-neutral-800 text-gray-500 text-xs font-medium rounded-md">
+          <span className="text-gray-400 text-xs">
             Coming Soon
           </span>
         )
@@ -257,220 +284,207 @@ export function IntegrationsPage() {
     try {
       const status = await canvasService.getIntegrationStatus()
       setCanvasStatus(status)
-    } catch (e) {
+    } catch (_error) {
       setCanvasStatus(null)
     }
   }
 
-  // Begin watching for backfill completion via WebSocket
-  const beginCanvasSyncWatch = () => {
-    setIsSyncingCanvas(true)
-    setSyncProgress({
-      coursesProcessed: 0,
-      totalCourses: 0,
-      assignmentsSynced: 0,
-      status: 'in_progress',
-      message: 'Fetching courses and assignments from Canvas...'
-    })
-  }
-
-  // Listen for Canvas sync completion via WebSocket
+  // Listen for OAuth connection completion via WebSocket
   useEffect(() => {
     if (!socket || !wsConnected) return
 
-    const handleCanvasSync = (message: any) => {
-      console.log('Canvas sync event received:', message)
-      if (!message) return
+    const handleOAuthConnected = async (message: Record<string, unknown>) => {
+      const data = (message.data as Record<string, unknown>) || message
 
-      // Backend emits: { user_id, event_type, data: { status, ... }, timestamp }
-      const eventData = message.data || message
-      console.log('Event data extracted:', eventData)
-      console.log('Status:', eventData.status)
-      
-      if (eventData.status === 'completed') {
-        console.log('✅ Handling completion event')
-        const assignmentsUpserted = eventData.assignments_upserted || 0
-        const coursesProcessed = eventData.courses_processed || 0
-        setSyncProgress({
-          coursesProcessed: coursesProcessed,
-          totalCourses: coursesProcessed,
-          assignmentsSynced: assignmentsUpserted,
-          status: 'completed',
-          message: eventData.message || `Sync completed! ${assignmentsUpserted} assignments synced.`
-        })
-        toast.success('Canvas sync completed', `${assignmentsUpserted} assignments available.`)
-        
-        setTimeout(() => {
-          console.log('⏰ Clearing sync state after 2s delay')
-          setSyncProgress(null)
-          setIsSyncingCanvas(false)
-          loadCanvasStatus()
-        }, 2000)
-      } else if (eventData.status === 'error' || eventData.status === 'failed') {
-        setSyncProgress({
-          coursesProcessed: 0,
-          totalCourses: 0,
-          assignmentsSynced: 0,
-          status: 'error',
-          message: eventData.message || 'Sync failed. Please try again.'
-        })
-        toast.error('Canvas sync failed', eventData.message || 'Unexpected error')
-        
-        setTimeout(() => {
-          setSyncProgress(null)
-          setIsSyncingCanvas(false)
-        }, 4000)
+      // Invalidate and refetch connections immediately to update UI
+      await queryClient.invalidateQueries({
+        queryKey: OAUTH_CACHE_KEYS.CONNECTIONS,
+        refetchType: 'all'
+      })
+
+      await refetchConnections()
+
+      // Clear loading states
+      setConnectingIntegration(null)
+      setPendingConnection(null)
+
+      // Clear sessionStorage markers
+      try {
+        sessionStorage.removeItem('oauth_in_progress')
+        sessionStorage.removeItem('oauth_result')
+      } catch {
+        // Ignore sessionStorage errors
       }
+
+      // Show success toast
+      const provider = data.provider as string || 'Account'
+      toast.success('Connected successfully', `${provider} account connected`)
     }
 
-    socket.on('canvas_sync', handleCanvasSync)
+    socket.on('oauth_connected', handleOAuthConnected)
     return () => {
-      socket.off('canvas_sync', handleCanvasSync)
+      socket.off('oauth_connected', handleOAuthConnected)
     }
-  }, [socket, wsConnected])
-
-  const handleCanvasSync = async () => {
-    if (!canvasStatus?.connected) return
-
-    try {
-      setIsSyncingCanvas(true)
-      if (isPollingStatus && pollTimer) {
-        clearTimeout(pollTimer)
-        setPollTimer(null)
-      }
-      setIsPollingStatus(false)
-      const shouldShowToast = () => {
-        const hidden = document.visibilityState !== 'visible'
-        const offPage = !window.location.pathname.toLowerCase().includes('integrations')
-        return hidden || offPage
-      }
-      if (shouldShowToast()) {
-        toast.loading('Canvas Sync', 'Starting Canvas sync...')
-      }
-      setSyncProgress({
-        coursesProcessed: 0,
-        totalCourses: 0,
-        assignmentsSynced: 0,
-        status: 'starting',
-        message: 'Starting Canvas sync...'
-      })
-
-      await canvasService.triggerSync('full')
-      
-      // Move to in-progress visual state
-      setSyncProgress(prev => ({
-        ...prev!,
-        status: 'in_progress',
-        message: 'Fetching courses and assignments from Canvas...'
-      }))
-
-      // Bounded polling fallback (prefer WebSocket in future)
-      const previousTotal = canvasStatus?.totalCanvasTasks || 0
-      const maxAttempts = 30 // ~60s at 2s interval
-      let attempts = 0
-      if (isPollingStatus) {
-        // Already polling; do not start another loop
-        return
-      }
-      setIsPollingStatus(true)
-
-      const pollForCompletion = async () => {
-        attempts += 1
-        try {
-          const status = await canvasService.getIntegrationStatus()
-          const increased = status.totalCanvasTasks > previousTotal
-          const lastSyncChanged = status.lastSync !== canvasStatus?.lastSync
-          if (increased || lastSyncChanged) {
-            setSyncProgress({
-              coursesProcessed: 1,
-              totalCourses: 1,
-              assignmentsSynced: status.totalCanvasTasks,
-              status: 'completed',
-              message: `Sync completed! ${status.totalCanvasTasks} assignments synced.`
-            })
-            if (shouldShowToast()) {
-              toast.success('Canvas Sync Completed', `${status.totalCanvasTasks} assignments available.`)
-            }
-            setIsPollingStatus(false)
-            if (pollTimer) {
-              clearTimeout(pollTimer)
-              setPollTimer(null)
-            }
-            setTimeout(() => {
-              setSyncProgress(null)
-              loadCanvasStatus()
-            }, 2000)
-          } else if (attempts < maxAttempts) {
-            const t = setTimeout(pollForCompletion, 2000)
-            setPollTimer(t)
-          } else {
-            // Timed out
-            setSyncProgress(prev => ({
-              ...prev!,
-              status: 'error',
-              message: 'Sync timed out. Please try again.'
-            }))
-            if (shouldShowToast()) {
-              toast.error('Canvas Sync Timed Out', 'Please try again shortly.')
-            }
-            setIsPollingStatus(false)
-            if (pollTimer) {
-              clearTimeout(pollTimer)
-              setPollTimer(null)
-            }
-            setTimeout(() => setSyncProgress(null), 4000)
-          }
-        } catch (e) {
-          setSyncProgress(prev => ({
-            ...prev!,
-            status: 'error',
-            message: 'Sync failed. Please try again.'
-          }))
-          if (shouldShowToast()) {
-            toast.error('Canvas Sync Failed', e instanceof Error ? e.message : 'Unexpected error')
-          }
-          setIsPollingStatus(false)
-          if (pollTimer) {
-            clearTimeout(pollTimer)
-            setPollTimer(null)
-          }
-          setTimeout(() => setSyncProgress(null), 4000)
-        }
-      }
-
-      const t = setTimeout(pollForCompletion, 2000)
-      setPollTimer(t)
-    } catch (e) {
-      setSyncProgress({
-        coursesProcessed: 0,
-        totalCourses: 0,
-        assignmentsSynced: 0,
-        status: 'error',
-        message: e instanceof Error ? e.message : 'Sync failed'
-      })
-      const hidden = document.visibilityState !== 'visible'
-      const offPage = !window.location.pathname.toLowerCase().includes('integrations')
-      if (hidden || offPage) {
-        toast.error('Canvas Sync Failed', e instanceof Error ? e.message : 'Unexpected error')
-      }
-      setTimeout(() => setSyncProgress(null), 5000)
-    } finally {
-      setIsSyncingCanvas(false)
-    }
-  }
+  }, [socket, wsConnected, refetchConnections, queryClient])
 
   // Cleanup any pending poll when unmounting
   useEffect(() => {
     return () => {
-      if (pollTimer) {
-        clearTimeout(pollTimer)
-      }
+      // No longer needed since we removed Canvas sync polling
     }
-  }, [pollTimer])
+  }, [])
 
   useEffect(() => {
     loadCanvasStatus()
   }, [])
+
+  // Cleanup timeout guard: Prevent orphaned pending connection states
+  useEffect(() => {
+    if (!pendingConnection) return
+
+    const PENDING_CONNECTION_TIMEOUT = 30000 // 30 seconds max
+    const timeout = setTimeout(() => {
+      setPendingConnection(null)
+      setConnectingIntegration(null)
+      try {
+        sessionStorage.removeItem('oauth_in_progress')
+      } catch {
+        // Ignore sessionStorage errors
+      }
+    }, PENDING_CONNECTION_TIMEOUT)
+
+    return () => clearTimeout(timeout)
+  }, [pendingConnection])
+
+  // Listen for OAuth completion via postMessage and sessionStorage (simplified)
+  useEffect(() => {
+    const processedTimestamps = new Set<number>()
+
+    const processOAuthResult = (result: Record<string, unknown>) => {
+      // Validate result
+      if (!result || !result.timestamp || !result.type) {
+        return
+      }
+
+      // Prevent duplicate processing by checking timestamp
+      const timestamp = result.timestamp as number
+      if (processedTimestamps.has(timestamp)) {
+        return
+      }
+
+      // Check if this is a recent event (within last 30 seconds)
+      const age = Date.now() - timestamp
+      if (age > 30000) {
+        return
+      }
+
+      // Mark as processed BEFORE doing anything else
+      processedTimestamps.add(timestamp)
+
+      // Clear the sessionStorage item immediately to prevent re-processing
+      try {
+        sessionStorage.removeItem('oauth_result')
+      } catch {
+        // Ignore sessionStorage errors
+      }
+
+      if (result.type === 'oauth-success') {
+        // Invalidate cache and refetch (fallback if WebSocket didn't fire)
+        queryClient.invalidateQueries({
+          queryKey: OAUTH_CACHE_KEYS.CONNECTIONS,
+          refetchType: 'all'
+        })
+
+        refetchConnections()
+
+        // Clear loading states
+        setConnectingIntegration(null)
+        setPendingConnection(null)
+
+        // Clear both sessionStorage items to prevent reprocessing
+        try {
+          sessionStorage.removeItem('oauth_in_progress')
+          sessionStorage.removeItem('oauth_result')
+        } catch {
+          // Ignore sessionStorage errors
+        }
+      } else if (result.type === 'oauth-error') {
+        const errorMessage = (result.error as string) || 'Failed to connect account'
+        toast.error('Connection failed', errorMessage)
+        setConnectingIntegration(null)
+        setPendingConnection(null)
+        try {
+          sessionStorage.removeItem('oauth_in_progress')
+        } catch {
+          // Ignore sessionStorage errors
+        }
+      }
+    }
+
+    const handleMessage = (event: MessageEvent) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) {
+        return
+      }
+
+      if (event.data.type === 'oauth-success' || event.data.type === 'oauth-error') {
+        processOAuthResult(event.data)
+      }
+    }
+
+    const handleStorageChange = (e: StorageEvent) => {
+      // Storage event only fires in OTHER tabs/windows
+      if (e.key === 'oauth_result' && e.newValue) {
+        try {
+          const result = JSON.parse(e.newValue)
+          processOAuthResult(result)
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+
+    // On mount, if we see an OAuth in-progress marker (e.g., redirect flow), show loading immediately
+    const inProgress = sessionStorage.getItem('oauth_in_progress')
+    if (inProgress) {
+      try {
+        const parsed = JSON.parse(inProgress)
+        if (parsed?.integrationId) {
+          setConnectingIntegration(parsed.integrationId)
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    // Check sessionStorage ONCE on mount only (no polling interval)
+    // Only process if there's a corresponding oauth_in_progress marker (means OAuth is actually in flight)
+    const result = sessionStorage.getItem('oauth_result')
+    if (result && inProgress) { // Only process if OAuth was in progress
+      try {
+        const parsed = JSON.parse(result)
+        const age = Date.now() - (parsed.timestamp || 0)
+        if (age < 60000) { // Only process if less than 60 seconds old
+          processOAuthResult(parsed)
+        } else {
+          sessionStorage.removeItem('oauth_result')
+        }
+      } catch {
+        sessionStorage.removeItem('oauth_result')
+      }
+    } else if (result && !inProgress) {
+      // Result exists but no in-progress marker - clean up orphaned result
+      sessionStorage.removeItem('oauth_result')
+    }
+
+    window.addEventListener('message', handleMessage)
+    window.addEventListener('storage', handleStorageChange)
+
+    return () => {
+      window.removeEventListener('message', handleMessage)
+      window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [refetchConnections, queryClient])
 
   if (isLoading) {
     return (
@@ -482,7 +496,7 @@ export function IntegrationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-900 flex flex-col items-center">
+    <div className="min-h-screen flex flex-col items-center" style={{ backgroundColor: '#0f0f0f' }}>
       <div className="w-full max-w-4xl px-6 pt-24 pb-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -495,46 +509,8 @@ export function IntegrationsPage() {
             <InlineAlert
               variant="error"
               title="Connection Error"
-              message={(error as string) || (connectError as any)?.message || (disconnectError as any)?.message}
+              message={(error as string) || (connectError as Error)?.message || (disconnectError as Error)?.message}
             />
-          </div>
-        )}
-
-        {/* Canvas Sync Progress Alert */}
-        {syncProgress && (
-          <div className={cn(
-            "mb-6 p-4 rounded-xl flex items-center gap-3",
-            syncProgress.status === 'completed' && "bg-green-600 text-white",
-            syncProgress.status === 'error' && "bg-red-600 text-white",
-            (syncProgress.status === 'in_progress' || syncProgress.status === 'starting') && "bg-blue-600 text-white"
-          )}>
-            {syncProgress.status === 'completed' && <CheckCircle className="w-5 h-5 text-white flex-shrink-0" />}
-            {syncProgress.status === 'error' && <XCircle className="w-5 h-5 text-white flex-shrink-0" />}
-            {(syncProgress.status === 'in_progress' || syncProgress.status === 'starting') && (
-              <Loader2 className="w-5 h-5 text-white flex-shrink-0 animate-spin" />
-            )}
-            <div className="flex-1">
-              <p className="text-sm font-medium">
-                Canvas Sync {syncProgress.status === 'completed' ? 'Completed' : syncProgress.status === 'error' ? 'Failed' : 'In Progress'}
-              </p>
-              <p className="text-white/80 text-xs">
-                {syncProgress.message}
-              </p>
-              {syncProgress.status === 'in_progress' && syncProgress.totalCourses > 0 && (
-                <div className="mt-2">
-                  <div className="flex justify-between text-xs text-white/80 mb-1">
-                    <span>Progress</span>
-                    <span>{syncProgress.coursesProcessed}/{syncProgress.totalCourses} courses</span>
-                  </div>
-                  <div className="w-full bg-white/20 rounded-full h-1.5">
-                    <div 
-                      className="bg-white h-1.5 rounded-full transition-all duration-300"
-                      style={{ width: `${(syncProgress.coursesProcessed / syncProgress.totalCourses) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -543,45 +519,23 @@ export function IntegrationsPage() {
           {Object.entries(groupedIntegrations).map(([category, categoryIntegrations]) => (
             <div key={category}>
               <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">{category}</h2>
-              <div className="bg-neutral-800/80 border border-gray-700/50 rounded-xl overflow-hidden">
-                {categoryIntegrations.map((integration, index) => {
-                  const status = getIntegrationStatus(integration)
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {categoryIntegrations.map((integration) => {
                   return (
-                    <div key={integration.id}>
-                      <div className="flex items-center justify-between p-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-neutral-700 flex items-center justify-center overflow-hidden">
-                            <img
-                              src={integration.icon}
-                              alt={integration.name}
-                              className="w-8 h-8 object-contain"
-                            />
-                          </div>
-                          <div>
-                            <h3 className="text-white font-medium">{integration.name}</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                                      {status === 'connected' && (
-                                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                      )}
-                                      <span className={cn(
-                                        "text-xs capitalize",
-                                        status === 'connected' ? 'text-green-400' : 'text-gray-400'
-                                      )}>
-                                        {status.replace('-', ' ')}
-                                      </span>
-                              {integration.id === 'canvas' && canvasStatus?.connected && (
-                                <span className="text-xs text-gray-400">
-                                Last sync: {formatLastSync(canvasStatus.lastSync)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                    <div key={integration.id} className="bg-neutral-800/40 border border-gray-700/50 rounded-xl p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-neutral-700 flex items-center justify-center overflow-hidden">
+                          <img
+                            src={integration.icon}
+                            alt={integration.name}
+                            className="w-8 h-8 object-contain"
+                          />
                         </div>
-                        {getStatusButton(integration)}
+                        <div>
+                          <h3 className="text-white font-medium text-sm">{integration.name}</h3>
+                        </div>
                       </div>
-                      {index < categoryIntegrations.length - 1 && (
-                        <div className="h-px bg-gray-700 mx-4"></div>
-                      )}
+                      {getStatusButton(integration)}
                     </div>
                   )
                 })}
@@ -601,10 +555,23 @@ export function IntegrationsPage() {
             lastSync: null,
             totalCanvasTasks: 0
           })
-          // Begin watching initial backfill progress so user sees syncing UI
-          beginCanvasSyncWatch()
         }}
       />
+      {selectedIntegration && (
+        <ManageConnectionModal
+          isOpen={showManageModal}
+          onClose={() => {
+            setShowManageModal(false)
+            setSelectedIntegration(null)
+          }}
+          integration={selectedIntegration}
+          onDisconnect={() => {
+            handleDisconnect(selectedIntegration)
+            setShowManageModal(false)
+            setSelectedIntegration(null)
+          }}
+        />
+      )}
     </div>
   )
 }

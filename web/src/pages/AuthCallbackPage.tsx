@@ -8,10 +8,10 @@ export function AuthCallbackPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        console.log('Handling auth callback...')
-        console.log('Current URL:', window.location.href)
-        console.log('Hash:', window.location.hash)
-        console.log('Search:', window.location.search)
+        // Debug logging only in development
+        if (import.meta.env.DEV) {
+          console.log('Handling auth callback...')
+        }
 
         // Get the URL hash and search params
         const hashParams = new URLSearchParams(window.location.hash.substring(1))
@@ -39,10 +39,8 @@ export function AuthCallbackPage() {
         }
 
         if (data.session) {
-          console.log('Found session, redirecting to home')
           navigate('/')
         } else {
-          console.log('No session found, redirecting to auth')
           navigate('/auth')
         }
       } catch (error) {

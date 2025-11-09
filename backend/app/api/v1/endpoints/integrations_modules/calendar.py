@@ -10,8 +10,10 @@ from pydantic import BaseModel, Field
 
 from app.core.auth import get_current_user, CurrentUser
 from app.services.integrations.calendar_sync_service import get_calendar_sync_service, get_calendar_webhook_service
-from app.services.workers.calendar_background_worker import get_calendar_scheduler, get_calendar_background_worker
-from app.agents.orchestrator import get_agent_orchestrator, WorkflowType
+from app.services.workers.calendar_background_worker import get_calendar_job_runner
+from app.workers.calendar_scheduler import get_calendar_scheduler
+from app.agents.orchestrator import get_agent_orchestrator
+from app.agents.graphs.base import WorkflowType
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -368,17 +370,15 @@ async def get_calendar_conflicts(
     Get unresolved calendar conflicts for the current user
     """
     try:
-        from app.config.database.supabase import get_supabase_client
+        from app.database.repositories.calendar_repositories.calendar_repository import (
+            get_calendar_sync_conflict_repository
+        )
         
-        supabase = get_supabase_client()
-        
-        response = await supabase.table("calendar_sync_conflicts").select(
-            "id, user_id, event1_id, event2_id, conflict_type, confidence_score, "
-            "resolution_status, detected_at, resolved_at"
-        ).eq("user_id", current_user.user_id).eq("resolution_status", "unresolved").execute()
+        conflict_repo = get_calendar_sync_conflict_repository()
+        conflicts_data = await conflict_repo.get_unresolved_by_user(current_user.user_id)
         
         conflicts = []
-        for conflict in response.data:
+        for conflict in conflicts_data:
             conflicts.append(ConflictResponse(
                 id=conflict["id"],
                 user_id=conflict["user_id"],
@@ -410,23 +410,24 @@ async def resolve_calendar_conflict(
     Resolve a calendar synchronization conflict
     """
     try:
+        from app.database.repositories.calendar_repositories.calendar_repository import (
+            get_calendar_sync_conflict_repository
+        )
+        
         calendar_service = get_calendar_sync_service()
+        conflict_repo = get_calendar_sync_conflict_repository()
         
-        # Get conflict details
-        from app.config.database.supabase import get_supabase_client
-        supabase = get_supabase_client()
+        # Get conflict details using repository
+        conflict = await conflict_repo.get_by_id_and_user(
+            conflict_id=request.conflict_id,
+            user_id=current_user.user_id
+        )
         
-        conflict_response = await supabase.table("calendar_sync_conflicts").select(
-            "*"
-        ).eq("id", request.conflict_id).eq("user_id", current_user.user_id).single().execute()
-        
-        if not conflict_response.data:
+        if not conflict:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conflict not found"
             )
-        
-        conflict = conflict_response.data
         
         # Resolve conflict based on action
         if request.resolution_action == "keep_event1":
@@ -553,8 +554,8 @@ async def handle_google_calendar_webhook(
         user_id = channel_id.replace("user_", "")
         
         # Queue webhook for background processing
-        background_worker = get_calendar_background_worker()
-        success = await background_worker.queue_webhook("google", {
+        job_runner = get_calendar_job_runner()
+        success = await job_runner.queue_webhook("google", {
             "user_id": user_id,
             "resource_id": resource_id,
             "resource_state": resource_state,
@@ -587,7 +588,7 @@ async def handle_microsoft_calendar_webhook(
         # Microsoft Graph sends an array of notifications
         notifications = body.get("value", [])
         
-        background_worker = get_calendar_background_worker()
+        job_runner = get_calendar_job_runner()
         
         for notification in notifications:
             subscription_id = notification.get("subscriptionId")
@@ -596,15 +597,19 @@ async def handle_microsoft_calendar_webhook(
             
             # Extract user_id from subscription mapping stored in database
             try:
-                from app.config.database.supabase import get_supabase
-                supabase = get_supabase()
+                from app.database.repositories.calendar_repositories.calendar_repository import (
+                    get_webhook_subscription_repository
+                )
+                
+                webhook_repo = get_webhook_subscription_repository()
                 
                 # Query webhook subscriptions table to get user_id for this subscription
-                response = supabase.table("webhook_subscriptions").select("user_id").eq("subscription_id", subscription_id).eq("provider", "microsoft").single().execute()
+                user_id = await webhook_repo.get_user_by_subscription_id(
+                    subscription_id=subscription_id,
+                    provider="microsoft"
+                )
                 
-                if response.data:
-                    user_id = response.data["user_id"]
-                else:
+                if not user_id:
                     logger.warning(f"No user mapping found for Microsoft subscription {subscription_id}")
                     continue  # Skip this notification
                     
@@ -612,7 +617,7 @@ async def handle_microsoft_calendar_webhook(
                 logger.error(f"Failed to get user_id for subscription {subscription_id}: {e}")
                 continue  # Skip this notification
             
-            success = await background_worker.queue_webhook("microsoft", {
+            success = await job_runner.queue_webhook("microsoft", {
                 "user_id": user_id,
                 "subscription_id": subscription_id,
                 "change_type": change_type,

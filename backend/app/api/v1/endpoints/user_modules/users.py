@@ -8,7 +8,7 @@ from pydantic import BaseModel
 import logging
 
 from app.core.auth import get_current_user, CurrentUser
-from app.config.database.supabase import get_supabase
+from app.services.user_service import UserService, get_user_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -25,7 +25,7 @@ class UserProfile(BaseModel):
 async def get_user_profile(
     user_id: str,
     current_user: CurrentUser = Depends(get_current_user),
-    supabase = Depends(get_supabase)
+    user_service: UserService = Depends(get_user_service)
 ):
     """
     Get user profile information from Supabase
@@ -37,79 +37,23 @@ async def get_user_profile(
             detail="Access denied"
         )
     
-    try:
-        # Get user profile from Supabase auth.users
-        auth_response = supabase.auth.admin.get_user_by_id(user_id)
-        
-        if not auth_response.user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        
-        user_data = auth_response.user
-        
-        # All user data is now in the users table
-        profile_data = {}
-        
-        logger.info(f"Retrieved profile for user {user_id}")
-        
-        return UserProfile(
-            user_id=user_id,
-            email=user_data.email,
-            name=profile_data.get("full_name") or user_data.user_metadata.get("full_name"),
-            city=profile_data.get("city"),
-            timezone=profile_data.get("timezone"),
-            preferences=profile_data.get("preferences", {
-                "theme": "light",
-                "notifications": True,
-                "language": "en"
-            })
-        )
-        
-    except Exception as e:
-        logger.error(f"Error fetching user profile: {e}")
-        # Fallback to basic user data from JWT
-        return UserProfile(
-            user_id=user_id,
-            email=current_user.email,
-            name="User",
-            preferences={"theme": "light", "notifications": True, "language": "en"}
-        )
+    # Get profile using service
+    profile_data = await user_service.get_user_profile(
+        user_id=user_id,
+        fallback_email=current_user.email
+    )
+    
+    logger.info(f"Retrieved profile for user {user_id}")
+    
+    return UserProfile(**profile_data)
 
 @router.get("/tasks")
 async def get_tasks(
     current_user: CurrentUser = Depends(get_current_user),
-    supabase = Depends(get_supabase)
+    user_service: UserService = Depends(get_user_service)
 ):
     """
     Get user tasks from Supabase
     """
-    try:
-        # Get tasks from Supabase with course information
-        response = supabase.table("tasks").select("""
-            *,
-            courses(
-                id,
-                name,
-                color,
-                icon,
-                canvas_course_code
-            )
-        """).eq("user_id", current_user.user_id).execute()
-        
-        tasks = response.data if response.data else []
-        logger.info(f"Retrieved {len(tasks)} tasks for user {current_user.user_id}")
-        
-        return {
-            "tasks": tasks,
-            "count": len(tasks)
-        }
-        
-    except Exception as e:
-        logger.error(f"Error fetching tasks: {e}")
-        # Return empty tasks on error
-        return {
-            "tasks": [],
-            "count": 0
-        }
+    # Get tasks using service
+    return await user_service.get_user_tasks(user_id=current_user.user_id)

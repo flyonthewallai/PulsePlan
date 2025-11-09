@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { X, Calendar, Clock, Type, FileText, Tag, AlertCircle, Save, Trash2, Copy } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -192,37 +191,26 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     completed: '#10B981',
   };
 
-  if (!event) return null;
+  if (!event || !isOpen) return null;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
-            onClick={handleClose}
-          />
-
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', duration: 0.3 }}
-            className={cn(
-              'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50',
-              'w-full max-w-md max-h-[90vh] overflow-auto',
-              'bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl',
-              className
-            )}
-            onClick={(e) => e.stopPropagation()}
-          >
+    <div className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 transition-all duration-300 ${
+      isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+    }`} onClick={handleClose}>
+      <div
+        className={cn(
+          `border border-neutral-700 rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-auto transition-all duration-300 ${
+            isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
+          }`,
+          'bg-neutral-900',
+          className
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {isOpen ? (
+          <>
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-neutral-700">
+            <div className="flex items-center justify-between p-4">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                 <Calendar size={20} />
                 Edit Event
@@ -241,7 +229,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                 <button
                   onClick={handleClose}
                   disabled={isSubmitting}
-                  className="p-2 hover:bg-neutral-700 rounded-lg transition-colors text-neutral-400 hover:text-white disabled:opacity-50"
+                  className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/60 disabled:opacity-50"
                 >
                   <X size={18} />
                 </button>
@@ -249,7 +237,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-4 space-y-3">
               {/* Title */}
               <div>
                 <label className="block text-sm font-medium text-neutral-300 mb-2 flex items-center gap-2">
@@ -434,7 +422,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
               )}
 
               {/* Actions */}
-              <div className="flex items-center justify-between pt-4 border-t border-neutral-700">
+              <div className="flex items-center justify-between pt-4 border-t border-neutral-700/30">
                 {/* Delete Button */}
                 <div>
                   {!showDeleteConfirm ? (
@@ -503,10 +491,10 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                 </div>
               </div>
             </form>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+          </>
+        ) : null}
+      </div>
+    </div>
   );
 };
 

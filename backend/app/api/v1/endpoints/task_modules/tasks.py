@@ -9,7 +9,8 @@ import logging
 
 from app.core.auth import get_current_user, CurrentUser
 from app.database.models import TaskModel, TaskPriority, TaskStatus
-from app.agents.tools.data.tasks import TaskDatabaseTool
+from app.services.task_service import TaskService, get_task_service
+from app.core.utils.error_handlers import handle_endpoint_error
 
 logger = logging.getLogger(__name__)
 
@@ -56,36 +57,27 @@ class TaskFilters(BaseModel):
 @router.post("/", response_model=Dict[str, Any])
 async def create_task(
     request: TaskCreateRequest,
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(get_current_user),
+    service: TaskService = Depends(get_task_service)
 ):
     """Create a new task"""
     try:
-        task_tool = TaskDatabaseTool()
+        task_data = {
+            "title": request.title,
+            "description": request.description,
+            "task_type": request.task_type,
+            "course": request.course,
+            "priority": request.priority.value if request.priority else "medium",
+            "due_date": request.due_date,
+            "tags": request.tags or [],
+            "estimated_minutes": request.estimated_minutes
+        }
         
-        result = await task_tool.execute(
-            input_data={
-                "operation": "create",
-                "task_data": {
-                    "title": request.title,
-                    "description": request.description,
-                    "task_type": request.task_type,
-                    "course": request.course,
-                    "priority": request.priority.value if request.priority else "medium",
-                    "due_date": request.due_date,
-                    "tags": request.tags or [],
-                    "estimated_minutes": request.estimated_minutes
-                }
-            },
-            context={"user_id": current_user.user_id}
-        )
-        
-        if result.success:
-            return {"data": result.data, "error": None}
-        else:
-            raise HTTPException(status_code=400, detail=result.error)
+        task = await service.create_task(current_user.user_id, task_data)
+        return {"data": {"task": task}, "error": None}
             
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create task: {str(e)}")
+        return handle_endpoint_error(e, logger, "create_task")
 
 
 @router.get("/", response_model=Dict[str, Any])
@@ -96,12 +88,11 @@ async def list_tasks(
     course: Optional[str] = Query(None, description="Filter by course"),
     start_date: Optional[str] = Query(None, description="Filter by start date"),
     end_date: Optional[str] = Query(None, description="Filter by end date"),
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(get_current_user),
+    service: TaskService = Depends(get_task_service)
 ):
     """List tasks with optional filters"""
     try:
-        task_tool = TaskDatabaseTool()
-        
         filters = {}
         if status:
             filters["status"] = status.value
@@ -116,35 +107,24 @@ async def list_tasks(
         if end_date:
             filters["end_date"] = end_date
         
-        result = await task_tool.execute(
-            input_data={
-                "operation": "list",
-                "filters": filters
-            },
-            context={"user_id": current_user.user_id}
-        )
+        result = await service.list_tasks(current_user.user_id, filters)
         
-        if result.success:
-            # Return in format expected by frontend: {tasks: Task[], count: number}
-            tasks_data = result.data.get("tasks", [])
-            return {"tasks": tasks_data, "count": len(tasks_data)}
-        else:
-            raise HTTPException(status_code=400, detail=result.error)
+        # Return in format expected by frontend: {tasks: Task[], count: number}
+        return {"tasks": result["tasks"], "count": result["total"]}
             
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list tasks: {str(e)}")
+        return handle_endpoint_error(e, logger, "list_tasks")
 
 
 @router.patch("/{task_id}", response_model=Dict[str, Any])
 async def update_task(
     task_id: str,
     request: TaskUpdateRequest,
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(get_current_user),
+    service: TaskService = Depends(get_task_service)
 ):
     """Update an existing task"""
     try:
-        task_tool = TaskDatabaseTool()
-        
         # Build update data from request
         update_data = {}
         if request.title is not None:
@@ -168,97 +148,59 @@ async def update_task(
         if request.estimated_minutes is not None:
             update_data["estimated_minutes"] = request.estimated_minutes
         
-        result = await task_tool.execute(
-            input_data={
-                "operation": "update",
-                "task_id": task_id,
-                "task_data": update_data
-            },
-            context={"user_id": current_user.user_id}
-        )
+        task = await service.update_task(task_id, current_user.user_id, update_data)
         
-        if result.success:
-            # Emit websocket event for task update
-            try:
-                from ....core.infrastructure.websocket import websocket_manager
-                task_data = result.data.get("task", {})
-                task_data["user_id"] = current_user.user_id
-                task_data["type"] = "task"  # Distinguish from todos
-                
-                # Use a default workflow_id for direct API updates
-                workflow_id = f"api_update_{current_user.user_id}"
-                await websocket_manager.emit_task_updated(workflow_id, task_data)
-            except Exception as ws_error:
-                # Don't fail the request if websocket emission fails
-                logger.warning(f"Failed to emit task_updated websocket event: {ws_error}")
+        # Emit websocket event for task update
+        try:
+            from app.core.infrastructure.websocket import websocket_manager
+            task_data = task.copy()
+            task_data["user_id"] = current_user.user_id
+            task_data["type"] = "task"  # Distinguish from todos
             
-            return {"data": result.data, "error": None}
-        else:
-            if "not found" in result.error.lower():
-                raise HTTPException(status_code=404, detail="Task not found")
-            raise HTTPException(status_code=400, detail=result.error)
+            # Use a default workflow_id for direct API updates
+            workflow_id = f"api_update_{current_user.user_id}"
+            await websocket_manager.emit_task_updated(workflow_id, task_data)
+        except Exception as ws_error:
+            # Don't fail the request if websocket emission fails
+            logger.warning(f"Failed to emit task_updated websocket event: {ws_error}")
+        
+        return {"data": {"task": task}, "error": None}
             
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update task: {str(e)}")
+        return handle_endpoint_error(e, logger, "update_task")
 
 
 @router.delete("/{task_id}", response_model=Dict[str, Any])
 async def delete_task(
     task_id: str,
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(get_current_user),
+    service: TaskService = Depends(get_task_service)
 ):
     """Delete a task"""
     try:
-        task_tool = TaskDatabaseTool()
-        
-        result = await task_tool.execute(
-            input_data={
-                "operation": "delete",
-                "task_id": task_id
-            },
-            context={"user_id": current_user.user_id}
-        )
-        
-        if result.success:
-            return {"data": None, "error": None}
-        else:
-            if "not found" in result.error.lower():
-                raise HTTPException(status_code=404, detail="Task not found")
-            raise HTTPException(status_code=400, detail=result.error)
+        result = await service.delete_task(task_id, current_user.user_id)
+        return {"data": result, "error": None}
             
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete task: {str(e)}")
+        return handle_endpoint_error(e, logger, "delete_task")
 
 
 @router.get("/{task_id}", response_model=Dict[str, Any])
 async def get_task(
     task_id: str,
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(get_current_user),
+    service: TaskService = Depends(get_task_service)
 ):
     """Get a specific task by ID"""
     try:
-        task_tool = TaskDatabaseTool()
+        task = await service.get_task(task_id, current_user.user_id)
         
-        result = await task_tool.execute(
-            input_data={
-                "operation": "get",
-                "task_id": task_id
-            },
-            context={"user_id": current_user.user_id}
-        )
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
         
-        if result.success:
-            return {"data": result.data, "error": None}
-        else:
-            if "not found" in result.error.lower():
-                raise HTTPException(status_code=404, detail="Task not found")
-            raise HTTPException(status_code=400, detail=result.error)
+        return {"data": {"task": task}, "error": None}
             
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get task: {str(e)}")
+        return handle_endpoint_error(e, logger, "get_task")
