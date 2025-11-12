@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '../../../lib/utils';
-import { useOAuthConnections } from '../../../hooks/useOAuthConnections';
+import { useOAuthConnections } from '@/hooks/integrations';
 
 interface CalendarFilterProps {
   onFilterChange?: (selectedCalendars: string[]) => void;

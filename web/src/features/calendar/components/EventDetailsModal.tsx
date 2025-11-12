@@ -10,6 +10,13 @@ import {
   Flag,
   Lightbulb,
   ChevronRight,
+  Edit2,
+  Trash2,
+  CheckCircle2,
+  Circle,
+  ListTodo,
+  ClipboardCheck,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { CalendarEvent, Timeblock } from '@/types';
@@ -18,6 +25,8 @@ interface EventDetailsModalProps {
   isOpen: boolean;
   event: (CalendarEvent & { timeblock?: Timeblock }) | null;
   onClose: () => void;
+  onEdit?: (event: CalendarEvent) => void;
+  onDelete?: (eventId: string) => void;
   className?: string;
 }
 
@@ -25,6 +34,8 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   isOpen,
   event,
   onClose,
+  onEdit,
+  onDelete,
   className,
 }) => {
   if (!event || !isOpen) return null;
@@ -37,7 +48,59 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   // Determine accent color from event or timeblock
   const accentColor = timeblock?.courseColor || timeblock?.color || event.color || '#3b82f6';
 
-  const isTaskEvent = timeblock?.source === 'task';
+  // Check if this is a task event - check timeblock type (task_block), source (task/timeblock), or fallback to event.task
+  const isTaskEvent = 
+    timeblock?.type === 'task_block' || 
+    timeblock?.source === 'task' || 
+    timeblock?.source === 'timeblock' ||
+    !!event.task;
+  const taskStatus = timeblock?.taskStatus || event.task?.status;
+
+  // Get task status display info
+  const getTaskStatusInfo = () => {
+    if (!isTaskEvent) return null;
+    
+    // Normalize status - handle 'done' and 'finished' as 'completed'
+    let normalizedStatus = taskStatus || 'todo';
+    if (normalizedStatus === 'done' || normalizedStatus === 'finished') {
+      normalizedStatus = 'completed';
+    }
+    
+    const statusMap = {
+      'todo': { 
+        label: 'To Do', 
+        icon: Circle, 
+        color: 'text-gray-400',
+        bgColor: 'bg-gray-400/10',
+        borderColor: 'border-gray-400/20'
+      },
+      'in_progress': { 
+        label: 'In Progress', 
+        icon: ClipboardCheck, 
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-400/10',
+        borderColor: 'border-blue-400/20'
+      },
+      'completed': { 
+        label: 'Completed', 
+        icon: CheckCircle2, 
+        color: 'text-green-400',
+        bgColor: 'bg-green-400/10',
+        borderColor: 'border-green-400/20'
+      },
+      'pending': { 
+        label: 'Pending', 
+        icon: Circle, 
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-400/10',
+        borderColor: 'border-yellow-400/20'
+      },
+    };
+    
+    return statusMap[normalizedStatus as keyof typeof statusMap] || statusMap.todo;
+  };
+
+  const taskStatusInfo = getTaskStatusInfo();
 
   // Extract meeting link from location
   const getMeetingInfo = () => {
@@ -72,7 +135,7 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
           }`,
           className
         )}
-        style={{ backgroundColor: '#181818' }}
+        style={{ backgroundColor: '#121212' }}
         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking modal content
       >
         {isOpen ? (
@@ -80,18 +143,47 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
                 <div className="flex-1 min-w-0">
-                <p className="text-xs text-white tracking-wide mb-1">Event</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-xs text-white tracking-wide">
+                    {isTaskEvent ? 'Task' : 'Event'}
+                  </p>
+                </div>
                   <h2 className="text-lg font-semibold text-white truncate">{event.title}</h2>
                   {timeblock?.courseName && (
                   <p className="text-sm text-gray-400 truncate mt-0.5">{timeblock.courseName}</p>
                   )}
               </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 hover:bg-white/5 rounded-lg transition-colors shrink-0 ml-2"
-              >
-                <X className="w-4 h-4 text-gray-500 hover:text-white" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0 ml-2">
+                {onEdit && (
+                  <button
+                    onClick={() => {
+                      onEdit(event);
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                    title="Edit event"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={() => {
+                      onDelete(event.id);
+                      onClose();
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                    title="Delete event"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Content */}
@@ -133,18 +225,25 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
 
               {/* Participants Section */}
               {timeblock?.attendees && timeblock.attendees.length > 0 && (
-                <div className="space-y-3">
+                <div className={cn(
+                  "space-y-3 pt-3 border-t border-white/10"
+                )}>
+                  {/* Participants Header */}
                   <div className="flex items-center gap-2">
                     <Users size={16} className="text-gray-500" />
-                    <span className="text-xs text-gray-400">{timeblock.attendees.length} participants</span>
+                    <span className="text-sm font-medium text-white">Participants</span>
                   </div>
 
+                  {/* Participants List */}
                   <div className="space-y-3">
                     {timeblock.attendees.slice(0, 5).map((attendee, idx) => {
-                      const displayName = attendee.name || attendee.email || 'Unknown';
-                      const email = attendee.email;
-                      const responseStatus = attendee.responseStatus;
+                      // Handle both string format (just email) and object format
+                      const isString = typeof attendee === 'string';
+                      const email = isString ? attendee : attendee.email;
+                      const name = isString ? null : attendee.name;
+                      const responseStatus = isString ? null : attendee.responseStatus;
 
+                      const displayName = name || email || 'Unknown';
                       const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
                       const isOrganizer = email && timeblock.organizer?.email === email;
 
@@ -215,38 +314,97 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
 
               {/* Task-specific metadata */}
               {isTaskEvent && (
-                <div className="space-y-2">
-                    {timeblock?.priority && (
-                      <div className="flex items-center gap-2">
-                      <Flag size={14} className="text-gray-500" />
-                      <span className="text-xs text-gray-400">{timeblock.priority} priority</span>
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                  {/* Task Header */}
+                  <div className="flex items-center gap-2">
+                    <ListTodo size={16} className="text-gray-500" />
+                    <span className="text-sm font-medium text-white">Task Details</span>
+                  </div>
+
+                  {/* Task Status - Prominent Display */}
+                  {taskStatusInfo && (
+                    <div className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-lg",
+                      taskStatusInfo.bgColor
+                    )}>
+                      <taskStatusInfo.icon size={16} className={taskStatusInfo.color} />
+                      <div className="flex-1">
+                        <p className={cn("text-sm font-medium", taskStatusInfo.color)}>
+                          Status: {taskStatusInfo.label}
+                        </p>
+                        {(taskStatus || 'todo') === 'completed' && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            This task has been completed
+                          </p>
+                        )}
+                        {(taskStatus || 'todo') === 'in_progress' && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            Currently in progress
+                          </p>
+                        )}
+                        {(taskStatus || 'todo') === 'todo' && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            Ready to start
+                          </p>
+                        )}
                       </div>
-                    )}
+                    </div>
+                  )}
+
+                  {/* Priority */}
+                  {timeblock?.priority && (
+                    <div className="flex items-center gap-2">
+                      <Flag size={14} className="text-gray-500" />
+                      <span className="text-xs text-gray-400 capitalize">{timeblock.priority} priority</span>
+                    </div>
+                  )}
+
+                  {/* Estimated Duration */}
                   {timeblock?.estimatedMinutes && (
                     <div className="flex items-center gap-2">
                       <Clock size={14} className="text-gray-500" />
                       <span className="text-xs text-gray-400">Estimated {timeblock.estimatedMinutes} minutes</span>
                     </div>
                   )}
+
+                  {/* Scheduling Rationale */}
                   {timeblock?.schedulingRationale && (
                     <div className="flex items-start gap-2 pt-1">
                       <Lightbulb size={14} className="text-gray-500 shrink-0 mt-0.5" />
-                      <p className="text-xs text-gray-400 leading-relaxed">{timeblock.schedulingRationale}</p>
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-gray-300 mb-1">Why scheduled here</p>
+                        <p className="text-xs text-gray-400 leading-relaxed">{timeblock.schedulingRationale}</p>
+                      </div>
                     </div>
                   )}
+
+                  {/* Tags */}
                   {timeblock?.tags && timeblock.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-gray-300">Tags</p>
+                      <div className="flex flex-wrap gap-2">
                         {timeblock.tags.map((tag, idx) => (
                           <span
                             key={idx}
-                          className="px-2 py-1 bg-neutral-700 text-white text-xs rounded"
+                            className="px-2 py-1 bg-neutral-700 text-white text-xs rounded"
                           >
                             {tag}
                           </span>
                         ))}
                       </div>
-                    )}
+                    </div>
+                  )}
+
+                  {/* Visual Link Indicator */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <ListTodo size={12} />
+                      <span>Linked to task</span>
+                      <ArrowRight size={12} />
+                      <span className="text-gray-400">Calendar</span>
+                    </div>
                   </div>
+                </div>
               )}
             </div>
           </>

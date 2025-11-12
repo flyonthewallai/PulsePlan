@@ -178,17 +178,7 @@ export interface User {
   updated_at: string;
 }
 
-// Streak and Analytics types
-export interface Streak {
-  id: string;
-  type: 'daily_tasks' | 'weekly_goals' | 'focus_sessions';
-  current_count: number;
-  best_count: number;
-  last_activity_date: string;
-  created_at: string;
-  updated_at: string;
-}
-
+// Analytics types
 export interface DashboardStats {
   tasksCompleted: number;
   tasksOverdue: number;

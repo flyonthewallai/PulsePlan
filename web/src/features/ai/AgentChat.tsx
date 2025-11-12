@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Send, Bot, User, Sparkles, Loader2, RefreshCw } from 'lucide-react'
-import { agentAPI, tasksAPI } from '../../lib/api/sdk'
-import { cn } from '../../lib/utils'
-import { toast } from '../../lib/toast'
-import type { AgentMessage } from '../../types'
+import { agentAPI, tasksAPI } from '@/lib/api/sdk'
+import { cn } from '@/lib/utils'
+import { toast } from '@/lib/toast'
+import type { AgentMessage } from '@/types'
 
 interface AgentChatProps {
   className?: string

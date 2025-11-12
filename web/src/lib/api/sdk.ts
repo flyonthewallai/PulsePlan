@@ -11,7 +11,6 @@ import type {
   SchedulingResult,
   User,
   DashboardStats,
-  Streak,
   AgentResponse,
   ApiResponse,
   PaginatedResponse,
@@ -314,13 +313,6 @@ export const analyticsApi = {
     return response.data!;
   },
 
-  getStreaks: async () => {
-    const response = await apiClient.get<Streak[]>(API_ENDPOINTS.ANALYTICS_STREAKS);
-    if (response.error) {
-      throw new Error(response.error);
-    }
-    return response.data || [];
-  },
 };
 
 export const referralApi = {

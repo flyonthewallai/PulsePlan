@@ -1,13 +1,13 @@
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { ThemeProvider } from './theme-provider';
 import { Toaster } from '../components/ui/toaster';
 import { ErrorBoundary } from './error-boundary';
-import { TaskSuccessProvider } from '../contexts/TaskSuccessContext';
-import { TaskSuccessOverlay } from '../components/TaskSuccessOverlay';
-import { WebSocketProvider } from '../contexts/WebSocketContext';
+import { TaskSuccessProvider } from '@/contexts/TaskSuccessContext';
+import { TaskSuccessOverlay } from '../components/tasks';
+import { WebSocketProvider } from '@/contexts/WebSocketContext';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 

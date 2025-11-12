@@ -2,8 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay, isAfter } from 'date-fns';
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Calendar as CalendarIcon, BookOpen, ListTodo } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { useTimeblocks } from '../../../hooks/useTimeblocks';
-import { useTimeblockUpdates } from '../../../hooks/useTimeblockUpdates';
+import { useTimeblocks } from '@/hooks/calendar';
+import { useTimeblockUpdates } from '@/hooks/calendar';
 import type { Timeblock } from '../../../types';
 
 interface CalendarAccount {

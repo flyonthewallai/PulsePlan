@@ -127,7 +127,6 @@ export const API_ENDPOINTS = {
   
   // Analytics
   ANALYTICS_DASHBOARD: '/api/v1/analytics/dashboard',
-  ANALYTICS_STREAKS: '/api/v1/analytics/streaks',
 } as const;
 
 // Environment variables with fallbacks

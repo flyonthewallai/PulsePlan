@@ -1,20 +1,15 @@
-import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthGate } from '../features/auth/AuthGate'
-import { AuthPage } from '../pages/AuthPage'
-import { HomePage } from '../pages/HomePage'
-import { CalendarPage } from '../pages/CalendarPage'
-import { StreaksPage } from '../pages/StreaksPage'
-import { AgentPage } from '../pages/AgentPage'
-import { ChatPage } from '../pages/ChatPage'
-import { TaskboardPage } from '../pages/TaskboardPage'
-import { IntegrationsPage } from '../pages/IntegrationsPage'
-import { OAuthSuccessPage } from '../pages/OAuthSuccessPage'
-import { OAuthErrorPage } from '../pages/OAuthErrorPage'
-import { AuthCallbackPage } from '../pages/AuthCallbackPage'
-import { PomodoroPage } from '../pages/PomodoroPage'
-import { PricingPage } from '../pages/PricingPage'
-import AdminNLUPage from '../pages/AdminNLUPage'
+import { AuthPage, AuthCallbackPage, OAuthSuccessPage, OAuthErrorPage } from '../pages/auth'
+import { HomePage } from '../pages/home'
+import { CalendarPage } from '../pages/calendar'
+import { AgentPage } from '../pages/chat'
+import { ChatPage } from '../pages/chat'
+import { TaskboardPage } from '../pages/tasks'
+import { IntegrationsPage } from '../pages/integrations'
+import { PomodoroPage } from '../pages/pomodoro'
+import { PricingPage } from '../pages/pricing'
+import { AdminNLUPage } from '../pages/admin'
 import { AppShell } from '../components/layout/AppShell'
 
 function ProtectedRoutes() {
@@ -25,7 +20,6 @@ function ProtectedRoutes() {
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/taskboard" element={<TaskboardPage />} />
         <Route path="/integrations" element={<IntegrationsPage />} />
-        <Route path="/streaks" element={<StreaksPage />} />
         <Route path="/agent" element={<AgentPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/pomodoro" element={<PomodoroPage />} />

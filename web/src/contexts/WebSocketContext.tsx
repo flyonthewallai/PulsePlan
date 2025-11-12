@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import io, { Socket } from 'socket.io-client';
-import { API_BASE_URL } from '../config/api';
-import { supabase } from '../lib/supabase';
+import { API_BASE_URL } from '@/config/api';
+import { supabase } from '@/lib/supabase';
 
 interface WebSocketContextType {
   socket: Socket | null;

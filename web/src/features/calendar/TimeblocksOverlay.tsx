@@ -20,8 +20,8 @@
  */
 
 import React from 'react';
-import { useTimeblocks } from '../../hooks/useTimeblocks';
-import type { Timeblock } from '../../types';
+import { useTimeblocks } from '@/hooks/calendar';
+import type { Timeblock } from '@/types';
 
 interface TimeblocksOverlayProps {
   weekStart: Date;

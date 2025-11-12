@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { X, Calendar, Clock, Type, FileText, Tag, AlertCircle, Save, Trash2, Copy } from 'lucide-react';
+import { X, Clock, Type, FileText, AlertCircle, Save, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { CalendarEvent, Task } from '@/types';
-import { colors, VALIDATION } from '../../../lib/utils/constants';
+import { VALIDATION } from '../../../lib/utils/constants';
+import { components, typography, colors, spacing, layout } from '../../../lib/design-tokens';
 
 interface EditEventModalProps {
   isOpen: boolean;
@@ -29,13 +30,11 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     description: '',
     start: '',
     end: '',
-    priority: 'medium' as 'high' | 'medium' | 'low',
     status: 'todo' as 'todo' | 'in_progress' | 'completed',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Initialize form data when event changes
   useEffect(() => {
@@ -45,11 +44,9 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         description: event.description || '',
         start: event.start,
         end: event.end,
-        priority: event.priority || 'medium',
         status: event.task?.status || 'todo',
       });
       setErrors({});
-      setShowDeleteConfirm(false);
     }
   }, [isOpen, event]);
 
@@ -69,7 +66,6 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
       formData.description !== (event.description || '') ||
       formData.start !== event.start ||
       formData.end !== event.end ||
-      formData.priority !== (event.priority || 'medium') ||
       formData.status !== (event.task?.status || 'todo')
     );
   }, [formData, event]);
@@ -126,7 +122,6 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         description: formData.description.trim(),
         start: formData.start,
         end: formData.end,
-        priority: formData.priority,
       };
 
       // If event has a task, update task-specific fields
@@ -136,7 +131,6 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
           title: formData.title.trim(),
           description: formData.description.trim(),
           dueDate: formData.start,
-          priority: formData.priority,
           status: formData.status,
           estimatedDuration: duration,
         };
@@ -166,22 +160,9 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     }
   };
 
-  const handleDuplicate = () => {
-    if (!event || !onDuplicate) return;
-    onDuplicate(event);
-    onClose();
-  };
-
   const handleClose = () => {
     if (isSubmitting) return;
     onClose();
-  };
-
-  // Priority color mapping
-  const priorityColors = {
-    high: colors.taskColors.high,
-    medium: colors.taskColors.medium,
-    low: colors.taskColors.low,
   };
 
   // Status color mapping
@@ -194,15 +175,20 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
   if (!event || !isOpen) return null;
 
   return (
-    <div className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 transition-all duration-300 ${
-      isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-    }`} onClick={handleClose}>
+    <div
+      className={cn(
+        components.modal.overlay,
+        'z-[60]', // Higher z-index to overlay on top of EventDetailsModal (z-50)
+        'p-4',
+        isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      )}
+      onClick={handleClose}
+    >
       <div
         className={cn(
-          `border border-neutral-700 rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-auto transition-all duration-300 ${
-            isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
-          }`,
-          'bg-neutral-900',
+          components.modal.container,
+          'max-w-md max-h-[80vh] overflow-auto',
+          isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4',
           className
         )}
         onClick={(e) => e.stopPropagation()}
@@ -210,37 +196,36 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         {isOpen ? (
           <>
             {/* Header */}
-            <div className="flex items-center justify-between p-4">
-              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                <Calendar size={20} />
+            <div className={cn(components.modal.header, layout.flex.between)}>
+              <h2 className={cn(components.modal.title)}>
                 Edit Event
               </h2>
-              <div className="flex items-center gap-1">
-                {onDuplicate && (
-                  <button
-                    onClick={handleDuplicate}
-                    disabled={isSubmitting}
-                    className="p-2 hover:bg-neutral-700 rounded-lg transition-colors text-neutral-400 hover:text-white disabled:opacity-50"
-                    title="Duplicate event"
-                  >
-                    <Copy size={18} />
-                  </button>
-                )}
+              <div className="flex items-center gap-1 shrink-0 ml-2">
+                <button
+                  onClick={() => {
+                    handleDelete();
+                  }}
+                  disabled={isSubmitting}
+                  className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors disabled:opacity-50"
+                  title="Delete event"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
                 <button
                   onClick={handleClose}
                   disabled={isSubmitting}
-                  className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/60 disabled:opacity-50"
+                  className="p-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <X size={18} />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-4 space-y-3">
+            <form onSubmit={handleSubmit} className={cn(spacing.modal.content, spacing.stack.sm)}>
               {/* Title */}
               <div>
-                <label className="block text-sm font-medium text-neutral-300 mb-2 flex items-center gap-2">
+                <label className={cn(components.input.label, 'flex items-center', spacing.gap.sm)}>
                   <Type size={16} />
                   Title
                 </label>
@@ -249,13 +234,15 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                   value={formData.title}
                   onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="What are you working on?"
-                  className="w-full px-3 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white 
-                           placeholder-neutral-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 
-                           focus:outline-none transition-colors"
+                  className={cn(
+                    components.input.base,
+                    'w-full',
+                    errors.title && components.input.error
+                  )}
                   disabled={isSubmitting}
                 />
                 {errors.title && (
-                  <p className="mt-1 text-sm bg-error text-white px-2 py-1 rounded flex items-center gap-1">
+                  <p className={cn(components.input.helper, colors.text.error, 'flex items-center', spacing.gap.xs)}>
                     <AlertCircle size={14} />
                     {errors.title}
                   </p>
@@ -263,45 +250,58 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
               </div>
 
               {/* Time Range */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className={cn(layout.grid.cols2, spacing.gap.md)}>
                 <div>
-                  <label className="block text-sm font-medium text-neutral-300 mb-2">
+                  <label className={components.input.label}>
                     Start Time
                   </label>
                   <input
                     type="datetime-local"
                     value={formData.start ? format(new Date(formData.start), "yyyy-MM-dd'T'HH:mm") : ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, start: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
-                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white 
-                             focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors"
+                    className={cn(
+                      components.input.base,
+                      'w-full',
+                      errors.start && components.input.error
+                    )}
                     disabled={isSubmitting}
                   />
                   {errors.start && (
-                    <p className="mt-1 text-sm bg-error text-white px-2 py-1 rounded">{errors.start}</p>
+                    <p className={cn(components.input.helper, colors.text.error)}>{errors.start}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-neutral-300 mb-2">
+                  <label className={components.input.label}>
                     End Time
                   </label>
                   <input
                     type="datetime-local"
                     value={formData.end ? format(new Date(formData.end), "yyyy-MM-dd'T'HH:mm") : ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, end: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
-                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white 
-                             focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors"
+                    className={cn(
+                      components.input.base,
+                      'w-full',
+                      errors.end && components.input.error
+                    )}
                     disabled={isSubmitting}
                   />
                   {errors.end && (
-                    <p className="mt-1 text-sm bg-error text-white px-2 py-1 rounded">{errors.end}</p>
+                    <p className={cn(components.input.helper, colors.text.error)}>{errors.end}</p>
                   )}
                 </div>
               </div>
 
               {/* Duration Display */}
               {duration > 0 && (
-                <div className="flex items-center gap-2 text-sm text-neutral-400 bg-neutral-800/50 px-3 py-2 rounded-lg">
+                <div className={cn(
+                  'flex items-center',
+                  spacing.gap.sm,
+                  typography.body.small,
+                  colors.text.secondary,
+                  colors.bg.input,
+                  'px-3 py-2 rounded-lg'
+                )}>
                   <Clock size={14} />
                   Duration: {duration} minutes
                   {duration >= 60 && (
@@ -310,89 +310,51 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                 </div>
               )}
               {errors.duration && (
-                <p className="text-sm bg-error text-white px-2 py-1 rounded flex items-center gap-1">
+                <p className={cn(components.input.helper, colors.text.error, 'flex items-center', spacing.gap.xs)}>
                   <AlertCircle size={14} />
                   {errors.duration}
                 </p>
               )}
 
-              {/* Priority and Status */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Priority */}
+              {/* Status */}
+              {event.task && (
                 <div>
-                  <label className="block text-sm font-medium text-neutral-300 mb-2 flex items-center gap-2">
-                    <Tag size={16} />
-                    Priority
+                  <label className={components.input.label}>
+                    Status
                   </label>
-                  <div className="space-y-2">
-                    {(['high', 'medium', 'low'] as const).map((priority) => (
+                  <div className={spacing.stack.xs}>
+                    {(['todo', 'in_progress', 'completed'] as const).map((status) => (
                       <button
-                        key={priority}
+                        key={status}
                         type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, priority }))}
+                        onClick={() => setFormData(prev => ({ ...prev, status }))}
                         disabled={isSubmitting}
                         className={cn(
-                          'w-full p-2 rounded-lg border transition-all capitalize text-sm font-medium flex items-center gap-2',
-                          formData.priority === priority
+                          'w-full p-2 rounded-lg border transition-all text-sm font-medium flex items-center gap-2',
+                          formData.status === status
                             ? 'border-current text-white'
-                            : 'border-neutral-600 text-neutral-400 hover:text-white hover:border-neutral-500',
+                            : cn(colors.border.default, colors.text.secondary, 'hover:text-white hover:border-gray-600'),
                           'disabled:opacity-50 disabled:cursor-not-allowed'
                         )}
                         style={{
-                          borderColor: formData.priority === priority ? priorityColors[priority] : undefined,
-                          backgroundColor: formData.priority === priority ? `${priorityColors[priority]}20` : undefined,
+                          borderColor: formData.status === status ? statusColors[status] : undefined,
+                          backgroundColor: formData.status === status ? `${statusColors[status]}20` : undefined,
                         }}
                       >
                         <div 
                           className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: priorityColors[priority] }}
+                          style={{ backgroundColor: statusColors[status] }}
                         />
-                        {priority}
+                        {status === 'todo' ? 'To Do' : status === 'in_progress' ? 'In Progress' : 'Completed'}
                       </button>
                     ))}
                   </div>
                 </div>
-
-                {/* Status */}
-                {event.task && (
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-300 mb-2">
-                      Status
-                    </label>
-                    <div className="space-y-2">
-                      {(['todo', 'in_progress', 'completed'] as const).map((status) => (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, status }))}
-                          disabled={isSubmitting}
-                          className={cn(
-                            'w-full p-2 rounded-lg border transition-all text-sm font-medium flex items-center gap-2',
-                            formData.status === status
-                              ? 'border-current text-white'
-                              : 'border-neutral-600 text-neutral-400 hover:text-white hover:border-neutral-500',
-                            'disabled:opacity-50 disabled:cursor-not-allowed'
-                          )}
-                          style={{
-                            borderColor: formData.status === status ? statusColors[status] : undefined,
-                            backgroundColor: formData.status === status ? `${statusColors[status]}20` : undefined,
-                          }}
-                        >
-                          <div 
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: statusColors[status] }}
-                          />
-                          {status === 'todo' ? 'To Do' : status === 'in_progress' ? 'In Progress' : 'Completed'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-neutral-300 mb-2 flex items-center gap-2">
+                <label className={cn(components.input.label, 'flex items-center', spacing.gap.sm)}>
                   <FileText size={16} />
                   Description
                 </label>
@@ -401,96 +363,75 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Add notes or details..."
                   rows={3}
-                  className="w-full px-3 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white 
-                           placeholder-neutral-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 
-                           focus:outline-none transition-colors resize-none"
+                  className={cn(
+                    components.textarea.base,
+                    'w-full',
+                    errors.description && components.input.error
+                  )}
                   disabled={isSubmitting}
                 />
                 {errors.description && (
-                  <p className="mt-1 text-sm bg-error text-white px-2 py-1 rounded">{errors.description}</p>
+                  <p className={cn(components.input.helper, colors.text.error)}>{errors.description}</p>
                 )}
               </div>
 
               {/* Submit Error */}
               {errors.submit && (
-                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
-                  <p className="text-sm bg-error text-white px-2 py-1 rounded flex items-center gap-2">
+                <div className={cn('p-3 rounded-lg', colors.bg.buttonDanger, colors.border.error)}>
+                  <p className={cn(typography.body.small, colors.text.error, 'flex items-center', spacing.gap.sm)}>
                     <AlertCircle size={16} />
                     {errors.submit}
                   </p>
                 </div>
               )}
-
-              {/* Actions */}
-              <div className="flex items-center justify-between pt-4 border-t border-neutral-700/30">
-                {/* Delete Button */}
-                <div>
-                  {!showDeleteConfirm ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      disabled={isSubmitting}
-                      className="px-4 py-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg 
-                               transition-colors disabled:opacity-50 flex items-center gap-2"
-                    >
-                      <Trash2 size={16} />
-                      Delete
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleDelete}
-                        disabled={isSubmitting}
-                        className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-sm rounded 
-                                 transition-colors disabled:opacity-50"
-                      >
-                        Confirm
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowDeleteConfirm(false)}
-                        disabled={isSubmitting}
-                        className="px-3 py-1.5 text-neutral-400 hover:text-white text-sm transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Save/Cancel */}
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    disabled={isSubmitting}
-                    className="px-4 py-2 text-neutral-400 hover:text-white transition-colors disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting || !formData.title.trim() || !hasChanges}
-                    className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg 
-                             transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-                             flex items-center gap-2"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save size={16} />
-                        Save Changes
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
             </form>
+
+            {/* Actions Footer */}
+            <div className={cn(
+              spacing.modal.footer,
+              components.divider.horizontal,
+              'flex justify-end'
+            )}>
+              {/* Save/Cancel */}
+              <div className={cn('flex items-center', spacing.gap.md)}>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  disabled={isSubmitting}
+                  className={cn(
+                    components.button.base,
+                    components.button.secondary,
+                    'disabled:opacity-50'
+                  )}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || !formData.title.trim() || !hasChanges}
+                  className={cn(
+                    components.button.base,
+                    components.button.primary,
+                    'flex items-center',
+                    spacing.gap.sm,
+                    'disabled:opacity-50 disabled:cursor-not-allowed'
+                  )}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </>
         ) : null}
       </div>

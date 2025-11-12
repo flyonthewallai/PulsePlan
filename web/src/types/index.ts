@@ -49,13 +49,6 @@ export interface AgentResponse {
   timestamp?: string;
 }
 
-export interface StreakData {
-  currentStreak: number;
-  longestStreak: number;
-  totalTasks: number;
-  completionRate: number;
-}
-
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'auto';
   workingHours: {
@@ -81,6 +74,7 @@ export interface CalendarEvent {
   color?: string;
   priority?: 'high' | 'medium' | 'low';
   timeblock?: Timeblock; // Full timeblock metadata for details modal
+  recurrence?: any | null; // Recurrence rules
 }
 
 export interface Subject {
@@ -91,7 +85,7 @@ export interface Subject {
 }
 
 // Timeblocks types (unified calendar feed)
-export type TimeblockSource = "task" | "calendar" | "busy";
+export type TimeblockSource = "task" | "calendar" | "busy" | "timeblock";
 export type TimeblockProvider = "google" | "outlook" | "apple" | "pulse" | null;
 
 export interface Timeblock {
@@ -107,6 +101,7 @@ export interface Timeblock {
   description?: string | null;
   location?: string | null;
   color?: string | null;
+  type?: string | null; // Timeblock type: task_block, habit, focus, break, meeting, class, study, exam, assignment, project, hobby, admin
 
   // Rich metadata for calendar events
   htmlLink?: string | null; // Direct link to Google Calendar/Outlook
