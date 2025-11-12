@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { supabase, getSession } from '../../lib/supabase'
+import { supabase, getSession } from '@/lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 
 interface AuthGateProps {

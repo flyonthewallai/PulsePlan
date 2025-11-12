@@ -12,7 +12,7 @@ import { EventDetailsModal } from './components/EventDetailsModal';
 import { SelectionLayer } from './components/SelectionLayer';
 import { SelectionManager } from './calendar-logic/selection';
 import { OverlapCalculator, type EventLayout } from './calendar-logic/overlaps';
-import { CALENDAR_CONSTANTS } from '../../lib/utils/constants';
+import { CALENDAR_CONSTANTS } from '@/lib/utils/constants';
 
 import type { CalendarEvent, CreateTaskData } from '@/types';
 import {
@@ -21,13 +21,13 @@ import {
   useUpdateCalendarEvent,
   useDeleteCalendarEvent,
   useDuplicateCalendarEvent,
-} from '../../hooks/useCalendarEvents';
-import { useTimeblocks } from '../../hooks/useTimeblocks';
+} from '@/hooks/calendar';
+import { useTimeblocks } from '@/hooks/calendar';
 import {
   useScreenReaderAnnouncements
-} from '../../hooks/useKeyboardNavigation';
-import { cn } from '../../lib/utils';
-import type { Timeblock } from '../../types';
+} from '@/hooks/ui';
+import { cn } from '@/lib/utils';
+import type { Timeblock } from '@/types';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface DailyCalendarProps {
@@ -535,7 +535,7 @@ export function DailyCalendar({
         onSubmit={async (prompt) => {
           if (!newEventData) return;
           // Use API service to create event with AI extraction
-          const { apiService } = await import('../../services/apiService');
+          const { apiService } = await import('@/services/core/apiService');
           const newEvent = await apiService.createEventWithAI(prompt, {
             start: newEventData.start,
             end: newEventData.end,

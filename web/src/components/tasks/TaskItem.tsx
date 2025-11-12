@@ -1,6 +1,6 @@
 import React from 'react'
 import { CheckSquare, Square, Calendar, Clock, Flag } from 'lucide-react'
-import { useTaskMutations } from '../../hooks/useTaskMutations'
+import { useTaskMutations } from '@/hooks/tasks'
 import { cn } from '../../lib/utils'
 import { format } from 'date-fns'
 import type { Task } from '../../types'

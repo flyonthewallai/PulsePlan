@@ -29,8 +29,6 @@ export function dateToGridY(date: Date, startHour: number): number {
   // Convert to pixels
   const y = (minutesFromGridStart / 60) * HOUR_HEIGHT;
 
-  console.log(`[dateToGridY] ${hour}:${String(minute).padStart(2, '0')} with startHour=${startHour} → minutesFromStart=${minutesFromGridStart}, y=${y}px`);
-
   return y;
 }
 
@@ -77,11 +75,6 @@ export function calculateEventPosition(
     const top = -(ALL_DAY_ROW_HEIGHT) + (stackIndex * (eventHeight + verticalGap)) + 4; // Negative offset + stacking
     const height = eventHeight;
 
-    console.log(`🟢 [NEW POSITIONING] All-Day "${(event as any).title}":`, {
-      top, left, width, height, dayIndex, stackIndex,
-      explanation: 'Negative top positions event in all-day row above time grid'
-    });
-
     return { left, top, width, height };
   }
 
@@ -96,12 +89,6 @@ export function calculateEventPosition(
   const durationMs = endDate.getTime() - startDate.getTime();
   const durationMinutes = durationMs / (1000 * 60);
   const height = Math.max((durationMinutes / 60) * HOUR_HEIGHT, 20);
-
-  console.log(`🔵 [NEW POSITIONING] Timed "${(event as any).title}":`, {
-    hour, minute, startHour,
-    gridY, top, left, width, height, dayIndex,
-    explanation: 'Top is relative to time grid start (overlay container)'
-  });
 
   return { left, top, width, height };
 }

@@ -4,10 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { User, Mail, Calendar, MapPin, Save } from 'lucide-react'
-import { userAPI } from '../../lib/api/sdk'
-import { getCurrentUser } from '../../lib/supabase'
-import { cn } from '../../lib/utils'
-import { toast } from '../../lib/toast'
+import { userAPI } from '@/lib/api/sdk'
+import { getCurrentUser } from '@/lib/supabase'
+import { cn } from '@/lib/utils'
+import { toast } from '@/lib/toast'
 
 const profileSchema = z.object({
   full_name: z.string().min(2, 'Name must be at least 2 characters'),

@@ -1,0 +1,2 @@
+export { PricingPage } from './PricingPage'
+

@@ -12,8 +12,8 @@ import { EventDetailsModal } from './components/EventDetailsModal';
 import { SelectionLayer } from './components/SelectionLayer';
 import { SelectionManager } from './calendar-logic/selection';
 import { OverlapCalculator, type EventLayout } from './calendar-logic/overlaps';
-import { CALENDAR_CONSTANTS } from '../../lib/utils/constants';
-import { ErrorBoundary } from '../../components/ui/ErrorBoundary';
+import { CALENDAR_CONSTANTS } from '@/lib/utils/constants';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
 import type { CalendarEvent, CreateTaskData } from '@/types';
 import {
@@ -22,13 +22,13 @@ import {
   useUpdateCalendarEvent,
   useDeleteCalendarEvent,
   useDuplicateCalendarEvent,
-} from '../../hooks/useCalendarEvents';
-import { useTimeblocks } from '../../hooks/useTimeblocks';
+} from '@/hooks/calendar';
+import { useTimeblocks } from '@/hooks/calendar';
 import {
   useScreenReaderAnnouncements
-} from '../../hooks/useKeyboardNavigation';
-import { cn } from '../../lib/utils';
-import type { Timeblock } from '../../types';
+} from '@/hooks/ui';
+import { cn } from '@/lib/utils';
+import type { Timeblock } from '@/types';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface WeeklyCalendarProps {
@@ -92,15 +92,6 @@ function WeeklyCalendarCore({
 
   // Convert timeblocks to CalendarEvent format for rendering
   const timeblockEvents: CalendarEvent[] = timeblocks.map((block: Timeblock) => {
-    // DEBUG: Log all-day status
-    if (block.title.includes('Halloween') || block.title.includes('Daylight')) {
-      console.log(`[Timeblock] ${block.title}:`, {
-        isAllDay: block.isAllDay,
-        start: block.start,
-        end: block.end
-      });
-    }
-
     return {
       id: block.id,
       title: block.title,
@@ -225,10 +216,6 @@ function WeeklyCalendarCore({
         const timedEvents = dayEvents.filter(e => !e.allDay);
         const allDayEvents = dayEvents.filter(e => e.allDay);
 
-        // DEBUG: Log event categorization
-        console.log(`[Day ${dayIndex}] Total: ${dayEvents.length}, Timed: ${timedEvents.length}, All-Day: ${allDayEvents.length}`);
-        allDayEvents.forEach(e => console.log(`  All-Day: ${e.title}, allDay=${e.allDay}`));
-
         // Process timed events (go in the time grid)
         if (timedEvents.length > 0) {
           const dayLayouts = OverlapCalculator.calculateEventLayouts(timedEvents, columnWidth, START_HOUR);
@@ -261,16 +248,8 @@ function WeeklyCalendarCore({
               laneCount: 1,
               zIndex: 10, // Higher z-index so they appear above time grid
             };
-            console.log(`[All-Day Layout] Setting ${event.title} to y=${allDayLayout.y}px (height=${EVENT_HEIGHT}px)`);
-
-            // Check if this ID already exists
-            if (layouts.has(allDayLayout.id)) {
-              console.warn(`⚠️ OVERWRITING layout for ${event.title}! Old:`, layouts.get(allDayLayout.id));
-            }
 
             layouts.set(allDayLayout.id, allDayLayout);
-
-            console.log(`[All-Day Layout] After set, y=${layouts.get(allDayLayout.id)?.y}px`);
           });
         }
       }
@@ -330,7 +309,8 @@ function WeeklyCalendarCore({
 
   const handleEventEdit = useCallback((event: CalendarEvent) => {
     setSelectedEvent(event);
-    setShowEditEventModal(true);
+    setShowDetailsModal(false); // Close details modal
+    setShowEditEventModal(true); // Open edit modal
   }, []);
 
   // Selection rendering handled by SelectionLayer
@@ -439,25 +419,10 @@ function WeeklyCalendarCore({
     const coords = clientToGridCoords(e.clientX, e.clientY);
     if (!coords) return;
 
-    // DEBUG: Log click coordinates
-    console.group('🖱️ CLICK DEBUG');
-    console.log('Client coords:', { x: e.clientX, y: e.clientY });
-    console.log('Grid coords:', coords);
-    console.log('Day index:', coords.dayIndex);
-    console.log('Base date:', getBaseDateForDay(coords.dayIndex).toDateString());
-    console.groupEnd();
-
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     const baseDate = getBaseDateForDay(coords.dayIndex);
     const next = SelectionManager.startSelection(coords.x, coords.y, coords.dayIndex, baseDate, START_HOUR);
-
-    // DEBUG: Log selection state
-    console.group('📐 SELECTION START');
-    console.log('Selection state:', next);
-    console.log('Start time:', next.startTime?.toLocaleString());
-    console.log('Start Y:', next.startY);
-    console.groupEnd();
 
     setSelection(next);
     setIsSelecting(true);
@@ -543,7 +508,7 @@ function WeeklyCalendarCore({
   const handleAIPromptSubmit = useCallback(async (prompt: string) => {
     if (!newEventData) return;
     // Use API service to create event with AI extraction
-    const { apiService } = await import('../../services/apiService');
+    const { apiService } = await import('@/services/core/apiService');
     const newEvent = await apiService.createEventWithAI(prompt, {
       start: newEventData.start,
       end: newEventData.end,
@@ -765,6 +730,8 @@ function WeeklyCalendarCore({
           setShowDetailsModal(false);
           setSelectedEvent(null);
         }}
+        onEdit={handleEventEdit}
+        onDelete={handleDeleteEvent}
       />
 
       <EditEventModal

@@ -1,9 +1,8 @@
 import React from 'react';
 import { Calendar, Plus, Sparkles, BarChart3 } from 'lucide-react';
 import { X, Maximize2 } from 'lucide-react';
-import AnimatedThinkingText from '../../../components/AnimatedThinkingText';
-import PulseTrace from '../../../components/PulseTrace';
-import { CommandInput } from '../../../components/CommandInput';
+import { AnimatedThinkingText, PulseTrace } from '../../../components/ui/common';
+import { CommandInput } from '../../../components/commands';
 
 interface Message {
   id: string;
@@ -158,6 +157,7 @@ export const PulseChatSidebar: React.FC<PulseChatSidebarProps> = ({
           onSubmit={onSendMessage}
           disabled={isTyping}
           placeholder="Ask anything..."
+          textSize="sm"
         />
       </div>
     </div>

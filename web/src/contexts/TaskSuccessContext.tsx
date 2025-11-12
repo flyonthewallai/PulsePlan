@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { Task } from '../types'
-import { useWebSocket } from './WebSocketContext'
+import type { Task } from '@/types'
+import { useWebSocket } from '@/contexts/WebSocketContext'
 
 // ============================================================================
 // TYPE DEFINITIONS - No more 'any' types!
@@ -67,6 +67,22 @@ interface WebSocketEventData {
 // CONTEXT TYPE - Proper React Context pattern instead of globals
 // ============================================================================
 
+interface ScheduleData {
+  schedule?: Array<{
+    title: string
+    start_time: string
+    end_time: string
+    duration?: number
+    type?: string
+  }>
+  commit_info?: {
+    blocks_committed: number
+    status: string
+  }
+  message?: string
+  status?: string
+}
+
 interface TaskSuccessContextType {
   showSuccessCard: boolean
   successTask: Task | null
@@ -82,6 +98,8 @@ interface TaskSuccessContextType {
   registerSimpleSuccessHandler: (handler: (operation: string, entityType: string, entityTitle: string, card: CrudCard, acknowledgementMessage?: string) => void) => void
   registerSearchResultsHandler: (handler: (searchData: SearchData) => void) => void
   registerUpdateTaskHandler: (handler: (taskId: string, updates: Partial<Task>) => void) => void
+  registerSchedulingWorkflowHandler: (handler: () => void) => void
+  registerSchedulingCompletionHandler: (handler: (scheduleData: ScheduleData) => void) => void
 }
 
 const TaskSuccessContext = createContext<TaskSuccessContextType | undefined>(undefined)
@@ -108,6 +126,11 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
   const simpleSuccessHandlerRef = useRef<((operation: string, entityType: string, entityTitle: string, card: CrudCard, acknowledgementMessage?: string) => void) | null>(null)
   const searchResultsHandlerRef = useRef<((searchData: SearchData) => void) | null>(null)
   const updateTaskHandlerRef = useRef<((taskId: string, updates: Partial<Task>) => void) | null>(null)
+  const schedulingWorkflowHandlerRef = useRef<(() => void) | null>(null)
+  const schedulingCompletionHandlerRef = useRef<((scheduleData: ScheduleData) => void) | null>(null)
+  
+  // Queue for conversational messages that arrive before handler is registered
+  const conversationalMessageQueueRef = useRef<Array<{ message: string; metadata?: ConversationalMetadata }>>([])
 
   // Helper function to extract task from various event structures
   const extractTask = (data: WebSocketEventData): Task | null => {
@@ -250,9 +273,10 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
     // Conversational response event
     socket.on('conversational_response', (data: WebSocketEventData) => {
       const responseData = data.data || data
-      
-      if (conversationalHandlerRef.current && 'message' in responseData) {
-        conversationalHandlerRef.current(responseData.message as string, {
+
+      if ('message' in responseData) {
+        const message = responseData.message as string
+        const metadata: ConversationalMetadata = {
           can_retry: responseData.can_retry as boolean | undefined,
           retry_suggestion: responseData.retry_suggestion as string | undefined,
           found_tasks: responseData.found_tasks as Task[] | undefined,
@@ -261,7 +285,42 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
           entity_type: responseData.entity_type as string | undefined,
           original_query: responseData.original_query as string | undefined,
           workflow_context: responseData.workflow_context as Record<string, unknown> | undefined
-        })
+        }
+
+        if (conversationalHandlerRef.current) {
+          conversationalHandlerRef.current(message, metadata)
+        } else {
+          // Queue the message to be processed when handler is registered
+          conversationalMessageQueueRef.current.push({ message, metadata })
+        }
+      }
+    })
+
+    // Scheduling workflow started event
+    socket.on('workflow_started', (data: any) => {
+      console.log('[TaskSuccessContext] workflow_started event received:', data)
+
+      // The message structure is: { user_id, event_type, data: { workflow_type, workflow_id }, timestamp }
+      const workflowType = data.data?.workflow_type || data.workflow_type
+      console.log('[TaskSuccessContext] workflow_type:', workflowType)
+
+      if (workflowType === 'scheduling' && schedulingWorkflowHandlerRef.current) {
+        console.log('[TaskSuccessContext] Calling schedulingWorkflowHandlerRef')
+        schedulingWorkflowHandlerRef.current()
+      }
+    })
+
+    // Scheduling workflow completed event
+    socket.on('scheduling_completed', (message: any) => {
+      console.log('[TaskSuccessContext] scheduling_completed event received:', message)
+
+      // Extract the actual data from the WebSocket message structure
+      // WebSocket messages have the format: { user_id, event_type, data, timestamp, conversation_context }
+      const scheduleData = message.data || message
+
+      if (schedulingCompletionHandlerRef.current) {
+        console.log('[TaskSuccessContext] Calling schedulingCompletionHandlerRef with data:', scheduleData)
+        schedulingCompletionHandlerRef.current(scheduleData)
       }
     })
 
@@ -295,6 +354,8 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
       socket.off('task_completed')
       socket.off('workflow_update')
       socket.off('conversational_response')
+      socket.off('workflow_started')
+      socket.off('scheduling_completed')
     }
   }, [socket, isConnected, queryClient])
 
@@ -329,6 +390,15 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
 
   const registerConversationalHandler = (handler: (message: string, metadata?: ConversationalMetadata) => void) => {
     conversationalHandlerRef.current = handler
+    
+    // Process any queued messages
+    if (conversationalMessageQueueRef.current.length > 0) {
+      const queue = [...conversationalMessageQueueRef.current]
+      conversationalMessageQueueRef.current = []
+      queue.forEach(({ message, metadata }) => {
+        handler(message, metadata)
+      })
+    }
   }
 
   const registerSimpleSuccessHandler = (handler: (operation: string, entityType: string, entityTitle: string, card: CrudCard, acknowledgementMessage?: string) => void) => {
@@ -341,6 +411,14 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
 
   const registerUpdateTaskHandler = (handler: (taskId: string, updates: Partial<Task>) => void) => {
     updateTaskHandlerRef.current = handler
+  }
+
+  const registerSchedulingWorkflowHandler = (handler: () => void) => {
+    schedulingWorkflowHandlerRef.current = handler
+  }
+
+  const registerSchedulingCompletionHandler = (handler: (scheduleData: ScheduleData) => void) => {
+    schedulingCompletionHandlerRef.current = handler
   }
 
   return (
@@ -359,6 +437,8 @@ export function TaskSuccessProvider({ children }: TaskSuccessProviderProps) {
         registerSimpleSuccessHandler,
         registerSearchResultsHandler,
         registerUpdateTaskHandler,
+        registerSchedulingWorkflowHandler,
+        registerSchedulingCompletionHandler,
       }}
     >
       {children}

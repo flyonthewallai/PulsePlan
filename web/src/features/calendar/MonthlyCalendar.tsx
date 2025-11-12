@@ -3,7 +3,7 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSa
 import { CreateEventTaskModal } from './components/CreateEventTaskModal';
 import { EditEventModal } from './components/EditEventModal';
 import { EventDetailsModal } from './components/EventDetailsModal';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 import type { CalendarEvent } from '@/types';
 import {
@@ -12,12 +12,12 @@ import {
   useUpdateCalendarEvent,
   useDeleteCalendarEvent,
   useDuplicateCalendarEvent,
-} from '../../hooks/useCalendarEvents';
-import { useTimeblocks } from '../../hooks/useTimeblocks';
+} from '@/hooks/calendar';
+import { useTimeblocks } from '@/hooks/calendar';
 import {
   useScreenReaderAnnouncements
-} from '../../hooks/useKeyboardNavigation';
-import type { Timeblock } from '../../types';
+} from '@/hooks/ui';
+import type { Timeblock } from '@/types';
 
 interface MonthlyCalendarProps {
   onEventClick?: (event: CalendarEvent) => void;

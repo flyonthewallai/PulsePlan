@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { format } from 'date-fns'
-import { CommandInput } from '../../../components/CommandInput'
+import { CommandInput } from '../../../components/commands'
 
 interface AIEventPromptProps {
   isOpen: boolean

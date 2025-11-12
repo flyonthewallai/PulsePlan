@@ -18,12 +18,12 @@ import {
 import { cn } from '../../lib/utils'
 import { typography, colors, components, cn as cnTokens } from '../../lib/design-tokens'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
-import { SettingsModal } from '../SettingsModal'
-import { ReferralModal } from '../ReferralModal'
-import { AmbassadorModal } from '../AmbassadorModal'
-import { useAuthWebSocket } from '../../hooks/useAuthWebSocket'
+import { SettingsModal } from '../modals'
+import { ReferralModal } from '../modals'
+import { AmbassadorModal } from '../modals'
+import { useAuthWebSocket } from '@/hooks/ui'
 import { ProfilePicture } from '../ui/ProfilePicture'
-import { useProfile } from '../../hooks/useProfile'
+import { useProfile } from '@/hooks/profile'
 
 interface AppShellProps {
   children: React.ReactNode

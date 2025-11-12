@@ -3,12 +3,12 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { X, Calendar, Clock, Flag, Tag } from 'lucide-react'
-import { cn } from '../../lib/utils'
-import { typography, components, spacing } from '../../lib/design-tokens'
-import { useTaskMutations } from '../../hooks/useTaskMutations'
-import type { Task, CreateTaskData } from '../../types'
+import { cn } from '@/lib/utils'
+import { typography, components, spacing } from '@/lib/design-tokens'
+import { useTaskMutations } from '@/hooks/tasks'
+import type { Task, CreateTaskData } from '@/types'
 import { format, parseISO } from 'date-fns'
-import { DateTimePicker } from '../../components/ui/DateTimePicker'
+import { DateTimePicker } from '@/components/ui/DateTimePicker'
 
 const taskSchema = z.object({
   title: z.string().min(1, 'Title is required').max(100, 'Title too long'),

@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Maximize2, Square, ChevronDown, Search, CheckSquare, FileText } from 'lucide-react'
-import { CommandInput } from '../../../components/CommandInput'
-import AnimatedThinkingText from '../../../components/AnimatedThinkingText'
-import PulseTrace from '../../../components/PulseTrace'
+import { CommandInput } from '../../../components/commands'
+import { AnimatedThinkingText, PulseTrace } from '../../../components/ui/common'
 import { agentAPI } from '../../../lib/api/sdk'
 
 interface Message {
